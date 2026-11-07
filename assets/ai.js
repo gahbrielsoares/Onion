@@ -112,10 +112,15 @@ const AI = (() => {
   function cachedModels(provider, stage) { return cfg.models[provider + ":" + stage] || []; }
   function pickDefault(stage, ids) {
     if (!ids.length) return "";
-    if (stage === "text") return ids.find(s => /sonnet/i.test(s)) || ids.find(s => /pro/i.test(s) && !/preview/i.test(s)) || ids.find(s => /flash/i.test(s) && !/lite|preview/i.test(s)) || ids[0];
-    if (stage === "image") return ids.find(s => /flash/i.test(s) && !/lite/i.test(s)) || ids[0];
-    if (stage === "voice") return ids.find(s => /multilingual|flash/i.test(s) && !/lite/i.test(s)) || ids[0];
-    return ids[0];
+    const ver = x => (x.match(/(\d+(?:\.\d+)?)/) || [0, 0])[1] * 1;
+    const stable = ids.filter(x => !/preview|exp|lite|latest|\d{3,}$/i.test(x));
+    const pool = stable.length ? stable : ids;
+    if (stage === "text") {
+      const claude = pool.find(x => /sonnet/i.test(x)); if (claude) return claude;
+      // a versão mais nova; empate: pro > flash
+      return [...pool].sort((a, b) => ver(b) - ver(a) || (/pro/i.test(b) - /pro/i.test(a)))[0];
+    }
+    return [...pool].sort((a, b) => ver(b) - ver(a))[0];
   }
   function pickQuick(ids) {
     return ids.find(s => /haiku/i.test(s)) || ids.find(s => /flash-lite|(^|-)mini\b/i.test(s)) || ids.find(s => /flash/i.test(s)) || "";

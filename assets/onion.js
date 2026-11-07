@@ -892,7 +892,8 @@ VIEWS.admin=()=>{ const c=AI.get(); return `
   <div class="btns"><button class="btn ghost small" id="aclear">Apagar todas as chaves deste navegador</button></div>`; };
 BIND.admin=el=>{
   Object.keys(AI.STAGES).forEach(st=>{
-    bindPills(el,"prov-"+st,v=>{ AI.setStage(st,{provider:v,model:"",...(st==="text"?{quick:""}:{})}); const ids=AI.cachedModels(v,st); if(ids.length) AI.setStage(st,{model:AI.pickDefault(st,ids),...(st==="text"?{quick:AI.pickQuick(ids)}:{})}); admMsg[st]=null; renderPanel(); });
+    bindPills(el,"prov-"+st,v=>{ AI.setStage(st,{provider:v,model:"",...(st==="text"?{quick:""}:{})}); const ids=AI.cachedModels(v,st); if(ids.length) AI.setStage(st,{model:AI.pickDefault(st,ids),...(st==="text"?{quick:AI.pickQuick(ids)}:{})}); admMsg[st]=null; renderPanel();
+      if(!ids.length && !AI.PROVIDERS[v].noKey && AI.get().keys[v]){ const b=document.querySelector(`[data-test="${st}"]`); if(b) b.click(); } });
   });
   el.querySelectorAll("[data-key]").forEach(i=>i.onchange=()=>{ AI.setKey(i.dataset.key,i.value); });
   el.querySelectorAll("[data-show]").forEach(b=>b.onclick=()=>{ const i=el.querySelector("#"+b.dataset.show); i.type=i.type==="password"?"text":"password"; });
@@ -908,6 +909,14 @@ BIND.admin=el=>{
       AI.setStage(st,patch);
       admMsg[st]= ids.length ? {ok:true,text:`✓ Chave aceita. ${ids.length} modelo${ids.length>1?"s":""} disponíve${ids.length>1?"is":"l"} pra ${AI.STAGES[st].name.toLowerCase()}.`}
                              : {ok:false,text:"A chave funciona, mas esta conta não tem modelos pra esta etapa. Escolha outro provedor."};
+      // a mesma chave serve pras outras etapas do mesmo provedor: carrega os modelos delas também
+      for(const o of Object.keys(AI.STAGES)){
+        if(o===st||AI.get()[o].provider!==p) continue;
+        try{ const ids2=await AI.listModels(p,o); const c2=AI.get()[o];
+          if(!c2.model||!ids2.includes(c2.model)) AI.setStage(o,{model:AI.pickDefault(o,ids2)});
+          admMsg[o]= ids2.length?{ok:true,text:`✓ Configurado junto com ${AI.STAGES[st].name}. ${ids2.length} modelo${ids2.length>1?"s":""} disponíve${ids2.length>1?"is":"l"}.`}:{ok:false,text:"Esta conta não tem modelos pra esta etapa. Escolha outro provedor."};
+        }catch(e){}
+      }
     }catch(e){ admMsg[st]={ok:false,text:e.message||"Não deu pra testar a chave."}; }
     renderPanel(); showInfo(null); renderProd();
   });
