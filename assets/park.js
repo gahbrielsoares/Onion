@@ -481,6 +481,57 @@ B.forEach(b => {
 });
 document.getElementById("agents").textContent = B.reduce((a, b) => a + b.desks.length, 0) + walkers.length + chatters.length;
 
+/* ============ GERENTE (piloto automático) ============ */
+let manager = null;
+const MGR_LOOK = { skin: "#e2ad86", hair: "#1c1c22", shirt: "#2b3142", pants: "#1f2330", style: 0 };
+function doorOf(k) { const b = BK[k]; if (!b) return [26.5, 22.5]; if (b.k === "arquivo") return [b.gx + b.w / 2, b.gy + b.d + .6]; return [b.gx + Math.max(1, Math.floor(b.w / 2) - .5) + .5, b.gy + b.d + .6]; }
+function routeTo(fx, fy, tx, ty) {
+  const key = (x, y) => y * GW + x, cost = (x, y) => { const t = tileType(x, y); if (t === "void" || t === "water" || t === "lot" || nearFountain(x, y)) return Infinity; return isWalk(t) ? 1 : 3.5; };
+  const sx = Math.floor(fx), sy = Math.floor(fy), ex = Math.floor(tx), ey = Math.floor(ty);
+  const dist = new Map([[key(sx, sy), 0]]), prev = new Map(), open = [[0, sx, sy]];
+  while (open.length) {
+    open.sort((a, b) => a[0] - b[0]); const [d, x, y] = open.shift();
+    if (x === ex && y === ey) break;
+    if (d > (dist.get(key(x, y)) ?? Infinity)) continue;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, ny = y + dy; const c = (nx === ex && ny === ey) ? 1 : cost(nx, ny); if (!isFinite(c)) continue;
+      const nd = d + c; if (nd < (dist.get(key(nx, ny)) ?? Infinity)) { dist.set(key(nx, ny), nd); prev.set(key(nx, ny), [x, y]); open.push([nd, nx, ny]); }
+    }
+  }
+  const path = []; let cur = [ex, ey];
+  if (!prev.has(key(ex, ey))) return [[tx, ty]];
+  while (cur && !(cur[0] === sx && cur[1] === sy)) { path.unshift([cur[0] + .5, cur[1] + .5]); cur = prev.get(key(cur[0], cur[1])); }
+  path.push([tx, ty]); return path;
+}
+function mgrGo(k, say) {
+  return new Promise(res => {
+    const [tx, ty] = doorOf(k);
+    if (!manager) { const [sx, sy] = doorOf("auto"); manager = { x: sx, y: sy, path: [], dir: 1, say: "" }; }
+    manager.say = say || ("indo pra " + (BK[k] ? BK[k].n : "praça")); manager.k = k;
+    if (manager.res) manager.res();
+    manager.path = routeTo(manager.x, manager.y, tx, ty); manager.res = res;
+    if (document.hidden) mgrArrive();
+  });
+}
+function mgrArrive() { if (!manager) return; const p = manager.path[manager.path.length - 1]; if (p) { manager.x = p[0]; manager.y = p[1]; } manager.path = []; const r = manager.res; manager.res = null; if (r) r(); }
+function mgrSay(t) { if (manager) manager.say = t; }
+function mgrLeave() { manager = null; }
+document.addEventListener("visibilitychange", () => { if (document.hidden && manager && manager.path.length) mgrArrive(); });
+function updateManager() {
+  if (!manager || !manager.path.length) return;
+  const [tx, ty] = manager.path[0], dx = tx - manager.x, dy = ty - manager.y, d = Math.hypot(dx, dy), sp = .17;
+  if (d <= sp) { manager.x = tx; manager.y = ty; manager.path.shift(); if (!manager.path.length) mgrArrive(); }
+  else { manager.x += dx / d * sp; manager.y += dy / d * sp; manager.dir = (dx + dy) >= 0 ? 1 : -1; }
+}
+function drawManager(g) {
+  const [x0, y0] = W(manager.x, manager.y), x = Math.round(x0), y = Math.round(y0), walking = manager.path.length > 0;
+  blob(g, x, y + 1, 7, 2, "rgba(224,177,74,.45)");
+  drawPersonAt(g, x, y, MGR_LOOK, manager.dir > 0 ? "front" : "back", walking ? (frame >> 2) % 2 : 0);
+  g.fillStyle = "#e0b14a"; g.fillRect(x - 1, y - 9, 2, 3);            // gravata
+  g.fillStyle = "#c9a26b"; g.fillRect(x + 4, y - 10, 4, 5); g.fillStyle = "#ffffff"; g.fillRect(x + 5, y - 9, 2, 3);   // prancheta
+  const s = ((frame >> 3) % 2) ? "#ffd166" : "#f2b82e"; g.fillStyle = s; g.fillRect(x - 1, y - 25, 3, 1); g.fillRect(x, y - 26, 1, 3);   // estrela
+}
+
 /* ============ RENDER ============ */
 const cv = document.getElementById("park"), ctx = cv.getContext("2d");
 const low = canvas(10, 10), lc = low.getContext("2d");
@@ -559,7 +610,8 @@ function updateWalkers() {
   for (let i = walkers.length - 1; i >= 0; i--) if (walkers[i].dead) walkers.splice(i, 1);
 }
 function render() {
-  frame++; updateWalkers();
+  frame++; updateWalkers(); updateManager();
+  if (manager && typeof AP !== "undefined" && AP.on && AP.follow && !drag) { const [mx, my] = W(manager.x, manager.y), visW = (panelKey && vw > 720) ? vw - Math.min(470, vw) : vw; camX += (mx - visW / zoom / 2 - camX) * .07; camY += (my - vh / zoom / 2 - camY) * .07; clampCam(); }
   const g = lc; g.setTransform(1, 0, 0, 1, 0, 0);
   g.fillStyle = "#2f6b2a"; g.fillRect(0, 0, low.width, low.height);
   const cx = Math.round(camX), cy = Math.round(camY);
@@ -577,6 +629,7 @@ function render() {
   chatters.forEach(p => objs.push({ d: p.x + p.y, f: () => { const [x, y] = W(p.x, p.y); drawPersonAt(g, x, y - (((frame + p.ph) >> 4) % 5 === 0 ? 1 : 0), p, "front", 0); } }));
   B.forEach(b => objs.push({ d: b.gx + b.gy + (b.w + b.d) / 2, f: () => drawBuilding(g, b) }));
   objs.push({ d: 27 + 24, f: () => drawFountain(g) });
+  if (manager) objs.push({ d: manager.x + manager.y + .01, f: () => drawManager(g) });
   objs.sort((a, b2) => a.d - b2.d).forEach(o => o.f());
   // pássaros passando
   birds.forEach((bd, i) => { bd.x += bd.sp; if (bd.x > WORLD_W + 60) { bd.x = -80; bd.y = 60 + R() * 300; } const y = bd.y + Math.sin(frame / 15 + i) * 6, wing = (frame >> 2) % 2;
@@ -584,7 +637,7 @@ function render() {
     g.fillStyle = "rgba(28,70,24,.18)"; g.fillRect(Math.round(bd.x) + 30, Math.round(y) + 140, 4, 1); });
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
   ctx.drawImage(low, 0, 0, low.width, low.height, -(camX - cx) * zoom * dpr, -(camY - cy) * zoom * dpr, low.width * zoom * dpr, low.height * zoom * dpr);
-  drawLabels();
+  drawLabels(); drawManagerLabel();
 }
 function toScreen(wx, wy) { return [(wx - camX) * zoom, (wy - camY) * zoom]; }
 function drawLabels() {
@@ -619,6 +672,18 @@ function drawLabels() {
     }
   });
 }
+function drawManagerLabel() {
+  if (!manager) return;
+  const [wx, wy] = W(manager.x, manager.y); const [x, y] = toScreen(wx, wy - 30);
+  ctx.font = `700 12px "Figtree", sans-serif`; ctx.textBaseline = "middle";
+  const t1 = "Gerente", t2 = manager.say || ""; const w = Math.max(ctx.measureText(t1).width, ctx.measureText(t2).width) + 22;
+  const bx = Math.round(x - w / 2), by = Math.round(y - 40);
+  ctx.fillStyle = "rgba(40,30,60,.25)"; ctx.fillRect(bx + 2, by + 2, Math.round(w), 34);
+  ctx.fillStyle = "#fff8e6"; ctx.fillRect(bx, by, Math.round(w), 34); ctx.fillStyle = "#e0b14a"; ctx.fillRect(bx, by, Math.round(w), 2);
+  ctx.fillStyle = "#8a6a1f"; ctx.fillText("★ " + t1, bx + 9, by + 11);
+  ctx.fillStyle = "#2b2340"; ctx.font = `500 12px "Figtree", sans-serif`; ctx.fillText(t2, bx + 9, by + 25);
+  ctx.fillStyle = "#fff8e6"; for (let i = 0; i < 5; i++) ctx.fillRect(Math.round(x) - 5 + i, by + 34 + i, 11 - i * 2, 1);
+}
 let last = 0;
 function loop(t) { if (t - last > 45) { last = t; render(); } requestAnimationFrame(loop); }
 
@@ -648,6 +713,7 @@ function setZoom(z, sx = vw / 2, sy = vh / 2) {
 document.getElementById("zoomIn").onclick = () => setZoom(zoom + 1);
 document.getElementById("zoomOut").onclick = () => setZoom(zoom - 1);
 document.getElementById("libBtn").onclick = () => openPanel("arquivo");
+document.getElementById("autoBtn").onclick = () => openPanel("auto");
 document.getElementById("admBtn").onclick = () => openPanel("admin");
 window.addEventListener("resize", resize);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closePanel(); });

@@ -140,6 +140,8 @@ const Cut = (() => {
       const b = await Store.get(`p${P.id}:scene:${j}`);
       try { bitmaps.push(b ? await createImageBitmap(b) : null); } catch (e) { bitmaps.push(null); }
     }
+    // cena sem imagem usa a vizinha mais próxima
+    for (let j = 0; j < sc; j++) if (!bitmaps[j]) { for (let d = 1; d < sc; d++) { const v = bitmaps[j - d] || bitmaps[j + d]; if (v) { bitmaps[j] = v; break; } } }
     // forma de onda pra linha do tempo
     const env = envelope(audio, Math.max(480, Math.floor(audio.length / 240))); const mx = Math.max(...env) || 1;
     const wave = Array.from(env).map(v => v / mx);

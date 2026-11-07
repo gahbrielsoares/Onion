@@ -11,7 +11,7 @@ let busy = null; // {k, role, action, ctl, cancel}
 const STAGES = ["titulos","roteiro","descricao","capa","imagens","narracao","montagem"];
 const STAGE_LABEL = {titulos:"Título",roteiro:"Roteiro",descricao:"Descrição",capa:"Capa",imagens:"Imagens",narracao:"Voz",montagem:"Edição"};
 function isUnlocked(k){
-  if (k==="virais"||k==="ideias"||k==="arquivo"||k==="admin") return true;
+  if (k==="virais"||k==="ideias"||k==="arquivo"||k==="admin"||k==="auto") return true;
   const P=S.project; if(!P) return false;
   const i=STAGES.indexOf(k); for(let j=0;j<i;j++) if(!P.done[STAGES[j]]) return false;
   return true;
@@ -67,11 +67,12 @@ function showInfo(b){
 }
 function renderProd(){
   const el=document.getElementById("prod"); const P=S.project;
+  const ap=(typeof AP!=="undefined"&&AP.on)?`<div class="st" style="color:var(--accent);font-weight:700">🤖 Piloto automático · vídeo ${AP.cur} de ${AP.total} <button class="btn ghost small" style="padding:2px 8px;margin-left:auto" onclick="openPanel('auto')">ver</button></div>`:"";
   el.classList.toggle("mobile", !!(busy||P) && vw<720 && !panelKey);
-  if(!P){ el.innerHTML=`<div class="st">Nada em produção</div><div class="tt">Comece no Laboratório de Virais ou de Ideias</div><div class="bar"><i style="width:0"></i></div>`; return; }
+  if(!P){ el.innerHTML=ap+`<div class="st">Nada em produção</div><div class="tt">Comece no Laboratório de Virais ou de Ideias</div><div class="bar"><i style="width:0"></i></div>`; return; }
   const done=STAGES.filter(s=>P.done[s]).length;
   const all=done===STAGES.length;
-  el.innerHTML=`<div class="st">${busy?`<span class="spin"></span> ${esc(BK[busy.k].n)}: ${esc(busy.action||"trabalhando")}`:(all?"✓ Vídeo concluído":"Em produção")}</div>
+  el.innerHTML=ap+`<div class="st">${busy?`<span class="spin"></span> ${esc(BK[busy.k].n)}: ${esc(busy.action||"trabalhando")}`:(all?"✓ Vídeo concluído":"Em produção")}</div>
   <div class="tt" title="${esc(P.title||P.idea.tema)}">${esc(P.title||P.idea.tema)}</div>
   <div class="bar"><i style="width:${done/STAGES.length*100}%"></i></div>
   <div class="chips">${STAGES.map(s=>`<span class="chip ${P.done[s]?"on":""}">${P.done[s]?"✓ ":""}${STAGE_LABEL[s]}</span>`).join("")}</div>
@@ -109,14 +110,16 @@ function aiNote(){
   return "";
 }
 
+function newProject(idea){ return {id:Date.now(),idea,config:{...S.config},done:{},titles:[],script:[],scenes:[],style:STYLES[0][0],voice:null,voiceName:null,speed:1,res:"1080p",template:TEMPLATES[0],captions:CAPTIONS[0]}; }
+const PSEUDO={auto:{k:"auto",n:"Piloto automático",c:"#e0b14a",desc:"A equipe produz vídeos do começo ao fim sozinha. O gerente decide cada etapa."}};
 /* ============ PANEL ============ */
 let panelKey=null;
 function openPanel(k){
-  panelKey=k; const b=BK[k];
-  document.getElementById("ptitle").innerHTML=esc(b.n)+(b.step?`<span class="step">Etapa ${b.step} de 7 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Configurações":"Sempre aberto")}</span>`);
+  panelKey=k; const b=BK[k]||PSEUDO[k];
+  document.getElementById("ptitle").innerHTML=esc(b.n)+(b.step?`<span class="step">Etapa ${b.step} de 7 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Configurações":(k==="auto"?"O gerente decide tudo":"Sempre aberto"))}</span>`);
   document.getElementById("psq").style.background=b.c;
   document.getElementById("panel").classList.add("open"); document.getElementById("panel").setAttribute("aria-hidden","false");
-  document.getElementById("scrim").classList.add("open");
+  document.getElementById("scrim").classList.toggle("open", k!=="auto");
   renderPanel(); renderProd();
   setTimeout(()=>document.getElementById("pclose").focus(),50);
 }
@@ -229,7 +232,7 @@ BIND.ideias=el=>{
   const d=el.querySelector("#discard"); if(d) d.onclick=()=>{ if(busy) interrupt(); Store.delPrefix(`p${S.project.id}:`); S.project=null; save(); toast("Produção descartada"); renderPanel(); renderProd(); };
   el.querySelector("#start").onclick=()=>{
     const idea=S.ideias.find(i=>i.id===S.selIdea); if(!idea) return;
-    S.project={id:Date.now(),idea,config:{...S.config},done:{},titles:[],script:[],scenes:[],style:STYLES[0][0],voice:null,voiceName:null,speed:1,res:"1080p",template:TEMPLATES[0],captions:CAPTIONS[0]};
+    S.project=newProject(idea);
     S.ideias=S.ideias.filter(i=>i.id!==idea.id); S.selIdea=null; save();
     courier("ideias","titulos"); toast("Ideia enviada pra Torre dos Títulos"); renderProd(); openPanel("titulos");
   };

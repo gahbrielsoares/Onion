@@ -48,6 +48,8 @@ assets/ai.js        provedores de IA por etapa, chaves, modelos, textos e imagen
 assets/store.js     imagens e áudios guardados no navegador (IndexedDB)
 assets/voice.js     narração (TTS), vozes, transcrição e utilitários de áudio
 assets/cut.js       OnionCut: alinhamento, cortes, legendas, prévia e render MP4
+assets/park.js      o parque em pixel art 2.5D, personagens, gerente e câmera
+assets/auto.js      piloto automático e diário do gerente
 assets/vendor/      JSZip e mp4-muxer (MIT)
 ```
 
@@ -60,4 +62,5 @@ assets/vendor/      JSZip e mp4-muxer (MIT)
 - [x] Pacote .zip com capa, cenas, roteiro e descrição
 - [x] Narração com Gemini, ElevenLabs ou OpenAI (em trechos, com amostra de voz)
 - [x] OnionCut: cortes nas pausas da voz, Ken Burns, templates, legendas animadas, prévia ao vivo
+- [x] Piloto automático: gera N vídeos sozinho, o gerente decide cada etapa e caminha entre os prédios
 - [x] Render em MP4 (H.264) direto no navegador, com WebCodecs (Chrome ou Edge no computador)
