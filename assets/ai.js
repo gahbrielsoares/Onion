@@ -25,7 +25,8 @@ const AI = (() => {
              providers: ["elevenlabs", "google", "openai"],
              blocked: { anthropic: "O Claude não gera áudio." } },
     cut:   { name: "OnionCut", what: "A montagem roda no seu navegador e não precisa de IA. Uma IA aqui só serve pra marcar o tempo de cada palavra, deixando as legendas palavra por palavra perfeitamente sincronizadas.",
-             providers: ["local", "elevenlabs", "google", "openai"] }
+             providers: ["local", "elevenlabs", "openai"],
+             blocked: { google: "O Gemini ainda não devolve o tempo exato de cada palavra. Sem IA, o OnionCut sincroniza pelas pausas da voz." } }
   };
 
   const DEFAULTS = {
@@ -95,14 +96,14 @@ const AI = (() => {
       const all = (await r.json()).data.map(m => m.id);
       if (stage === "image") ids = all.filter(s => /image/i.test(s));
       else if (stage === "voice") ids = all.filter(s => /tts/i.test(s));
-      else if (stage === "cut") ids = all.filter(s => /transcribe|whisper/i.test(s));
+      else if (stage === "cut") ids = all.filter(s => /^whisper/i.test(s));
       else ids = all.filter(s => /^(gpt|o\d)/i.test(s) && !/image|tts|audio|realtime|transcribe|search|instruct|embedding/i.test(s));
     } else if (provider === "elevenlabs") {
       const r = await fetch("https://api.elevenlabs.io/v1/models", { headers: { "xi-api-key": k } });
       if (!r.ok) throw await httpErr(r, provider);
       const all = await r.json();
       ids = (stage === "cut")
-        ? ["scribe_v1"].concat(all.filter(m => /scribe/i.test(m.model_id)).map(m => m.model_id))
+        ? ["scribe_v1"]
         : all.filter(m => m.can_do_text_to_speech).map(m => m.model_id);
     }
     ids = vsort([...new Set(ids)]);

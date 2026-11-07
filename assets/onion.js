@@ -38,7 +38,7 @@ const VOICES={
   "Edge (econômica)":[["Guy","masculina, neutra","#6a6a7a"],["Jenny","feminina, neutra","#7a6a6a"]]
 };
 const TEMPLATES=["Oração serena","Noite de fé","Luz divina","Salmo","Documentário escuro","Mistério","Clean"];
-const CAPTIONS=["Palavra por palavra","Frase curta","Karaokê"];
+const CAPTIONS=["Palavra por palavra","Karaokê","Frase curta","Sem legenda"];
 
 /* ============ BUILDINGS ============ */
 const B=[
@@ -452,6 +452,7 @@ function openPanel(k){
   setTimeout(()=>document.getElementById("pclose").focus(),50);
 }
 function closePanel(){
+  if(typeof stopPreview==="function") stopPreview(); if(typeof stopAudio==="function") stopAudio();
   panelKey=null; document.getElementById("panel").classList.remove("open"); document.getElementById("panel").setAttribute("aria-hidden","true");
   document.getElementById("scrim").classList.remove("open"); renderProd();
 }
@@ -559,7 +560,7 @@ BIND.ideias=el=>{
   const d=el.querySelector("#discard"); if(d) d.onclick=()=>{ if(busy) interrupt(); Store.delPrefix(`p${S.project.id}:`); S.project=null; save(); toast("Produção descartada"); renderPanel(); renderProd(); };
   el.querySelector("#start").onclick=()=>{
     const idea=S.ideias.find(i=>i.id===S.selIdea); if(!idea) return;
-    S.project={id:Date.now(),idea,config:{...S.config},done:{},titles:[],script:[],scenes:[],style:STYLES[0][0],provider:"ElevenLabs",voice:null,speed:1,template:TEMPLATES[0],captions:CAPTIONS[0]};
+    S.project={id:Date.now(),idea,config:{...S.config},done:{},titles:[],script:[],scenes:[],style:STYLES[0][0],voice:null,voiceName:null,speed:1,res:"1080p",template:TEMPLATES[0],captions:CAPTIONS[0]};
     S.ideias=S.ideias.filter(i=>i.id!==idea.id); S.selIdea=null; save();
     courier("ideias","titulos"); toast("Ideia enviada pra Torre dos Títulos"); renderProd(); openPanel("titulos");
   };
@@ -869,69 +870,185 @@ async function drawScenes(idx){
 }
 
 /* ---- Narração ---- */
-VIEWS.narracao=()=>{ const P=S.project; const working=busy&&busy.k==="narracao"; const list=VOICES[P.provider]; const words=wc(scriptText()); const mins=(words/(140*P.speed)).toFixed(1); return `
-  <p class="lead">O roteiro narrado na sua conta de voz. Escolha o provedor e a voz.</p>
-  ${pills("prov",Object.keys(VOICES),P.provider)}
-  <div class="voices" style="margin-top:12px">${list.map(v=>`<button type="button" class="voice" aria-pressed="${P.voice===v[0]}" data-voice="${esc(v[0])}"><span class="av" style="background:${v[2]}">${v[0][0]}</span><span><b>${esc(v[0])}</b><small>${esc(v[1])}</small></span></button>`).join("")}</div>
-  <div class="field" style="margin-top:14px"><label for="spd">Velocidade: <b id="spv">${P.speed.toFixed(2)}×</b></label><input id="spd" type="range" min="0.8" max="1.2" step="0.05" value="${P.speed}"></div>
-  <div class="btns"><button class="btn ghost small" id="prev" ${"speechSynthesis" in window?"":"disabled"}>▶ Ouvir um trecho (voz do navegador)</button></div>
-  <div class="btns"><button class="btn" id="ngo" ${busy||!P.voice?"disabled":""}>🎙 ${P.voice?`Gerar narração com ${esc(P.voice)}`:"Escolha uma voz"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
-  <p class="m" style="font-size:12.5px;color:var(--muted)">~${mins} min de áudio · ${words} palavras</p>
-  ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div><div class="bar"><i style="width:${(P.narrProg||0)*100}%"></i></div>`:""}
-  ${P.narration?`<div class="card"><div class="t">✓ Narração pronta</div><div class="m">${esc(P.narration.voice)} · ${esc(P.narration.provider)} · ${P.narration.mins} min</div></div>`:""}
-  <div class="note">A prévia usa a voz do seu navegador só pra ouvir o ritmo. A narração final vai sair pela API do provedor escolhido na próxima etapa.</div>
-  <div class="btns"><button class="btn" id="nok" ${!P.narration||P.done.narracao?"disabled":""}>${P.done.narracao?"Narração aprovada ✓":"Aprovar e mandar pro OnionCut"}</button></div>`; };
+let voiceCache={}, sampleUrls={}, playing=null, fullUrl=null;
+function stopAudio(){ if(playing){ try{ playing.pause(); }catch(e){} playing=null; } }
+VIEWS.narracao=()=>{ const P=S.project; const working=busy&&busy.k==="narracao"; const c=AI.get(); const prov=c.voice.provider;
+  const N=P.narr; const okN=N?N.chunks.filter(x=>x.st==="ok").length:0, badN=N?N.chunks.filter(x=>x.st&&x.st!=="ok"&&x.st!=="wait").length:0;
+  const words=wc(scriptText()); const est=(words/(140*P.speed)).toFixed(1);
+  if(!AI.stageReady("voice")) return `<p class="lead">O roteiro narrado com voz realista.</p><div class="note">Configure o cartão Narração na Administração pra escolher as vozes. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
+  return `
+  <p class="lead">O roteiro narrado com voz realista. Voz por <b>${esc(AI.PROVIDERS[prov].name)}</b> · ${esc(c.voice.model)} <a href="#" onclick="openPanel('admin');return false" style="color:var(--accent)">trocar</a></p>
+  <div class="row" style="align-items:end"><div class="field" style="margin:0"><label for="vq">Buscar voz</label><input id="vq" placeholder="nome, estilo, sotaque" value="${esc(ui.vq||"")}"></div>
+  <div class="field" style="margin:0"><label for="vg">Mostrar</label><select id="vg"><option value="canal" ${ui.vg!=="todas"?"selected":""}>Vozes ${esc((P.config.voz||"").toLowerCase())}s</option><option value="todas" ${ui.vg==="todas"?"selected":""}>Todas</option></select></div></div>
+  <div class="voices" id="vlist" style="margin-top:12px;max-height:300px;overflow:auto"><div class="status"><span class="spin"></span>Carregando vozes…</div></div>
+  <div class="row" style="margin-top:14px"><div class="field"><label for="spd">Velocidade: <b id="spv">${P.speed.toFixed(2)}×</b></label><input id="spd" type="range" min="0.8" max="1.2" step="0.05" value="${P.speed}"></div>
+  <div class="field"><label for="vsty">Jeito de falar (opcional)</label><input id="vsty" value="${esc(P.voiceStyle||"")}" placeholder="Ex.: calmo e acolhedor"></div></div>
+  <div class="btns"><button class="btn" id="ngo" ${busy||!P.voice?"disabled":""}>🎙 ${!P.voice?"Escolha uma voz":(N&&okN?`Gerar de novo com ${esc(P.voiceName)}`:`Gerar narração com ${esc(P.voiceName)}`)}</button>
+    ${N&&badN&&!working?`<button class="btn ghost small" id="nretry">Refazer os ${badN} trechos com erro</button>`:""}
+    ${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
+  <p class="m" style="font-size:12.5px;color:var(--muted)">~${est} min de áudio · ${words} palavras${N?` · ${N.chunks.length} trechos`:""}</p>
+  ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div><div class="bar"><i style="width:${N?okN/N.chunks.length*100:0}%"></i></div>`:""}
+  ${N?`<div class="chips" style="margin:8px 0">${N.chunks.map((x,i)=>`<span class="chip ${x.st==="ok"?"on":""}" title="${esc(x.st&&x.st!=="ok"&&x.st!=="wait"?x.st:x.text.slice(0,80))}" style="${x.st&&x.st!=="ok"&&x.st!=="wait"?"color:var(--danger)":""}">${x.st==="ok"?"✓":x.st==="wait"?"…":x.st?"!":"·"} ${i+1}</span>`).join("")}</div>`:""}
+  ${ui.narErr?`<div class="err">${esc(ui.narErr)}</div>`:""}
+  ${P.narration?`<div class="card"><div class="t">✓ Narração pronta</div><div class="m">${esc(P.narration.voice)} · ${esc(P.narration.provider)} · ${P.narration.mins} min</div>
+    <div id="nplayer" class="btns"><button class="btn ghost small" id="nplay">▶ Ouvir a narração completa</button><button class="btn ghost small" id="ndl">⬇ Baixar (.wav)</button></div></div>`:""}
+  <div class="btns"><button class="btn" id="nok" ${!P.narration||P.done.narracao||working?"disabled":""}>${P.done.narracao?"Narração aprovada ✓":"Aprovar e mandar pro OnionCut"}</button></div>`; };
+function renderVoices(el,list){
+  const P=S.project, box=el.querySelector("#vlist"); if(!box) return;
+  const q=(ui.vq||"").toLowerCase(), want=(P.config.voz||"").toLowerCase();
+  let vs=list.filter(v=>!q||(v.name+" "+v.desc).toLowerCase().includes(q));
+  if(ui.vg!=="todas") vs=vs.filter(v=>v.gender===want||v.gender==="neutra"||!want);
+  if(!vs.length){ box.innerHTML=`<div class="empty">Nenhuma voz com esse filtro.</div>`; return; }
+  const cols=["#5b6ee1","#7a5be1","#e15b9a","#2e8b57","#b07a2e","#2e9bb0","#c75be1","#e17a5b"];
+  box.innerHTML=vs.map((v,i)=>`<div class="voice" role="button" tabindex="0" aria-pressed="${P.voice===v.id}" data-voice="${esc(v.id)}" data-name="${esc(v.name)}">
+    <span class="av" style="background:${cols[i%cols.length]}">${esc(v.name[0])}</span><span style="flex:1;min-width:0"><b>${esc(v.name)}</b><small>${esc([v.gender,v.desc].filter(Boolean).join(" · "))}</small></span>
+    <button type="button" class="x" style="width:30px;height:30px;font-size:12px" data-sample="${esc(v.id)}" aria-label="Ouvir amostra de ${esc(v.name)}">▶</button></div>`).join("");
+  box.querySelectorAll("[data-voice]").forEach(c=>{ const pick=()=>{ P.voice=c.dataset.voice; P.voiceName=c.dataset.name; save(); renderPanel(); }; c.onclick=e=>{ if(e.target.closest("[data-sample]")) return; pick(); }; c.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); pick(); } }; });
+  box.querySelectorAll("[data-sample]").forEach(b=>b.onclick=async e=>{
+    e.stopPropagation(); stopAudio(); const id=b.dataset.sample; const v=list.find(x=>x.id===id);
+    try{
+      let url=v.preview||sampleUrls[AI.get().voice.provider+":"+id];
+      if(!url){ b.innerHTML=`<span class="spin"></span>`; const txt=(P.script[0]||P.title||"").split(/(?<=[.!?])\s+/).slice(0,2).join(" ").slice(0,220)||"This is how this voice sounds.";
+        const r=await Voice.synth(txt,{voiceId:id,speed:P.speed,style:P.voiceStyle}); url=URL.createObjectURL(r.blob); sampleUrls[AI.get().voice.provider+":"+id]=url; }
+      b.innerHTML="▶"; playing=new Audio(url); playing.play();
+    }catch(err){ b.innerHTML="▶"; toast(err.message||"Não deu pra tocar a amostra"); }
+  });
+}
 BIND.narracao=el=>{
-  const P=S.project;
-  bindPills(el,"prov",v=>{ P.provider=v; P.voice=null; save(); renderPanel(); });
-  el.querySelectorAll("[data-voice]").forEach(b=>b.onclick=()=>{ P.voice=b.dataset.voice; save(); renderPanel(); });
+  const P=S.project; if(!AI.stageReady("voice")) return;
+  const prov=AI.get().voice.provider;
+  const load=async()=>{ try{ if(!voiceCache[prov]) voiceCache[prov]=await Voice.list(); renderVoices(el,voiceCache[prov]); }catch(e){ const b=el.querySelector("#vlist"); if(b) b.innerHTML=`<div class="err">${esc(e.message||"Não deu pra carregar as vozes")}</div>`; } };
+  load();
+  const vq=el.querySelector("#vq"); vq.oninput=()=>{ ui.vq=vq.value; if(voiceCache[prov]) renderVoices(el,voiceCache[prov]); };
+  el.querySelector("#vg").onchange=e=>{ ui.vg=e.target.value; if(voiceCache[prov]) renderVoices(el,voiceCache[prov]); };
   const sp=el.querySelector("#spd"); sp.oninput=()=>{ P.speed=+sp.value; el.querySelector("#spv").textContent=P.speed.toFixed(2)+"×"; save(); };
-  el.querySelector("#prev").onclick=()=>{ try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(scriptText().slice(0,280)); const lang=(IDIOMAS.find(i=>i[0]===P.config.idioma)||[])[2]; if(lang) u.lang=lang; u.rate=P.speed; speechSynthesis.speak(u); }catch(e){ toast("O navegador não tem voz disponível"); } };
-  el.querySelector("#ngo").onclick=runNarracao;
-  el.querySelector("#nok").onclick=()=>{ P.done.narracao=true; save(); courier("narracao","montagem"); toast("Narração aprovada"); renderProd(); openPanel("montagem"); };
+  el.querySelector("#vsty").oninput=e=>{ P.voiceStyle=e.target.value; save(); };
+  el.querySelector("#ngo").onclick=()=>{ if(P.narration&&!confirm("Gerar de novo substitui a narração atual. Continuar?")) return; runNarracao(false); };
+  const rt=el.querySelector("#nretry"); if(rt) rt.onclick=()=>runNarracao(true);
+  const pl=el.querySelector("#nplay"); if(pl) pl.onclick=async()=>{
+    pl.disabled=true; pl.innerHTML=`<span class="spin"></span> Juntando os trechos…`;
+    try{ const b=await fullNarration(P); if(fullUrl) URL.revokeObjectURL(fullUrl); fullUrl=URL.createObjectURL(b);
+      const a=document.createElement("audio"); a.controls=true; a.src=fullUrl; a.style.width="100%"; pl.replaceWith(a); a.play(); }
+    catch(e){ pl.disabled=false; pl.textContent="▶ Ouvir a narração completa"; toast(e.message||"Não deu pra abrir o áudio"); }
+  };
+  const dl=el.querySelector("#ndl"); if(dl) dl.onclick=async()=>{ dl.disabled=true; try{ saveBlob(await fullNarration(P),slug(P.title)+"-narracao.wav"); }catch(e){ toast(e.message||"Falhou"); } dl.disabled=false; };
+  el.querySelector("#nok").onclick=()=>{ stopAudio(); P.done.narracao=true; save(); courier("narracao","montagem"); toast("Narração aprovada"); renderProd(); openPanel("montagem"); };
 };
-async function runNarracao(){
-  const P=S.project, n=nBlocks(); setBusy("narracao","gravando o bloco 1"); P.narrProg=0; renderPanel();
-  const steps=40;
-  for(let i=1;i<=steps;i++){ if(busy.cancel){ clearBusy(); return renderPanel(); } await sleep(110); P.narrProg=i/steps; const blk=Math.min(n,Math.ceil(i/steps*n)); if(busy.action!==`gravando o bloco ${blk}`){ setAction(`gravando o bloco ${blk}`); } if(i%4===0) renderPanel(); }
-  P.narration={voice:P.voice,provider:P.provider,mins:(wc(scriptText())/(140*P.speed)).toFixed(1)}; save();
-  clearBusy(); renderPanel();
+async function fullNarration(P){
+  const parts=[]; for(let i=0;i<P.narr.chunks.length;i++){ const b=await Store.get(`p${P.id}:audio:${i}`); if(!b) throw {message:`Falta o trecho ${i+1}. Gere a narração de novo.`}; parts.push(await Voice.decode(b)); }
+  return Voice.wav(Voice.concat(parts,.35));
+}
+async function runNarracao(onlyFailed){
+  const P=S.project; ui.narErr=null; stopAudio();
+  const c=AI.get();
+  if(!onlyFailed||!P.narr){
+    await Store.delPrefix(`p${P.id}:audio:`);
+    P.narr={provider:AI.PROVIDERS[c.voice.provider].name,voiceId:P.voice,voiceName:P.voiceName,speed:P.speed,style:P.voiceStyle||"",chunks:Voice.chunkScript(scriptText()).map(t=>({text:t,st:null}))};
+    P.narration=null; P.done.narracao=false; P.done.montagem=false; P.render=null; Cut._R=null;
+  }
+  const N=P.narr; const idx=N.chunks.map((_,i)=>i).filter(i=>N.chunks[i].st!=="ok");
+  setBusy("narracao",`gravando o trecho 1 de ${N.chunks.length}`); idx.forEach(i=>N.chunks[i].st="wait"); save(); renderPanel();
+  let done=0;
+  const jobs=idx.map(i=>async()=>{
+    const ch=N.chunks[i];
+    try{
+      const r=await Voice.synth(ch.text,{voiceId:N.voiceId,speed:N.speed,style:N.style,prev:N.chunks[i-1]?.text||"",next:N.chunks[i+1]?.text||"",signal:busy.ctl.signal});
+      await Store.put(`p${P.id}:audio:${i}`,r.blob);
+      const f=await Voice.decode(r.blob); ch.dur=f.length/Voice.SR; ch.words=r.words||null; ch.tw=null; ch.st="ok";
+    }catch(e){ if(e.code==="cancelled"){ ch.st=null; throw e; } ch.st=e.message||"Falhou"; if(e.code==="rate_limited"||e.code==="overloaded") throw e; }
+    done++; setAction(`gravando o trecho ${Math.min(done+1,idx.length)} de ${idx.length}`); save(); renderPanel();
+  });
+  await imagePool(jobs,2);
+  N.chunks.forEach(x=>{ if(x.st==="wait") x.st=null; });
+  if(N.chunks.every(x=>x.st==="ok")){
+    const tot=N.chunks.reduce((a,x)=>a+x.dur,0)+.35*(N.chunks.length-1);
+    P.narration={voice:N.voiceName,provider:N.provider,mins:(tot/60).toFixed(1),secs:tot};
+  } else { const b=N.chunks.find(x=>x.st&&x.st!=="ok"); ui.narErr=b?b.st:"A narração foi interrompida. Clique em gerar pra continuar."; }
+  save(); clearBusy(); renderPanel();
 }
 
-/* ---- Montagem ---- */
-VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem"; const st=styleOf(P.style); const words=(P.script[0]||"").split(/\s+/).slice(0,14); return `
-  <p class="lead">O OnionCut junta cenas, voz e legendas e corta nas pausas da narração.</p>
+/* ---- Montagem (OnionCut) ---- */
+const RES=["1080p","720p"];
+let cutPrev=null;
+function fmtT(s){ s=Math.max(0,s); return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`; }
+function cutOpts(P){ return {template:P.template,captions:P.captions,res:P.res||"1080p"}; }
+VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem"; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null; const sup=Cut.supported(); return `
+  <p class="lead">O OnionCut junta cenas, voz e legendas, troca as imagens nas pausas da narração e exporta o vídeo em MP4.</p>
+  ${sup?"":`<div class="err">Este navegador não consegue gerar vídeo. Abra o Onion no Chrome ou no Edge, no computador.</div>`}
   <h3>Template</h3>${pills("tpl",TEMPLATES,P.template)}
   <h3>Legendas</h3>${pills("cap",CAPTIONS,P.captions)}
-  <div class="btns"><button class="btn" id="mgo" ${busy?"disabled":""}>🎬 ${P.cut?"Montar de novo":"Montar no OnionCut"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
-  ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div><div class="bar"><i style="width:${(P.cutProg||0)*100}%"></i></div>`:""}
-  ${P.cut?`<h3>Linha do tempo</h3><div class="tl">
-    <div class="lane"><b>Vídeo</b><div class="track">${P.scenes.map((s,i)=>`<i ${s.img==="ok"?`data-img="${mkey(P.id,"scene",i)}"`:""} style="background:linear-gradient(${(i*47)%360}deg,${st[1]},${st[2]})"></i>`).join("")}</div></div>
-    <div class="lane"><b>Legendas</b><div class="track" style="gap:4px">${words.map(w=>`<span class="cap">${esc(w.replace(/[^\p{L}\p{N}'’-]/gu,"").toUpperCase())}</span>`).join("")}</div></div>
-    <div class="lane"><b>Áudio</b><div class="track wave">${Array.from({length:80},(_,i)=>`<i style="height:${20+Math.abs(Math.sin(i*1.7)*Math.cos(i*.37))*80}%"></i>`).join("")}</div></div>
+  <h3>Resolução</h3>${pills("res",RES,P.res||"1080p")}
+  <div class="btns"><button class="btn" id="mprep" ${busy?"disabled":""}>🎬 ${R?"Montar de novo":"Montar no OnionCut"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
+  ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>${P.renderProg!=null?`<div class="bar"><i style="width:${P.renderProg*100}%"></i></div>`:""}`:""}
+  ${ui.cutErr?`<div class="err">${esc(ui.cutErr)}</div>`:""}
+  ${R?`<div class="note">Montagem automática: ${R.scenes.length} cenas em ${fmtT(R.dur)} de narração. ${R.hits} de ${Math.max(0,R.scenes.length-1)} trocas caíram numa pausa da voz. ${R.pauses.length} pausas detectadas. Legendas ${R.exact===R.chunks?"com tempo exato de cada palavra":(R.exact?`exatas em ${R.exact} de ${R.chunks} trechos`:"sincronizadas pelas pausas da voz")}.</div>
+  <canvas id="pv" width="640" height="360" style="width:100%;border-radius:10px;background:#000;display:block"></canvas>
+  <div class="btns" style="margin-top:8px"><button class="btn ghost small" id="pplay">▶ Assistir prévia</button><input id="pseek" type="range" min="0" max="${Math.ceil(R.dur)}" step="0.1" value="${ui.pt||0}" style="flex:1"><span class="m" id="ptime" style="font-size:12px;color:var(--muted)">${fmtT(ui.pt||0)} / ${fmtT(R.dur)}</span></div>
+  <h3>Linha do tempo</h3><div class="tl">
+    <div class="lane"><b>Vídeo</b><div class="track">${R.scenes.map((s,i)=>`<i ${P.scenes[i]&&P.scenes[i].img==="ok"?`data-img="${mkey(P.id,"scene",i)}"`:""} style="flex:${Math.max(.1,s.e-s.s)};background:#333" title="Cena ${i+1}: ${fmtT(s.s)}"></i>`).join("")}</div></div>
+    <div class="lane"><b>Legendas</b><div class="track" style="gap:4px">${R.caps.slice(0,6).map(c=>`<span class="cap">${esc(c.ws.map(w=>w.w).join(" ").toUpperCase())}</span>`).join("")}</div></div>
+    <div class="lane"><b>Áudio</b><div class="track wave">${R.wave.map(v=>`<i style="height:${Math.max(6,v*100)}%"></i>`).join("")}</div></div>
   </div>
-  <p class="m" style="font-size:12.5px;color:var(--muted)">${P.scenes.length} cenas · ${P.narration?P.narration.mins:"?"} min · template ${esc(P.template)}</p>`:""}
-  <div class="note">Nesta versão a montagem ainda é uma prévia. O render do vídeo no navegador, com legendas palavra por palavra e cortes nas pausas reais da voz, é a próxima etapa. O pacote .zip já leva capa, imagens, roteiro e descrição.</div>
+  <div class="btns"><button class="btn" id="mrender" ${busy||!sup?"disabled":""}>⬇ Renderizar o vídeo (MP4 ${esc(P.res||"1080p")})</button></div>
+  <p class="m" style="font-size:12px;color:var(--muted)">O render roda aqui no seu computador. Deixe esta aba aberta até terminar.</p>`:""}
+  ${P.render?`<div class="card"><div class="t">✓ Vídeo renderizado</div><div class="m">${esc(P.render.name)} · ${esc(P.render.res)}${P.render.mb?` · ${P.render.mb} MB`:""} · ${fmtT(P.render.secs||0)}</div></div>`:""}
   <div class="btns">
-    <button class="btn" id="mok" ${!P.cut?"disabled":""}>Salvar na Biblioteca</button>
+    <button class="btn" id="mok" ${!P.render||working?"disabled":""}>Salvar na Biblioteca</button>
     <button class="btn ghost small" id="mdl">⬇ Baixar pacote (.zip)</button>
   </div>`; };
 BIND.montagem=el=>{
-  const P=S.project;
-  bindPills(el,"tpl",v=>{P.template=v; save();}); bindPills(el,"cap",v=>{P.captions=v; save();});
-  el.querySelector("#mgo").onclick=runMontagem;
+  const P=S.project; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null;
+  const redraw=()=>{ const c=el.querySelector("#pv"); if(c&&R&&!cutPrev) Cut.still(R,c,cutOpts(P),Math.max(.6,ui.pt||0)); };
+  bindPills(el,"tpl",v=>{P.template=v; save(); redraw();}); bindPills(el,"cap",v=>{P.captions=v; save(); redraw();});
+  bindPills(el,"res",v=>{P.res=v; save(); const b=el.querySelector("#mrender"); if(b) b.textContent=`⬇ Renderizar o vídeo (MP4 ${v})`;});
+  el.querySelector("#mprep").onclick=runPrepare;
   el.querySelector("#mdl").onclick=e=>downloadPack(P,e.currentTarget);
   el.querySelector("#mok").onclick=()=>{
-    P.done.montagem=true; const item={...P,savedAt:Date.now()}; S.library.unshift(item); S.project=null; save();
+    stopPreview(); P.done.montagem=true; const item={...P,savedAt:Date.now()}; S.library.unshift(item); S.project=null; Cut._R=null; save();
     courier("montagem","arquivo"); toast("+1 vídeo pronto na Biblioteca"); renderProd(); openPanel("arquivo");
   };
   paintImgs(el);
+  if(R){
+    redraw();
+    const pp=el.querySelector("#pplay"), sk=el.querySelector("#pseek"), tm=el.querySelector("#ptime");
+    pp.onclick=()=>{
+      if(cutPrev){ stopPreview(); pp.textContent="▶ Assistir prévia"; return; }
+      pp.textContent="⏸ Pausar";
+      cutPrev=Cut.preview(R,el.querySelector("#pv"),cutOpts(P),{from:ui.pt||0,onTime:t=>{ ui.pt=t; sk.value=t; tm.textContent=`${fmtT(t)} / ${fmtT(R.dur)}`; },onEnd:()=>{ cutPrev=null; ui.pt=0; pp.textContent="▶ Assistir prévia"; }});
+    };
+    sk.oninput=()=>{ ui.pt=+sk.value; tm.textContent=`${fmtT(ui.pt)} / ${fmtT(R.dur)}`; if(cutPrev){ stopPreview(); pp.textContent="▶ Assistir prévia"; } redraw(); };
+    const rb=el.querySelector("#mrender"); if(rb) rb.onclick=runRender;
+  }
 };
-async function runMontagem(){
-  const P=S.project; const steps=["trazendo os arquivos","sincronizando a voz","cortando nas pausas","aplicando as legendas","aplicando transições e filtro","renderizando"];
-  setBusy("montagem",steps[0]); P.cutProg=0; renderPanel();
-  for(let i=0;i<steps.length*8;i++){ if(busy.cancel){ clearBusy(); return renderPanel(); } await sleep(120); P.cutProg=(i+1)/(steps.length*8); const s=steps[Math.floor(i/8)]; if(busy.action!==s){ setAction(s); renderPanel(); } }
-  P.cut=true; save(); clearBusy(); renderPanel();
+function stopPreview(){ if(cutPrev){ cutPrev.stop(); cutPrev=null; } }
+async function runPrepare(){
+  const P=S.project; ui.cutErr=null; stopPreview();
+  if(!P.narr||!P.narration){ ui.cutErr="Gere a narração no Estúdio antes de montar."; return renderPanel(); }
+  setBusy("montagem","abrindo o áudio"); P.renderProg=null; renderPanel();
+  try{ const R=await Cut.prepare(P,{onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal}); R.pid=P.id; Cut._R=R; ui.pt=0; P.cut=true; save(); }
+  catch(e){ if(e.code!=="cancelled") ui.cutErr=e.message||"A montagem falhou."; }
+  clearBusy(); renderPanel();
+}
+async function runRender(){
+  const P=S.project, R=Cut._R; ui.cutErr=null; stopPreview();
+  const name=`${slug(P.title)}.mp4`;
+  let fh=null;
+  if(window.showSaveFilePicker){
+    try{ fh=await showSaveFilePicker({suggestedName:name,types:[{description:"Vídeo MP4",accept:{"video/mp4":[".mp4"]}}]}); }
+    catch(e){ if(e.name==="AbortError") return; fh=null; }
+  }
+  setBusy("montagem","preparando o render"); P.renderProg=0; renderPanel();
+  try{
+    const out=await Cut.render(R,cutOpts(P),{fileHandle:fh,signal:busy.ctl.signal,onProgress:({f,total,fps,eta})=>{
+      P.renderProg=f/total; setAction(`renderizando ${Math.round(f/total*100)}% · ${fps.toFixed(0)} quadros/s · falta ${fmtT(eta)}`);
+      const el=document.getElementById("pbody"); const bar=el&&el.querySelector(".bar>i"); const st=el&&el.querySelector(".status");
+      if(bar&&st){ bar.style.width=(P.renderProg*100)+"%"; st.innerHTML=`<span class="spin"></span>${esc(busy.action)}…`; } else renderPanel();
+    }});
+    let mb=null;
+    if(out.blob){ mb=(out.blob.size/1048576).toFixed(0); saveBlob(out.blob,name); }
+    P.render={name:fh?fh.name:name,res:P.res||"1080p",mb,secs:R.dur,at:Date.now()}; save(); toast("Vídeo pronto: "+(fh?fh.name:name));
+  }catch(e){ if(e.code!=="cancelled") ui.cutErr=e.message||"O render falhou."; }
+  P.renderProg=null; clearBusy(); renderPanel();
 }
 function slug(t){ return (t||"video").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").slice(0,50)||"video"; }
 function saveBlob(blob,name){
@@ -955,6 +1072,7 @@ async function downloadPack(P,btn){
     z.file("titulo.txt",P.title||"");
     z.file("onion-tudo.txt",packText(P));
     if(P.thumbSel!=null){ const b=await Store.get(mkey(P.id,"thumb",P.thumbSel)); if(b) z.file("capa.jpg",b); }
+    if(P.narr&&P.narr.chunks.every(x=>x.st==="ok")){ try{ z.file("narracao.wav",await fullNarration(P)); }catch(e){} }
     const f=z.folder("cenas");
     for(let i=0;i<P.scenes.length;i++){ const b=await Store.get(mkey(P.id,"scene",i)); if(b) f.file(`${String(i+1).padStart(2,"0")}.jpg`,b); }
     f.file("prompts.txt",P.scenes.map((s,i)=>`${String(i+1).padStart(2,"0")}. ${s.trecho}\n    ${s.prompt}`).join("\n\n"));

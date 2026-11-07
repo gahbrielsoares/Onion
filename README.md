@@ -32,7 +32,7 @@ Cada prédio do **Onion Park** é uma etapa da produção: você clica, configur
 | Textos | Anthropic, Google Gemini, OpenAI |
 | Imagens e capas | Google Gemini, OpenAI |
 | Narração | ElevenLabs, Google Gemini, OpenAI |
-| OnionCut | Sem IA (padrão), ElevenLabs, Google Gemini, OpenAI (só pra sincronia das legendas) |
+| OnionCut | Sem IA (padrão), ElevenLabs, OpenAI (só pra sincronia exata das legendas) |
 
 ## Segurança
 
@@ -46,6 +46,9 @@ assets/onion.css    estilos
 assets/onion.js     parque, etapas e estado
 assets/ai.js        provedores de IA por etapa, chaves, modelos, textos e imagens
 assets/store.js     imagens e áudios guardados no navegador (IndexedDB)
+assets/voice.js     narração (TTS), vozes, transcrição e utilitários de áudio
+assets/cut.js       OnionCut: alinhamento, cortes, legendas, prévia e render MP4
+assets/vendor/      JSZip e mp4-muxer (MIT)
 ```
 
 ## Status
@@ -55,5 +58,6 @@ assets/store.js     imagens e áudios guardados no navegador (IndexedDB)
 - [x] Administração com provedor e chave por etapa
 - [x] Imagens e capas com Gemini ou OpenAI (guardadas no navegador, IndexedDB)
 - [x] Pacote .zip com capa, cenas, roteiro e descrição
-- [ ] Narração com ElevenLabs
-- [ ] OnionCut: render do vídeo no navegador
+- [x] Narração com Gemini, ElevenLabs ou OpenAI (em trechos, com amostra de voz)
+- [x] OnionCut: cortes nas pausas da voz, Ken Burns, templates, legendas animadas, prévia ao vivo
+- [x] Render em MP4 (H.264) direto no navegador, com WebCodecs (Chrome ou Edge no computador)
