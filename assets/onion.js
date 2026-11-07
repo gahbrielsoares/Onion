@@ -556,7 +556,7 @@ BIND.ideias=el=>{
   el.querySelector("#nadd").onclick=add; ni.onkeydown=e=>{ if(e.key==="Enter") add(); };
   el.querySelectorAll("[data-pick]").forEach(c=>c.onclick=e=>{ if(e.target.dataset.del) return; S.selIdea=+c.dataset.pick; save(); renderPanel(); });
   el.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ S.ideias=S.ideias.filter(i=>i.id!==+b.dataset.del); if(S.selIdea===+b.dataset.del) S.selIdea=null; save(); renderPanel(); });
-  const d=el.querySelector("#discard"); if(d) d.onclick=()=>{ if(busy) interrupt(); S.project=null; save(); toast("Produção descartada"); renderPanel(); renderProd(); };
+  const d=el.querySelector("#discard"); if(d) d.onclick=()=>{ if(busy) interrupt(); Store.delPrefix(`p${S.project.id}:`); S.project=null; save(); toast("Produção descartada"); renderPanel(); renderProd(); };
   el.querySelector("#start").onclick=()=>{
     const idea=S.ideias.find(i=>i.id===S.selIdea); if(!idea) return;
     S.project={id:Date.now(),idea,config:{...S.config},done:{},titles:[],script:[],scenes:[],style:STYLES[0][0],provider:"ElevenLabs",voice:null,speed:1,template:TEMPLATES[0],captions:CAPTIONS[0]};
@@ -679,86 +679,194 @@ Responda só com JSON: {"descricao":"...","hashtags":["#...", "..."]}`;
   clearBusy(); renderPanel();
 }
 
+/* ---- Mídia: utilitários ---- */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const mkey=(pid,kind,i)=>`p${pid}:${kind}:${i}`;
+async function toJpeg(blob,w,h,q=.9){
+  try{
+    const bmp=await createImageBitmap(blob);
+    const W2=w||bmp.width, H2=h||bmp.height;
+    const c=document.createElement("canvas"); c.width=W2; c.height=H2;
+    const g=c.getContext("2d");
+    // cobre a área mantendo a proporção (corta as sobras)
+    const s=Math.max(W2/bmp.width,H2/bmp.height), dw=bmp.width*s, dh=bmp.height*s;
+    g.drawImage(bmp,(W2-dw)/2,(H2-dh)/2,dw,dh);
+    return await new Promise(r=>c.toBlob(b=>r(b||blob),"image/jpeg",q));
+  }catch(e){ return blob; }
+}
+function paintImgs(el){
+  el.querySelectorAll("[data-img]").forEach(async n=>{
+    const u=await Store.url(n.dataset.img);
+    if(u){ n.style.backgroundImage=`url("${u}")`; n.style.backgroundSize="cover"; n.style.backgroundPosition="center"; n.classList.add("has-img"); }
+  });
+}
+// gera imagens com no máximo `conc` ao mesmo tempo, tentando de novo quando bate no limite
+async function imagePool(jobs,conc,onDone){
+  let next=0;
+  async function worker(){
+    while(next<jobs.length){
+      if(busy&&busy.cancel) return;
+      const j=jobs[next++];
+      for(let tent=0;;tent++){
+        try{ await j(); break; }
+        catch(e){
+          if(e&&e.code==="cancelled") return;
+          if(e&&(e.code==="rate_limited"||e.code==="overloaded")&&tent<2){ setAction("esperando o limite da API liberar"); await sleep(15000*(tent+1)); continue; }
+          onDone&&onDone(e); break;
+        }
+      }
+      onDone&&onDone(null);
+    }
+  }
+  await Promise.all(Array.from({length:conc},worker));
+}
+function imgNote(){
+  if(AI.stageReady("image")) return "";
+  return `<div class="note">As imagens de verdade saem quando o cartão Imagens e capas estiver pronto. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
+}
+
 /* ---- Capa ---- */
 const THUMB_BG=["linear-gradient(120deg,#2b1d3a 0%,#8a2f7c 55%,#f2c14e 120%)","linear-gradient(120deg,#0f2a3d 0%,#3a7ae1 60%,#9ec5d8 120%)","linear-gradient(120deg,#3a1a14 0%,#d1502f 60%,#ffd58a 120%)","linear-gradient(120deg,#1a2a1e 0%,#2e8b57 55%,#f2e2b0 120%)"];
-VIEWS.capa=()=>{ const P=S.project; const working=busy&&busy.k==="capa"; const th=P.thumbs||[]; return `
-  <p class="lead">A equipe propõe 4 frases de impacto e a composição da capa. Marque a que vai pro vídeo.</p>
+VIEWS.capa=()=>{ const P=S.project; const working=busy&&busy.k==="capa"; const th=P.thumbs||[]; const st=P.thumbImg||[]; return `
+  <p class="lead">A equipe escreve 4 frases de impacto e desenha uma capa pra cada. Marque a que vai pro vídeo.</p>
   <div class="field"><label for="cvis">Ideia visual (opcional)</label><textarea id="cvis" rows="2" placeholder="Ex.: mulher de cabelo branco orando perto da janela, luz da manhã, tons de azul">${esc(P.thumbVisual||"")}</textarea></div>
   <div class="field"><label for="ctxt">Texto da capa (opcional)</label><input id="ctxt" value="${esc(P.thumbOwn||"")}" placeholder="Deixe vazio e a equipe escreve. 4 a 6 palavras funcionam melhor"></div>
-  ${aiNote()}
-  <div class="btns"><button class="btn" id="cgo" ${busy||(!AI.ready()&&!P.thumbOwn)?"disabled":""}>✦ ${th.length?"Gerar outras 4":"Gerar 4 capas"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
-  ${working?`<div class="status"><span class="spin"></span>desenhando as versões…</div>`:""}
+  ${aiNote()}${imgNote()}
+  <div class="btns"><button class="btn" id="cgo" ${busy||!AI.ready()?"disabled":""}>✦ ${th.length?"Gerar outras 4":"Gerar 4 capas"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
+  ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>`:""}
   ${ui.capErr?`<div class="err">${esc(ui.capErr)}</div>`:""}
-  ${th.length?`<div class="thumbs" style="margin-top:12px">${th.map((t,i)=>`<button type="button" class="thumb ${P.thumbSel===i?"sel":""}" data-th="${i}" style="background:${THUMB_BG[i%4]}" aria-label="Versão ${i+1}: ${esc(t)}"><span class="fig"></span><b>${esc(t)}</b></button>`).join("")}</div>
-  ${P.thumbScene?`<div class="note"><b>Composição:</b> ${esc(P.thumbScene)}</div>`:""}`:""}
-  <div class="note">Aqui você aprova o texto e a composição. A arte final da capa sai da API de imagens (Nano Banana / Gemini) quando a integração com o Gemini entrar.</div>
-  <div class="btns"><button class="btn" id="cok" ${P.thumbSel==null||P.done.capa?"disabled":""}>${P.done.capa?"Capa aprovada ✓":"Usar esta capa e mandar pras Imagens"}</button></div>`; };
+  ${th.length?`<div class="thumbs" style="margin-top:12px">${th.map((t,i)=>{ const s=st[i]; const has=s==="ok";
+    return `<button type="button" class="thumb ${P.thumbSel===i?"sel":""}" data-th="${i}" ${has?`data-img="${mkey(P.id,"thumb",i)}"`:""} style="background:${THUMB_BG[i%4]}" aria-label="Versão ${i+1}: ${esc(t)}">${has?"":`<span class="fig"></span><b>${esc(t)}</b>`}${s==="wait"?`<span class="tbadge"><span class="spin"></span></span>`:""}${s&&s!=="ok"&&s!=="wait"?`<span class="tbadge err" title="${esc(s)}">!</span>`:""}</button>`; }).join("")}</div>
+  <p class="m" style="font-size:12px;color:var(--muted)">${th.map((t,i)=>`V${i+1}: ${esc(t)}`).join(" · ")}</p>
+  ${st.some(s=>s&&s!=="ok"&&s!=="wait")&&!working?`<div class="err">${esc(st.find(s=>s&&s!=="ok"&&s!=="wait"))}</div><div class="btns"><button class="btn ghost small" id="cretry">Tentar de novo as que falharam</button></div>`:""}
+  ${P.thumbScene?`<div class="note"><b>Composição:</b> ${esc(P.thumbScene)}</div>`:""}
+  ${P.thumbSel!=null&&st[P.thumbSel]==="ok"?`<div class="btns"><button class="btn ghost small" id="cdl">⬇ Baixar a capa marcada (1280×720)</button></div>`:""}`:""}
+  <div class="btns"><button class="btn" id="cok" ${P.thumbSel==null||P.done.capa||working?"disabled":""}>${P.done.capa?"Capa aprovada ✓":"Usar esta capa e mandar pras Imagens"}</button></div>`; };
 BIND.capa=el=>{
   const P=S.project;
   el.querySelector("#cvis").oninput=e=>{P.thumbVisual=e.target.value; save();};
-  el.querySelector("#ctxt").oninput=e=>{P.thumbOwn=e.target.value; save(); el.querySelector("#cgo").disabled=!!busy||(!AI.ready()&&!P.thumbOwn);};
+  el.querySelector("#ctxt").oninput=e=>{P.thumbOwn=e.target.value; save();};
   el.querySelector("#cgo").onclick=runCapa;
+  const rt=el.querySelector("#cretry"); if(rt) rt.onclick=()=>drawThumbs(true);
   el.querySelectorAll("[data-th]").forEach(b=>b.onclick=()=>{ if(P.done.capa) return; P.thumbSel=+b.dataset.th; save(); renderPanel(); });
+  const dl=el.querySelector("#cdl"); if(dl) dl.onclick=async()=>{ const b=await Store.get(mkey(P.id,"thumb",P.thumbSel)); if(b) saveBlob(b,slug(P.title)+"-capa.jpg"); };
   el.querySelector("#cok").onclick=()=>{ P.done.capa=true; save(); courier("capa","imagens"); toast("Capa aprovada"); renderProd(); openPanel("imagens"); };
+  paintImgs(el);
 };
 async function runCapa(){
   const P=S.project; ui.capErr=null;
-  if(!AI.ready()){ P.thumbs=[P.thumbOwn,P.thumbOwn,P.thumbOwn,P.thumbOwn]; P.thumbSel=0; save(); return renderPanel(); }
-  setBusy("capa","desenhando versões"); renderPanel();
+  setBusy("capa","escrevendo as frases"); renderPanel();
   const prompt=`Você é diretor de arte de thumbnails de YouTube com alto CTR.
 Título: "${P.title}". Público: ${P.config.publico}. Nicho: ${P.config.nicho}.
 ${P.thumbOwn?`O texto da capa já foi definido: "${P.thumbOwn}". Crie 4 variações bem próximas dele.`:`Crie 4 textos de capa diferentes, de 3 a 6 palavras, no idioma ${P.config.idioma}. Eles devem complementar o título, não repetir.`}
 ${P.thumbVisual?`Ideia visual do criador: ${P.thumbVisual}.`:""}
-Descreva também, em português e em 1-2 frases, a composição da imagem (personagem, expressão, luz, cores, onde fica o texto).
-Responda só com JSON: {"textos":["...","...","...","..."],"cena":"..."}`;
-  try{ const r=await ask(prompt,{json:true,tier:"quick"}); P.thumbs=(r.textos||[]).slice(0,4); P.thumbScene=r.cena||""; P.thumbSel=0; save(); }
-  catch(e){ ui.capErr=errMsg(e); }
+Descreva a composição da imagem em português (1-2 frases) e também escreva um prompt de imagem em inglês para ela ("prompt_en"): personagem, expressão, luz, cores, fundo, deixando o terço direito livre para o texto. Não inclua o texto da capa no prompt_en.
+Responda só com JSON: {"textos":["...","...","...","..."],"cena":"...","prompt_en":"..."}`;
+  try{
+    const r=await ask(prompt,{json:true,tier:"quick"});
+    await Store.delPrefix(`p${P.id}:thumb:`);
+    P.thumbs=(r.textos||[]).slice(0,4); P.thumbScene=r.cena||""; P.thumbPrompt=r.prompt_en||r.cena||""; P.thumbSel=0; P.thumbImg=[]; save();
+  }catch(e){ ui.capErr=errMsg(e); clearBusy(); return renderPanel(); }
+  clearBusy();
+  if(AI.stageReady("image")) await drawThumbs(false); else renderPanel();
+}
+async function drawThumbs(onlyFailed){
+  const P=S.project; ui.capErr=null;
+  setBusy("capa","desenhando as capas"); 
+  const idx=P.thumbs.map((_,i)=>i).filter(i=>!onlyFailed||(P.thumbImg[i]&&P.thumbImg[i]!=="ok"));
+  idx.forEach(i=>P.thumbImg[i]="wait"); renderPanel();
+  let done=0;
+  const jobs=idx.map(i=>async()=>{
+    const prompt=`YouTube thumbnail, 16:9, eye-catching, professional, high contrast, sharp focus. ${P.thumbPrompt}
+On the right third, large bold headline text in thick condensed sans-serif, white with subtle dark outline, uppercase, exactly these words and nothing else: "${P.thumbs[i]}". Spell it exactly. No other text, no logos, no watermark.`;
+    try{ const b=await AI.image(prompt,{aspect:"16:9",signal:busy.ctl.signal}); await Store.put(mkey(P.id,"thumb",i),await toJpeg(b,1280,720,.9)); P.thumbImg[i]="ok"; }
+    catch(e){ if(e.code==="cancelled"){ P.thumbImg[i]=null; throw e; } P.thumbImg[i]=e.message||"Falhou"; if(e.code==="rate_limited"||e.code==="overloaded") throw e; }
+    done++; setAction(`capa ${done} de ${idx.length}`); save(); renderPanel();
+  });
+  await imagePool(jobs,2);
+  P.thumbImg=P.thumbImg.map(s=>s==="wait"?null:s); save();
   clearBusy(); renderPanel();
 }
 
 /* ---- Imagens ---- */
 function styleOf(name){ return STYLES.find(s=>s[0]===name)||STYLES[0]; }
-VIEWS.imagens=()=>{ const P=S.project; const working=busy&&busy.k==="imagens"; const n=Math.min(40,Math.round(P.config.duracao*1.7)); const ph=P.imgPhase||0; return `
+function sceneCount(){ return Math.min(40,Math.round(S.project.config.duracao*1.7)); }
+VIEWS.imagens=()=>{ const P=S.project; const working=busy&&busy.k==="imagens"; const n=sceneCount(); const ph=P.imgPhase||0;
+  const ok=P.scenes.filter(s=>s.img==="ok").length, bad=P.scenes.filter(s=>s.img&&s.img!=="ok"&&s.img!=="wait").length;
+  const sel=P.selScene!=null?P.scenes[P.selScene]:null; const st=styleOf(P.style); return `
   <p class="lead">As cenas saem do próprio roteiro, na ordem da edição. Cerca de ${n} cenas pra ${P.config.duracao} min.</p>
   <h3>Estilo das imagens</h3>
   <div class="styles">${STYLES.map(s=>`<button type="button" class="sty" aria-pressed="${P.style===s[0]}" data-sty="${esc(s[0])}"><i style="background:linear-gradient(135deg,${s[1]},${s[2]})"></i>${esc(s[0])}</button>`).join("")}</div>
-  ${aiNote()}
-  <div class="btns"><button class="btn" id="igo" ${busy||!AI.ready()?"disabled":""}>✦ ${P.scenes.length?"Gerar as cenas de novo":"Gerar as imagens do roteiro"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
+  ${aiNote()}${imgNote()}
+  <div class="btns"><button class="btn" id="igo" ${busy||!AI.ready()?"disabled":""}>✦ ${P.scenes.length?"Refazer tudo do zero":"Gerar as imagens do roteiro"}</button>
+    ${P.scenes.length&&ok<P.scenes.length&&!working&&AI.stageReady("image")?`<button class="btn ghost small" id="imiss">Gerar as ${P.scenes.length-ok} que faltam</button>`:""}
+    ${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
   ${(working||P.scenes.length)?`<div class="steps"><span class="${ph>1?"ok":ph===1?"on":""}">${ph>1?"✓":"●"} Ler o roteiro</span><span>›</span><span class="${ph>2?"ok":ph===2?"on":""}">${ph>2?"✓":"●"} Escrever os prompts</span><span>›</span><span class="${ph>3?"ok":ph===3?"on":""}">${ph>3?"✓":"●"} Gerar as imagens</span></div>`:""}
+  ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>`:""}
   ${ui.imgErr?`<div class="err">${esc(ui.imgErr)}</div>`:""}
-  ${P.scenes.length?`<p class="m" style="font-size:12.5px;color:var(--muted)">${P.scenes.filter(s=>s.ok).length} de ${P.scenes.length} prontas · estilo ${esc(P.style)}</p>
-  <div class="scenes">${P.scenes.map((s,i)=>{ const st=styleOf(P.style); return `<div class="scene ${s.ok?"":"wait"}" title="${esc(s.prompt)}" style="background:linear-gradient(${(i*47)%360}deg,${st[1]},${st[2]})"><span>${String(i+1).padStart(2,"0")}</span>${s.ok?"":"…"}</div>`; }).join("")}</div>
+  ${P.scenes.length?`<p class="m" style="font-size:12.5px;color:var(--muted)">${ok} de ${P.scenes.length} prontas${bad?` · ${bad} com erro`:""} · estilo ${esc(P.style)} · toque numa cena pra ver e refazer</p>
+  <div class="scenes">${P.scenes.map((s,i)=>`<button type="button" class="scene ${s.img==="ok"?"":"wait"} ${P.selScene===i?"cur":""}" data-sc="${i}" ${s.img==="ok"?`data-img="${mkey(P.id,"scene",i)}"`:""} style="background:linear-gradient(${(i*47)%360}deg,${st[1]},${st[2]})" aria-label="Cena ${i+1}"><span>${String(i+1).padStart(2,"0")}</span>${s.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(s.img&&s.img!=="ok"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}</button>`).join("")}</div>
+  ${sel?`<div class="card" style="margin-top:10px">
+    <div class="t">Cena ${P.selScene+1}</div>
+    ${sel.img==="ok"?`<div class="big" data-img="${mkey(P.id,"scene",P.selScene)}"></div>`:""}
+    <div class="m" style="margin:6px 0">${esc(sel.trecho||"")}…</div>
+    ${sel.img&&sel.img!=="ok"&&sel.img!=="wait"?`<div class="err">${esc(sel.img)}</div>`:""}
+    <div class="field"><label for="sprompt">Prompt da imagem</label><textarea id="sprompt" rows="3">${esc(sel.prompt||"")}</textarea></div>
+    <div class="btns"><button class="btn small" id="sredo" ${busy||!AI.stageReady("image")?"disabled":""}>↻ Gerar esta de novo</button>${sel.img==="ok"?`<button class="btn ghost small" id="sdl">⬇ Baixar</button>`:""}</div></div>`:""}
   <div class="btns"><button class="btn ghost small" id="icp">Copiar os prompts</button></div>`:""}
-  <div class="note">Os prompts de cada cena já saem prontos. As imagens de verdade serão geradas pela API do Gemini na próxima etapa; aqui você vê a sequência e o estilo.</div>
-  <div class="btns"><button class="btn" id="iok" ${!P.scenes.length||P.scenes.some(s=>!s.ok)||P.done.imagens?"disabled":""}>${P.done.imagens?"Cenas aprovadas ✓":"Aprovar cenas e mandar pro Estúdio"}</button></div>`; };
+  <div class="btns"><button class="btn" id="iok" ${!P.scenes.length||ok<P.scenes.length||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Cenas aprovadas ✓":"Aprovar cenas e mandar pro Estúdio"}</button></div>`; };
 BIND.imagens=el=>{
   const P=S.project;
   el.querySelectorAll("[data-sty]").forEach(b=>b.onclick=()=>{ P.style=b.dataset.sty; save(); renderPanel(); });
-  el.querySelector("#igo").onclick=runImagens;
+  el.querySelector("#igo").onclick=()=>{ if(P.scenes.some(s=>s.img==="ok")&&!confirm("Refazer tudo apaga as imagens atuais. Continuar?")) return; runImagens(); };
+  const mi=el.querySelector("#imiss"); if(mi) mi.onclick=()=>drawScenes(P.scenes.map((s,i)=>i).filter(i=>P.scenes[i].img!=="ok"));
+  el.querySelectorAll("[data-sc]").forEach(b=>b.onclick=()=>{ P.selScene=P.selScene===+b.dataset.sc?null:+b.dataset.sc; save(); renderPanel(); });
+  const sp=el.querySelector("#sprompt"); if(sp) sp.oninput=()=>{ P.scenes[P.selScene].prompt=sp.value; save(); };
+  const rd=el.querySelector("#sredo"); if(rd) rd.onclick=()=>{ P.done.imagens=false; drawScenes([P.selScene]); };
+  const sd=el.querySelector("#sdl"); if(sd) sd.onclick=async()=>{ const b=await Store.get(mkey(P.id,"scene",P.selScene)); if(b) saveBlob(b,`cena-${String(P.selScene+1).padStart(2,"0")}.jpg`); };
   const cp=el.querySelector("#icp"); if(cp) cp.onclick=()=>navigator.clipboard?.writeText(P.scenes.map((s,i)=>`${i+1}. ${s.prompt}`).join("\n")).then(()=>toast("Prompts copiados"),()=>toast("Não deu pra copiar"));
   el.querySelector("#iok").onclick=()=>{ P.done.imagens=true; save(); courier("imagens","narracao"); toast("Cenas aprovadas"); renderProd(); openPanel("narracao"); };
+  paintImgs(el);
 };
 async function runImagens(){
-  const P=S.project; ui.imgErr=null; const n=Math.min(40,Math.round(P.config.duracao*1.7));
-  setBusy("imagens","lendo o roteiro"); P.imgPhase=1; P.scenes=[]; renderPanel();
-  await sleep(900);
+  const P=S.project; ui.imgErr=null; const n=sceneCount();
+  setBusy("imagens","lendo o roteiro"); P.imgPhase=1; P.selScene=null; P.done.imagens=false; renderPanel();
+  await Store.delPrefix(`p${P.id}:scene:`); P.scenes=[];
   P.imgPhase=2; setAction("escrevendo os prompts"); renderPanel();
   const prompt=`Divida este roteiro em exatamente ${n} cenas consecutivas, na ordem, cobrindo o texto inteiro.
-Para cada cena: "trecho" (as primeiras 8 a 12 palavras daquele trecho, no idioma do roteiro) e "prompt" (prompt de imagem em inglês, 1-2 frases, descrevendo uma imagem única e específica daquele momento, no estilo "${P.style}", formato 16:9, sem texto na imagem). Mantenha personagens consistentes entre as cenas e varie enquadramento e cenário pra não ficar repetitivo.
+Para cada cena: "trecho" (as primeiras 8 a 12 palavras daquele trecho, no idioma do roteiro) e "prompt" (prompt de imagem em inglês, 1-2 frases, descrevendo uma imagem única e específica daquele momento).
+Antes, defina mentalmente os personagens principais (idade, aparência, roupa) e descreva-os do mesmo jeito em todas as cenas em que aparecem, pra manter consistência. Varie enquadramento e cenário pra não ficar repetitivo. Nada de texto escrito dentro das imagens.
 Roteiro:
 """${scriptText().slice(0,24000)}"""
 Responda só com JSON: {"cenas":[{"trecho":"...","prompt":"..."}]}`;
   try{
     const r=await ask(prompt,{json:true});
-    P.scenes=(r.cenas||[]).map(c=>({...c,ok:false})); save();
-    P.imgPhase=3; setAction("gerando as imagens"); renderPanel();
-    for(let i=0;i<P.scenes.length;i++){ if(busy&&busy.cancel) break; await sleep(140); P.scenes[i].ok=true; setAction(`imagem ${i+1} de ${P.scenes.length}`); if(i%3===0||i===P.scenes.length-1) renderPanel(); }
-    if(P.scenes.every(s=>s.ok)) P.imgPhase=4;
-    save();
-  }catch(e){ ui.imgErr=errMsg(e); P.imgPhase=0; }
-  clearBusy(); renderPanel();
+    P.scenes=(r.cenas||[]).map(c=>({trecho:c.trecho,prompt:c.prompt,img:null})); P.imgPhase=3; save();
+  }catch(e){ ui.imgErr=errMsg(e); P.imgPhase=0; clearBusy(); return renderPanel(); }
+  clearBusy();
+  if(AI.stageReady("image")) await drawScenes(P.scenes.map((_,i)=>i));
+  else { ui.imgErr="Os prompts estão prontos. Configure Imagens e capas na Administração pra gerar as imagens."; renderPanel(); }
 }
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function drawScenes(idx){
+  const P=S.project; ui.imgErr=null; const st=P.style;
+  setBusy("imagens",`imagem 0 de ${idx.length}`); P.imgPhase=3;
+  idx.forEach(i=>P.scenes[i].img="wait"); renderPanel();
+  let done=0, last=0;
+  const jobs=idx.map(i=>async()=>{
+    const s=P.scenes[i];
+    const prompt=`${s.prompt} Visual style: ${st}. Cinematic 16:9 composition, high detail, coherent lighting. No text, no captions, no watermark, no logos.`;
+    try{ const b=await AI.image(prompt,{aspect:"16:9",signal:busy.ctl.signal}); await Store.put(mkey(P.id,"scene",i),await toJpeg(b,0,0,.88)); s.img="ok"; }
+    catch(e){ if(e.code==="cancelled"){ s.img=null; throw e; } s.img=e.message||"Falhou"; if(e.code==="rate_limited"||e.code==="overloaded") throw e; }
+    done++; setAction(`imagem ${done} de ${idx.length}`); save();
+    if(Date.now()-last>700||done===idx.length){ last=Date.now(); renderPanel(); }
+  });
+  await imagePool(jobs,2);
+  P.scenes.forEach(s=>{ if(s.img==="wait") s.img=null; });
+  if(P.scenes.every(s=>s.img==="ok")) P.imgPhase=4;
+  const bad=P.scenes.find(s=>s.img&&s.img!=="ok");
+  if(bad) ui.imgErr=bad.img;
+  save(); clearBusy(); renderPanel();
+}
 
 /* ---- Narração ---- */
 VIEWS.narracao=()=>{ const P=S.project; const working=busy&&busy.k==="narracao"; const list=VOICES[P.provider]; const words=wc(scriptText()); const mins=(words/(140*P.speed)).toFixed(1); return `
@@ -798,25 +906,26 @@ VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem";
   <div class="btns"><button class="btn" id="mgo" ${busy?"disabled":""}>🎬 ${P.cut?"Montar de novo":"Montar no OnionCut"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
   ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div><div class="bar"><i style="width:${(P.cutProg||0)*100}%"></i></div>`:""}
   ${P.cut?`<h3>Linha do tempo</h3><div class="tl">
-    <div class="lane"><b>Vídeo</b><div class="track">${P.scenes.map((s,i)=>`<i style="background:linear-gradient(${(i*47)%360}deg,${st[1]},${st[2]})"></i>`).join("")}</div></div>
+    <div class="lane"><b>Vídeo</b><div class="track">${P.scenes.map((s,i)=>`<i ${s.img==="ok"?`data-img="${mkey(P.id,"scene",i)}"`:""} style="background:linear-gradient(${(i*47)%360}deg,${st[1]},${st[2]})"></i>`).join("")}</div></div>
     <div class="lane"><b>Legendas</b><div class="track" style="gap:4px">${words.map(w=>`<span class="cap">${esc(w.replace(/[^\p{L}\p{N}'’-]/gu,"").toUpperCase())}</span>`).join("")}</div></div>
     <div class="lane"><b>Áudio</b><div class="track wave">${Array.from({length:80},(_,i)=>`<i style="height:${20+Math.abs(Math.sin(i*1.7)*Math.cos(i*.37))*80}%"></i>`).join("")}</div></div>
   </div>
-  <p class="m" style="font-size:12.5px;color:var(--muted)">${P.scenes.length} cenas, trocas nas pausas da voz · ${P.narration.mins} min · template ${esc(P.template)}</p>`:""}
-  <div class="note">Nesta versão a montagem é uma prévia. O render em MP4 com FFmpeg, legendas palavra por palavra e cortes nas pausas reais da voz entra na próxima etapa.</div>
+  <p class="m" style="font-size:12.5px;color:var(--muted)">${P.scenes.length} cenas · ${P.narration?P.narration.mins:"?"} min · template ${esc(P.template)}</p>`:""}
+  <div class="note">Nesta versão a montagem ainda é uma prévia. O render do vídeo no navegador, com legendas palavra por palavra e cortes nas pausas reais da voz, é a próxima etapa. O pacote .zip já leva capa, imagens, roteiro e descrição.</div>
   <div class="btns">
     <button class="btn" id="mok" ${!P.cut?"disabled":""}>Salvar na Biblioteca</button>
-    ${P.cut?`<button class="btn ghost small" id="mdl">⬇ Baixar pacote (.txt)</button>`:""}
+    <button class="btn ghost small" id="mdl">⬇ Baixar pacote (.zip)</button>
   </div>`; };
 BIND.montagem=el=>{
   const P=S.project;
   bindPills(el,"tpl",v=>{P.template=v; save();}); bindPills(el,"cap",v=>{P.captions=v; save();});
   el.querySelector("#mgo").onclick=runMontagem;
-  const dl=el.querySelector("#mdl"); if(dl) dl.onclick=()=>downloadPack(P);
+  el.querySelector("#mdl").onclick=e=>downloadPack(P,e.currentTarget);
   el.querySelector("#mok").onclick=()=>{
     P.done.montagem=true; const item={...P,savedAt:Date.now()}; S.library.unshift(item); S.project=null; save();
     courier("montagem","arquivo"); toast("+1 vídeo pronto na Biblioteca"); renderProd(); openPanel("arquivo");
   };
+  paintImgs(el);
 };
 async function runMontagem(){
   const P=S.project; const steps=["trazendo os arquivos","sincronizando a voz","cortando nas pausas","aplicando as legendas","aplicando transições e filtro","renderizando"];
@@ -824,30 +933,51 @@ async function runMontagem(){
   for(let i=0;i<steps.length*8;i++){ if(busy.cancel){ clearBusy(); return renderPanel(); } await sleep(120); P.cutProg=(i+1)/(steps.length*8); const s=steps[Math.floor(i/8)]; if(busy.action!==s){ setAction(s); renderPanel(); } }
   P.cut=true; save(); clearBusy(); renderPanel();
 }
+function slug(t){ return (t||"video").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").slice(0,50)||"video"; }
+function saveBlob(blob,name){
+  const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),3000);
+}
 function packText(P){
   return [`ONION · ${P.title}`,"",`Canal: ${P.config.nicho} · ${P.config.publico} · ${P.config.idioma}`,"","== DESCRIÇÃO ==",P.description||"",(P.hashtags||[]).join(" "),"",
     "== TEXTO DA CAPA ==",(P.thumbs||[])[P.thumbSel]||"",P.thumbScene?("Composição: "+P.thumbScene):"","",
     "== ROTEIRO ==",...P.script.map((t,i)=>`[Bloco ${i+1}]\n${t}\n`),"== CENAS (prompts) ==",...P.scenes.map((s,i)=>`${i+1}. ${s.trecho}\n   ${s.prompt}`),"",
     `== NARRAÇÃO ==\n${P.narration?`${P.narration.voice} (${P.narration.provider}), ${P.speed}×`:"—"}`].join("\n");
 }
-async function downloadPack(P){
-  const name="onion-"+(P.title||"video").toLowerCase().normalize("NFD").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").slice(0,50)+".txt";
-  const url=URL.createObjectURL(new Blob([packText(P)],{type:"text/plain;charset=utf-8"}));
-  const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
+async function downloadPack(P,btn){
+  const name=slug(P.title);
+  if(!window.JSZip){ return saveBlob(new Blob([packText(P)],{type:"text/plain;charset=utf-8"}),`onion-${name}.txt`); }
+  const old=btn&&btn.innerHTML; if(btn){ btn.disabled=true; btn.innerHTML=`<span class="spin"></span> Empacotando…`; }
+  try{
+    const z=new JSZip();
+    z.file("roteiro.txt",P.script.join("\n\n"));
+    z.file("descricao.txt",(P.description||"")+"\n\n"+(P.hashtags||[]).join(" "));
+    z.file("titulo.txt",P.title||"");
+    z.file("onion-tudo.txt",packText(P));
+    if(P.thumbSel!=null){ const b=await Store.get(mkey(P.id,"thumb",P.thumbSel)); if(b) z.file("capa.jpg",b); }
+    const f=z.folder("cenas");
+    for(let i=0;i<P.scenes.length;i++){ const b=await Store.get(mkey(P.id,"scene",i)); if(b) f.file(`${String(i+1).padStart(2,"0")}.jpg`,b); }
+    f.file("prompts.txt",P.scenes.map((s,i)=>`${String(i+1).padStart(2,"0")}. ${s.trecho}\n    ${s.prompt}`).join("\n\n"));
+    saveBlob(await z.generateAsync({type:"blob"}),`onion-${name}.zip`);
+  }catch(e){ toast("Não deu pra montar o .zip neste navegador"); }
+  if(btn){ btn.disabled=false; btn.innerHTML=old; }
 }
 
 /* ---- Arquivo / Biblioteca ---- */
 VIEWS.arquivo=()=>`<div class="lib">
   <p class="lead">Vídeos que já passaram por todo o campus. ${S.library.length?`${S.library.length} no total.`:""}</p>
   ${S.library.length?S.library.map((P,i)=>`<details><summary>${esc(P.title)}</summary>
-    <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""}</p>
+    ${P.thumbSel!=null&&(P.thumbImg||[])[P.thumbSel]==="ok"?`<div class="big" data-img="${mkey(P.id,"thumb",P.thumbSel)}" style="margin-top:8px"></div>`:""}
+    <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
-    <div class="btns"><button class="btn small" data-dl="${i}">⬇ Baixar pacote</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+    <div class="btns"><button class="btn small" data-dl="${i}">⬇ Baixar pacote (.zip)</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+  <p class="m" id="usage" style="font-size:12px;color:var(--muted)"></p>
 </div>`;
 BIND.arquivo=el=>{
-  el.querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>downloadPack(S.library[+b.dataset.dl]));
-  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ S.library.splice(+b.dataset.rm,1); save(); renderPanel(); });
+  el.querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>downloadPack(S.library[+b.dataset.dl],b));
+  el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{ const P=S.library[+b.dataset.rm]; if(!confirm(`Remover “${P.title}” e as imagens dele deste navegador?`)) return; S.library.splice(+b.dataset.rm,1); save(); await Store.delPrefix(`p${P.id}:`); renderPanel(); });
+  paintImgs(el);
+  Store.usage().then(u=>{ const n=el.querySelector("#usage"); if(u&&n&&u.usage!=null) n.textContent=`Espaço usado neste navegador: ${(u.usage/1048576).toFixed(0)} MB de ${(u.quota/1048576/1024).toFixed(1)} GB disponíveis.`; });
 };
 
 /* ---- Administração ---- */

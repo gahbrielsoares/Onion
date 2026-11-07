@@ -147,3 +147,11 @@ button,input,select,textarea{font:inherit;color:inherit}
   .panel,.scrim,.toast,.bar>i{transition:none}
   .live,.spin{animation:none}
 }
+.thumb.has-img{padding:0}
+.thumb .tbadge{position:absolute;right:6px;top:6px;background:rgba(0,0,0,.55);color:#fff;border-radius:999px;min-width:22px;height:22px;display:grid;place-items:center;font-weight:700;font-size:12px}
+.thumb .tbadge.err{background:var(--danger)}
+.scene{border:2px solid transparent;cursor:pointer;padding:4px;font:inherit;color:#fff}
+.scene.cur{border-color:var(--gold)}
+.scene.has-img span{background:rgba(0,0,0,.55)}
+.big{aspect-ratio:16/9;border-radius:10px;background:var(--surface-2) center/cover no-repeat;margin:8px 0}
+.tl .track i[data-img]{background-size:cover;background-position:center}

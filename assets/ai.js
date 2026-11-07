@@ -188,6 +188,61 @@ const AI = (() => {
     catch (e) { throw fail("invalid_json", "Resposta fora do formato", { text }); }
   }
 
-  return { PROVIDERS, STAGES, get, setKey, setStage, clearAll, ready, stageReady,
+  /* ---------- imagens ---------- */
+  function b64Blob(b64, type) {
+    const bin = atob(b64), arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: type || "image/png" });
+  }
+  async function image(prompt, { aspect = "16:9", signal } = {}) {
+    const st = cfg.image, p = st.provider, k = cfg.keys[p];
+    if (!k) throw fail("no_key", "Cole a chave de " + PROVIDERS[p].name + " no cartão Imagens e capas da Administração.");
+    if (!st.model) throw fail("model", "Escolha o modelo de imagem na Administração.");
+    try {
+      if (p === "google") {
+        const go = (withCfg) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(st.model)}:generateContent`, {
+          method: "POST", signal, headers: { "content-type": "application/json", "x-goog-api-key": k },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: withCfg ? prompt : prompt + ` Aspect ratio ${aspect}, landscape.` }] }],
+            generationConfig: withCfg ? { responseModalities: ["TEXT", "IMAGE"], imageConfig: { aspectRatio: aspect } } : { responseModalities: ["TEXT", "IMAGE"] }
+          })
+        });
+        let res = await go(true);
+        if (res.status === 400) {
+          let m = ""; try { m = (await res.clone().json()).error?.message || ""; } catch (e) {}
+          if (/image_?config|aspect/i.test(m)) res = await go(false);
+        }
+        if (!res.ok) throw await httpErr(res, p);
+        const j = await res.json();
+        const c = j.candidates?.[0];
+        const part = (c?.content?.parts || []).find(x => x.inlineData || x.inline_data);
+        if (!part) {
+          const why = c?.finishReason || j.promptFeedback?.blockReason || "";
+          if (/SAFETY|PROHIBIT|BLOCK|IMAGE_OTHER|RECITATION/i.test(why)) throw fail("blocked", "O filtro do Google barrou esta imagem. Ajuste o prompt e tente de novo.");
+          throw fail("no_image", "O modelo não devolveu imagem. Tente de novo ou troque o modelo de imagem.");
+        }
+        const d = part.inlineData || part.inline_data;
+        return b64Blob(d.data, d.mimeType || d.mime_type);
+      }
+      if (p === "openai") {
+        const res = await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST", signal, headers: { "content-type": "application/json", Authorization: "Bearer " + k },
+          body: JSON.stringify({ model: st.model, prompt, n: 1, size: aspect === "16:9" ? "1536x1024" : "1024x1024" })
+        });
+        if (!res.ok) throw await httpErr(res, p);
+        const d = (await res.json()).data?.[0];
+        if (d?.b64_json) return b64Blob(d.b64_json, "image/png");
+        if (d?.url) return await (await fetch(d.url)).blob();
+        throw fail("no_image", "O modelo não devolveu imagem.");
+      }
+      throw fail("provider", "Este provedor não gera imagens.");
+    } catch (e) {
+      if (e && e.name === "AbortError") throw fail("cancelled", "Interrompido");
+      if (e && e.code) throw e;
+      throw fail("network", "Sem conexão com " + PROVIDERS[p].name + ".");
+    }
+  }
+
+  return { image, PROVIDERS, STAGES, get, setKey, setStage, clearAll, ready, stageReady,
            listModels, cachedModels, pickDefault, pickQuick, call, json };
 })();

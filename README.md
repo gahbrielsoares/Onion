@@ -44,7 +44,8 @@ O site é estático e público. **Nenhuma chave fica no código.** Cada pessoa c
 index.html          página do parque
 assets/onion.css    estilos
 assets/onion.js     parque, etapas e estado
-assets/ai.js        provedores de IA por etapa, chaves e descoberta de modelos
+assets/ai.js        provedores de IA por etapa, chaves, modelos, textos e imagens
+assets/store.js     imagens e áudios guardados no navegador (IndexedDB)
 ```
 
 ## Status
@@ -52,6 +53,7 @@ assets/ai.js        provedores de IA por etapa, chaves e descoberta de modelos
 - [x] Parque interativo com etapas encadeadas
 - [x] Textos com IA: temas, títulos, roteiro, descrição, capa, prompts de cena
 - [x] Administração com provedor e chave por etapa
-- [ ] Imagens e capas com Gemini
+- [x] Imagens e capas com Gemini ou OpenAI (guardadas no navegador, IndexedDB)
+- [x] Pacote .zip com capa, cenas, roteiro e descrição
 - [ ] Narração com ElevenLabs
 - [ ] OnionCut: render do vídeo no navegador
