@@ -23,9 +23,16 @@ Cada prédio do **Onion Park** é uma etapa da produção: você clica, configur
 
 ## Como usar
 
-1. Abra o site e entre na **Administração**.
-2. Cole sua chave da Anthropic (crie em console.anthropic.com e defina um limite de gasto).
+1. Abra o site e entre na **Administração** (⚙ no topo).
+2. Em cada etapa, escolha o provedor, cole a chave e clique em **Salvar e testar**. O teste já carrega os modelos disponíveis na sua conta.
 3. Siga a seta dourada no parque.
+
+| Etapa | Provedores |
+|---|---|
+| Textos | Anthropic, Google Gemini, OpenAI |
+| Imagens e capas | Google Gemini, OpenAI |
+| Narração | ElevenLabs, Google Gemini, OpenAI |
+| OnionCut | Sem IA (padrão), ElevenLabs, Google Gemini, OpenAI (só pra sincronia das legendas) |
 
 ## Segurança
 
@@ -37,13 +44,14 @@ O site é estático e público. **Nenhuma chave fica no código.** Cada pessoa c
 index.html          página do parque
 assets/onion.css    estilos
 assets/onion.js     parque, etapas e estado
-assets/ai.js        chamadas à API da Anthropic (streaming)
+assets/ai.js        provedores de IA por etapa, chaves e descoberta de modelos
 ```
 
 ## Status
 
 - [x] Parque interativo com etapas encadeadas
 - [x] Textos com IA: temas, títulos, roteiro, descrição, capa, prompts de cena
+- [x] Administração com provedor e chave por etapa
 - [ ] Imagens e capas com Gemini
 - [ ] Narração com ElevenLabs
 - [ ] OnionCut: render do vídeo no navegador

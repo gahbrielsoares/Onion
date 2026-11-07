@@ -436,7 +436,7 @@ async function ask(prompt,{json=false,tier="default",onText}={}){
   return json ? AI.json(prompt,opts) : AI.call(prompt,opts);
 }
 function aiNote(){
-  if(!AI.ready()) return `<div class="note">A equipe precisa da sua chave da Anthropic pra trabalhar. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
+  if(!AI.ready()) return `<div class="note">A equipe de textos ainda não tem chave e modelo configurados. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
   return "";
 }
 
@@ -851,31 +851,67 @@ BIND.arquivo=el=>{
 };
 
 /* ---- Administração ---- */
+let admMsg={}; // stage -> {ok,text}
+function stageStatus(st){
+  const c=AI.get(), p=c[st].provider;
+  if(AI.PROVIDERS[p].noKey) return `<span class="tag gold">pronto</span>`;
+  if(!c.keys[p]) return `<span class="tag hot">falta a chave</span>`;
+  if(!c[st].model) return `<span class="tag hot">falta escolher o modelo</span>`;
+  return `<span class="tag gold">pronto</span>`;
+}
+function modelField(st,field,label){
+  const c=AI.get(), p=c[st].provider, ids=AI.cachedModels(p,st), cur=c[st][field]||"";
+  const id=`m-${st}-${field}`;
+  if(!ids.length) return `<div class="field"><label for="${id}">${label}</label><input id="${id}" data-model="${st}:${field}" value="${esc(cur)}" placeholder="Clique em Testar pra carregar a lista"></div>`;
+  const opts=(cur&&!ids.includes(cur)?[cur,...ids]:ids);
+  return `<div class="field"><label for="${id}">${label}</label><select id="${id}" data-model="${st}:${field}">${field==="quick"?`<option value="">Mesmo do principal</option>`:""}${opts.map(m=>`<option ${m===cur?"selected":""}>${esc(m)}</option>`).join("")}</select></div>`;
+}
 VIEWS.admin=()=>{ const c=AI.get(); return `
-  <p class="lead">O Onion roda inteiro no seu navegador. As chaves ficam guardadas só aqui, neste aparelho, e vão direto pra API de cada empresa.</p>
-  <h3>Anthropic (roteiros, títulos, descrição, cenas)</h3>
-  <div class="field"><label for="ak">Chave da API</label><input id="ak" type="password" autocomplete="off" placeholder="sk-ant-…" value="${esc(c.anthropicKey)}"></div>
-  <div class="row"><div class="field"><label for="am">Modelo principal</label><input id="am" value="${esc(c.model)}"></div>
-  <div class="field"><label for="aq">Modelo rápido</label><input id="aq" value="${esc(c.quickModel)}"></div></div>
-  <div class="btns"><button class="btn" id="asave">Salvar chave</button><button class="btn ghost small" id="atest" ${c.anthropicKey?"":"disabled"}>Testar conexão</button>${c.anthropicKey?`<button class="btn ghost small" id="aclear">Apagar chave deste navegador</button>`:""}</div>
-  <div id="ares"></div>
-  <div class="note">Crie a chave em console.anthropic.com e defina um limite mensal de gasto lá. Nunca cole chaves no código nem no repositório do GitHub: o site é público, a chave não.</div>
-  <h3>Próximas integrações</h3>
-  <div class="card"><div class="t">Google Gemini (imagens e capas)</div><div class="m">Chega na próxima etapa do projeto.</div></div>
-  <div class="card"><div class="t">ElevenLabs (narração)</div><div class="m">Chega na próxima etapa do projeto.</div></div>
-  <div class="card"><div class="t">OnionCut no navegador (MP4/WebM)</div><div class="m">Chega na próxima etapa do projeto.</div></div>`; };
+  <p class="lead">Pra cada etapa, escolha quem faz o trabalho e cole a chave. A mesma chave vale pra todas as etapas do mesmo provedor. Tudo fica guardado só neste navegador.</p>
+  ${Object.entries(AI.STAGES).map(([st,S2])=>{
+    const p=c[st].provider, P2=AI.PROVIDERS[p];
+    const others=Object.keys(AI.STAGES).filter(o=>o!==st&&c[o].provider===p&&!P2.noKey).map(o=>AI.STAGES[o].name);
+    const msg=admMsg[st];
+    return `<section class="card" style="padding:14px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><h3 style="margin:0">${S2.name}</h3>${stageStatus(st)}</div>
+      <p class="m" style="margin:4px 0 10px">${S2.what}</p>
+      <div class="pills" data-group="prov-${st}">
+        ${S2.providers.map(x=>`<button type="button" class="pill" aria-pressed="${x===p}" data-v="${x}">${esc(AI.PROVIDERS[x].name)}</button>`).join("")}
+        ${Object.keys(S2.blocked||{}).map(x=>`<button type="button" class="pill" disabled style="opacity:.45;cursor:not-allowed" title="${esc(S2.blocked[x])}">${esc(AI.PROVIDERS[x].name)}</button>`).join("")}
+      </div>
+      ${Object.values(S2.blocked||{}).map(t=>`<p class="m" style="font-size:12px;margin:6px 0 0">${esc(t)}</p>`).join("")}
+      ${P2.noKey?`<p class="m" style="margin-top:10px">Nada pra configurar: as legendas usam o texto do roteiro e os cortes usam as pausas detectadas no áudio.</p>`:`
+      <div class="field" style="margin-top:12px"><label for="k-${st}">Chave de ${esc(P2.name)}</label>
+        <div style="display:flex;gap:6px"><input id="k-${st}" data-key="${p}" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(P2.keyHint)}" value="${esc(c.keys[p])}"><button type="button" class="btn ghost small" data-show="k-${st}" aria-label="Mostrar chave">👁</button></div>
+        <p class="m" style="font-size:12px;margin:5px 0 0">Crie em ${esc(P2.where)}${others.length?` · esta chave também é usada em ${others.join(" e ")}`:""}</p></div>
+      ${st==="text"?`<div class="row">${modelField(st,"model","Modelo principal")}${modelField(st,"quick","Modelo rápido")}</div>`:modelField(st,"model","Modelo")}
+      <div class="btns" style="margin-top:4px"><button class="btn small" data-test="${st}">Salvar e testar</button></div>
+      ${msg?`<div class="${msg.ok?"status":"err"}" style="${msg.ok?"color:var(--ok)":""}">${esc(msg.text)}</div>`:""}`}
+    </section>`;}).join("")}
+  <div class="note">Defina um limite mensal de gasto no painel de cada provedor. Nunca cole chaves no código nem no repositório: o site é público, as chaves não.</div>
+  <div class="btns"><button class="btn ghost small" id="aclear">Apagar todas as chaves deste navegador</button></div>`; };
 BIND.admin=el=>{
-  const res=el.querySelector("#ares");
-  el.querySelector("#asave").onclick=()=>{
-    AI.set({anthropicKey:el.querySelector("#ak").value.trim(),model:el.querySelector("#am").value.trim()||"claude-sonnet-5-5",quickModel:el.querySelector("#aq").value.trim()||"claude-haiku-5-5"});
-    toast(AI.ready()?"Chave salva neste navegador":"Chave removida"); renderPanel(); showInfo(null);
-  };
-  const t=el.querySelector("#atest"); if(t) t.onclick=async()=>{
-    res.innerHTML=`<div class="status"><span class="spin"></span>Testando…</div>`;
-    try{ await AI.test(); res.innerHTML=`<div class="status" style="color:var(--ok)">✓ Conectado. A equipe está pronta.</div>`; }
-    catch(e){ res.innerHTML=`<div class="err">${esc(e.message||"Falhou")}</div>`; }
-  };
-  const c=el.querySelector("#aclear"); if(c) c.onclick=()=>{ AI.clear(); toast("Chave apagada deste navegador"); renderPanel(); };
+  Object.keys(AI.STAGES).forEach(st=>{
+    bindPills(el,"prov-"+st,v=>{ AI.setStage(st,{provider:v,model:"",...(st==="text"?{quick:""}:{})}); const ids=AI.cachedModels(v,st); if(ids.length) AI.setStage(st,{model:AI.pickDefault(st,ids),...(st==="text"?{quick:AI.pickQuick(ids)}:{})}); admMsg[st]=null; renderPanel(); });
+  });
+  el.querySelectorAll("[data-key]").forEach(i=>i.onchange=()=>{ AI.setKey(i.dataset.key,i.value); });
+  el.querySelectorAll("[data-show]").forEach(b=>b.onclick=()=>{ const i=el.querySelector("#"+b.dataset.show); i.type=i.type==="password"?"text":"password"; });
+  el.querySelectorAll("[data-model]").forEach(i=>i.onchange=()=>{ const [st,f]=i.dataset.model.split(":"); AI.setStage(st,{[f]:i.value.trim()}); renderPanel(); showInfo(null); });
+  el.querySelectorAll("[data-test]").forEach(b=>b.onclick=async()=>{
+    const st=b.dataset.test, inp=el.querySelector("#k-"+st);
+    AI.setKey(inp.dataset.key,inp.value);
+    b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando…`;
+    try{
+      const p=AI.get()[st].provider; const ids=await AI.listModels(p,st); const cur=AI.get()[st];
+      const patch={}; if(!cur.model||!ids.includes(cur.model)) patch.model=AI.pickDefault(st,ids);
+      if(st==="text"&&!cur.quick) patch.quick=AI.pickQuick(ids);
+      AI.setStage(st,patch);
+      admMsg[st]= ids.length ? {ok:true,text:`✓ Chave aceita. ${ids.length} modelo${ids.length>1?"s":""} disponíve${ids.length>1?"is":"l"} pra ${AI.STAGES[st].name.toLowerCase()}.`}
+                             : {ok:false,text:"A chave funciona, mas esta conta não tem modelos pra esta etapa. Escolha outro provedor."};
+    }catch(e){ admMsg[st]={ok:false,text:e.message||"Não deu pra testar a chave."}; }
+    renderPanel(); showInfo(null); renderProd();
+  });
+  el.querySelector("#aclear").onclick=()=>{ AI.clearAll(); admMsg={}; toast("Chaves apagadas deste navegador"); renderPanel(); };
 };
 
 /* ============ BOOT ============ */
