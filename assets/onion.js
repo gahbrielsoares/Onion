@@ -584,7 +584,7 @@ function renderVoices(el,list){
     try{
       let url=v.preview||sampleUrls[AI.get().voice.provider+":"+id];
       if(!url){ b.innerHTML=`<span class="spin"></span>`; const txt=(P.script[0]||P.title||"").split(/(?<=[.!?])\s+/).slice(0,2).join(" ").slice(0,220)||"This is how this voice sounds.";
-        const r=await Voice.synth(txt,{voiceId:id,speed:P.speed,style:P.voiceStyle,lang:LANG_EN[P.config.idioma]}); url=URL.createObjectURL(r.blob); sampleUrls[AI.get().voice.provider+":"+id]=url; }
+        const r=await Voice.synth(txt,{voiceId:id,speed:P.speed,style:P.voiceStyle,lang:LANG_EN[P.config.idioma],idioma:P.config.idioma}); url=URL.createObjectURL(r.blob); sampleUrls[AI.get().voice.provider+":"+id]=url; }
       b.innerHTML="▶"; playing=new Audio(url); playing.play();
     }catch(err){ b.innerHTML="▶"; toast(err.message||"Não deu pra tocar a amostra"); }
   });
@@ -627,7 +627,7 @@ async function runNarracao(onlyFailed){
   const jobs=idx.map(i=>async()=>{
     const ch=N.chunks[i];
     try{
-      const r=await Voice.synth(ch.text,{voiceId:N.voiceId,speed:N.speed,style:N.style,lang:LANG_EN[P.config.idioma],prev:N.chunks[i-1]?.text||"",next:N.chunks[i+1]?.text||"",signal:busy.ctl.signal});
+      const r=await Voice.synth(ch.text,{voiceId:N.voiceId,speed:N.speed,style:N.style,lang:LANG_EN[P.config.idioma],idioma:P.config.idioma,prev:N.chunks[i-1]?.text||"",next:N.chunks[i+1]?.text||"",signal:busy.ctl.signal});
       await Store.put(`p${P.id}:audio:${i}`,r.blob);
       const f=await Voice.decode(r.blob); ch.dur=f.length/Voice.SR; ch.words=r.words||null; ch.tw=null; ch.st="ok";
     }catch(e){ if(e.code==="cancelled"){ ch.st=null; throw e; } ch.st=e.message||"Falhou"; if(e.code==="rate_limited"||e.code==="overloaded") throw e; }
@@ -803,12 +803,22 @@ VIEWS.arquivo=()=>`<div class="lib">
       <span class="playbtn">▶</span><span class="playlbl">${P.render&&P.render.stored?"Assistir o vídeo":"Assistir a prévia"}</span></div>
     <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
-    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button><button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
   <p class="m" id="usage" style="font-size:12px;color:var(--muted)"></p>
 </div>`;
 BIND.arquivo=el=>{
   el.querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>downloadPack(S.library[+b.dataset.dl],b));
   el.querySelectorAll("[data-play]").forEach(box=>{ const go=()=>playLibrary(box,S.library[+box.dataset.play]); box.onclick=go; box.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } }; });
+  el.querySelectorAll("[data-reopen]").forEach(b=>b.onclick=async()=>{
+    if(S.project) return toast("Termine ou descarte o vídeo em produção antes");
+    const P=S.library[+b.dataset.reopen];
+    if(!confirm(`Reabrir “${P.title}” no campus? O vídeo volta pro Estúdio de Narração; roteiro, capa e imagens são mantidos.`)) return;
+    S.library.splice(+b.dataset.reopen,1);
+    await Store.delPrefix(`p${P.id}:audio:`); await Store.delPrefix(`p${P.id}:video:`);
+    Object.assign(P,{narr:null,narration:null,render:null,cut:false}); P.done.narracao=false; P.done.montagem=false; delete P.savedAt;
+    P.config.idioma=P.config.idioma||(S.config&&S.config.idioma); S.project=P; Cut._R=null; save(); renderProd();
+    courier("arquivo","narracao"); toast("Vídeo de volta no Estúdio de Narração"); openPanel("narracao");
+  });
   el.querySelectorAll("[data-vid]").forEach(b=>b.onclick=async()=>{ const P=S.library[+b.dataset.vid]; const v=await Store.get(mkey(P.id,"video",0)); if(v) saveBlob(v,`${slug(P.title)}.mp4`); else toast("O vídeo não está mais guardado neste navegador"); });
   el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{ const P=S.library[+b.dataset.rm]; if(!confirm(`Remover “${P.title}” e as imagens dele deste navegador?`)) return; S.library.splice(+b.dataset.rm,1); save(); await Store.delPrefix(`p${P.id}:`); renderPanel(); });
   paintImgs(el);

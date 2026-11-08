@@ -75,15 +75,22 @@ const Voice = (() => {
   async function errText(r) { try { const j = await r.json(); return j.error?.message || j.detail?.message || (typeof j.detail === "string" ? j.detail : "") || ""; } catch (e) { return ""; } }
 
   // devolve {blob, words?:[{w,s,e}]} — words só quando o provedor dá o tempo exato
-  async function synth(text, { voiceId, speed = 1, style = "", prev = "", next = "", signal, lang = "" } = {}) {
+  async function synth(text, { voiceId, speed = 1, style = "", prev = "", next = "", signal, lang = "", idioma = "" } = {}) {
     const c = AI.get(), p = c.voice.provider, k = c.keys[p], model = c.voice.model;
     if (!k) throw fail("no_key", "Cole a chave de " + AI.PROVIDERS[p].name + " no cartão Narração.");
     if (!model) throw fail("model", "Escolha o modelo de narração na Administração.");
     if (!voiceId) throw fail("voice", "Escolha uma voz.");
     try {
       if (p === "google") {
-        const pace = speed < .95 ? "at a slightly slower, unhurried pace" : speed > 1.05 ? "at a slightly faster, energetic pace" : "at a natural pace";
-        const instr = `Read the following narration aloud${lang ? " in " + lang + ", with a native " + lang + " accent" : ""} ${pace}${style ? ", " + style : ""}. Read only the text, exactly as written:\n\n`;
+        // a instrução vai no mesmo idioma do texto: instrução em inglês faz o modelo ler (ou traduzir) em inglês
+        const slow = speed < .95, fast = speed > 1.05;
+        let instr;
+        if (idioma === "Português") instr = `Leia em voz alta o texto abaixo, em português do Brasil, com sotaque brasileiro nativo, ${slow ? "num ritmo um pouco mais lento e calmo" : fast ? "num ritmo um pouco mais rápido e animado" : "num ritmo natural"}${style ? ", " + style : ""}. Leia somente o texto, exatamente como está escrito, sem traduzir nada:\n\n`;
+        else if (idioma === "Espanhol") instr = `Lee en voz alta el siguiente texto en español, con acento nativo, ${slow ? "a un ritmo un poco más lento y calmado" : fast ? "a un ritmo un poco más rápido" : "a un ritmo natural"}${style ? ", " + style : ""}. Lee solo el texto, exactamente como está escrito, sin traducir nada:\n\n`;
+        else {
+          const pace = slow ? "at a slightly slower, unhurried pace" : fast ? "at a slightly faster, energetic pace" : "at a natural pace";
+          instr = `Read the following narration aloud${lang ? " in " + lang + ", with a native accent" : ""} ${pace}${style ? ", " + style : ""}. Read only the text, exactly as written, and do not translate it${lang && lang !== "American English" ? " (it is in " + lang + ")" : ""}:\n\n`;
+        }
         const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
           method: "POST", signal, headers: { "content-type": "application/json", "x-goog-api-key": k },
           body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: instr + text }] }],
