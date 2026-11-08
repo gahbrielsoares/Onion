@@ -42,7 +42,7 @@ const firstErr = () => ui.virErr || ui.titErr || ui.rotErr || ui.desErr || ui.ca
 
 /* ---------- etapas ---------- */
 async function apIdea() {
-  if (S.project) { apLog("Ideias", `continuando o vídeo em produção: “${S.project.title || S.project.idea.tema}”`); return; }
+  if (S.project) { apLog("Ideias", `continuando o vídeo em produção: “${S.project.title || S.project.idea.tema}” (${S.project.config.idioma})`); return; }
   const used = S.library.map(p => p.idea?.tema).concat(AP.usedTopics || []).filter(Boolean);
   let idea = null;
   if (S.ideias.length) {
@@ -67,7 +67,7 @@ async function apIdea() {
   }
   (AP.usedTopics = AP.usedTopics || []).push(idea.tema);
   S.project = newProject(idea); save(); renderProd();
-  apLog("Ideias", "produção começou", "ok");
+  apLog("Ideias", `produção começou · vídeo em ${S.project.config.idioma}`, "ok");
   courier("ideias", "titulos");
 }
 async function apTitulos() {
@@ -146,7 +146,7 @@ async function apMontagem() {
   await apRender(P);
   apLog("OnionCut", `vídeo salvo: ${P.render.name}`, "ok");
   // biblioteca
-  P.done.montagem = true; S.library.unshift({ ...P, savedAt: Date.now() }); S.project = null; Cut._R = null; save(); renderProd();
+  P.done.montagem = true; S.library.unshift(slimForLibrary(P)); S.project = null; Cut._R = null; save(); renderProd();
   courier("montagem", "arquivo");
   await walk("arquivo", "guardando no Arquivo");
 }
@@ -160,9 +160,9 @@ async function apRender(P) {
       P.renderProg = f / total; setAction(`renderizando ${Math.round(f / total * 100)}% · falta ${fmtT(eta)}`); mgrSay(`renderizando ${Math.round(f / total * 100)}%`);
       if (panelKey === "auto") renderAutoHead();
     } });
-    let mb = null;
-    if (out.blob) { mb = (out.blob.size / 1048576).toFixed(0); saveBlob(out.blob, name); }
-    P.render = { name, res: P.res, mb, secs: R.dur, at: Date.now() };
+    const vb = await keepVideo(P, out, fh);
+    if (out.blob) saveBlob(out.blob, name);
+    P.render = { name, res: P.res, mb: vb ? (vb.size / 1048576).toFixed(0) : null, secs: R.dur, at: Date.now(), stored: !!vb };
     // capa e descrição junto do vídeo
     const thumb = await Store.get(mkey(P.id, "thumb", P.thumbSel));
     const desc = new Blob([`${P.title}\n\n${P.description || ""}\n\n${(P.hashtags || []).join(" ")}\n`], { type: "text/plain;charset=utf-8" });
@@ -190,7 +190,7 @@ async function runAuto() {
       for (const step of [apIdea, apTitulos, apRoteiro, apDescricao, apCapa, apImagens, apNarracao, apMontagem]) { apCheck(); await step(); if (panelKey === "auto") renderAutoHead(); }
       AP.done++; apLog("Gerente", `✓ vídeo ${AP.cur} pronto`, "ok");
     }
-    apLog("Gerente", `terminei: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} prontos`, "ok"); toast(`Piloto automático: ${AP.done} vídeo(s) prontos`);
+    apLog("Gerente", `terminei: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} pronto${AP.done > 1 ? "s" : ""}`, "ok"); toast(`Piloto automático: ${AP.done} vídeo(s) prontos`);
   } catch (e) {
     AP.err = e.message || "Algo deu errado."; apLog("Gerente", AP.err, e.code === "stopped" ? "warn" : "err");
     if (e.code !== "stopped") toast("Piloto automático parou: " + AP.err);
@@ -217,6 +217,8 @@ VIEWS.auto = () => {
   <p class="lead">O gerente cuida de tudo: escolhe o tema, o título, a capa, o estilo das imagens, a voz e o template, e caminha de prédio em prédio até o vídeo sair renderizado.</p>
   <div id="aphead"></div>
   ${AP.on ? "" : `
+  ${S.config ? `<div class="card"><div class="t">Canal: ${esc(S.config.nicho)} · vídeos em <span style="color:var(--accent)">${esc(S.config.idioma)}</span></div><div class="m">${esc(S.config.publico)} · ${esc(S.config.formato)} · ${S.config.duracao} min · voz ${esc((S.config.voz || "").toLowerCase())} <a href="#" onclick="openPanel('ideias');return false" style="color:var(--accent)">alterar</a></div></div>` : ""}
+  ${S.project ? `<div class="note" style="${S.config && S.project.config.idioma !== S.config.idioma ? "border:1px solid var(--danger)" : ""}"><b>Tem um vídeo pela metade:</b> “${esc(S.project.title || S.project.idea.tema)}” em ${esc(S.project.config.idioma)}. O piloto continua ele primeiro.${S.config && S.project.config.idioma !== S.config.idioma ? ` <b style="color:var(--danger)">Atenção: ele está em ${esc(S.project.config.idioma)}, mas o canal agora está em ${esc(S.config.idioma)}.</b>` : ""}<div class="btns" style="margin-top:6px"><button class="btn ghost small" id="apdisc">Descartar esse vídeo</button></div></div>` : ""}
   ${miss.length ? `<div class="note"><b>Antes de começar:</b>${miss.map(([t, k]) => `<div style="margin-top:6px">• ${esc(t)} ${k ? `<button class="btn ghost small" style="padding:3px 8px" onclick="openPanel('${k}')">abrir</button>` : ""}</div>`).join("")}</div>` : ""}
   <div class="row"><div class="field"><label for="apn">Quantos vídeos</label><input id="apn" type="number" min="1" max="20" value="${AP.total}"></div>
   <div class="field"><label for="apr">Região dos temas virais</label><select id="apr">${REGIOES.map(r => `<option ${r === (AP.region || S.viraisRegion) ? "selected" : ""}>${r}</option>`).join("")}</select></div></div>
@@ -250,6 +252,7 @@ function renderAutoLog() {
 BIND.auto = el => {
   renderAutoHead(); renderAutoLog();
   if (AP.on) return;
+  const dc = el.querySelector("#apdisc"); if (dc) dc.onclick = () => { if (!confirm("Descartar o vídeo pela metade?")) return; Store.delPrefix(`p${S.project.id}:`); S.project = null; Cut._R = null; save(); renderProd(); renderPanel(); };
   const n = el.querySelector("#apn"); n.oninput = () => { AP.total = Math.max(1, Math.min(20, +n.value || 1)); const b = el.querySelector("#apgo"); if (b) b.textContent = `🤖 Gerar ${AP.total} vídeo${AP.total > 1 ? "s" : ""} no automático`; };
   el.querySelector("#apr").onchange = e => { AP.region = e.target.value; };
   bindPills(el, "apres", v => { AP.res = v; });

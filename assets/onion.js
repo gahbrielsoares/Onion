@@ -73,7 +73,7 @@ function renderProd(){
   const done=STAGES.filter(s=>P.done[s]).length;
   const all=done===STAGES.length;
   el.innerHTML=ap+`<div class="st">${busy?`<span class="spin"></span> ${esc(BK[busy.k].n)}: ${esc(busy.action||"trabalhando")}`:(all?"✓ Vídeo concluído":"Em produção")}</div>
-  <div class="tt" title="${esc(P.title||P.idea.tema)}">${esc(P.title||P.idea.tema)}</div>
+  <div class="tt" title="${esc(P.title||P.idea.tema)}">${esc(P.title||P.idea.tema)} <span class="chip" style="font-weight:600">${esc(P.config.idioma)}</span></div>
   <div class="bar"><i style="width:${done/STAGES.length*100}%"></i></div>
   <div class="chips">${STAGES.map(s=>`<span class="chip ${P.done[s]?"on":""}">${P.done[s]?"✓ ":""}${STAGE_LABEL[s]}</span>`).join("")}</div>
   ${busy?`<div class="btns" style="margin-top:8px"><button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button></div>`:""}`;
@@ -216,14 +216,17 @@ VIEWS.ideias=()=>{
 };
 BIND.ideias=el=>{
   let lang=(S.config&&S.config.idioma)||"Inglês";
-  bindPills(el,"lang",v=>lang=v);
-  const cn=el.querySelector("#cn"); cn.onchange=()=>el.querySelector("#cno").style.display=cn.value==="Outro"?"":"none";
-  const cd=el.querySelector("#cd"); cd.oninput=()=>{ const v=Math.max(10,Math.min(60,+cd.value||15)); el.querySelector("#cdb").textContent=Math.max(2,Math.round(v/5))+" blocos de roteiro"; };
-  el.querySelector("#csave").onclick=()=>{
-    const nicho=cn.value==="Outro"?(el.querySelector("#cnx").value.trim()||"Outro"):cn.value;
-    S.config={nicho,publico:el.querySelector("#cp").value,formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,duracao:Math.max(10,Math.min(60,+cd.value||15)),idioma:lang};
-    save(); toast("Canal salvo"); renderPanel();
-  };
+  const cn=el.querySelector("#cn"), cd=el.querySelector("#cd");
+  const readCfg=()=>{ const nicho=cn.value==="Outro"?(el.querySelector("#cnx").value.trim()||"Outro"):cn.value;
+    return {nicho,publico:el.querySelector("#cp").value,formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,duracao:Math.max(10,Math.min(60,+cd.value||15)),idioma:lang}; };
+  // depois do primeiro "Salvar canal", toda mudança é salva na hora
+  const autosave=()=>{ if(S.config){ S.config=readCfg(); save(); renderProd(); } };
+  bindPills(el,"lang",v=>{ lang=v; autosave(); if(S.config) toast("Idioma dos vídeos: "+v); });
+  cn.onchange=()=>{ el.querySelector("#cno").style.display=cn.value==="Outro"?"":"none"; autosave(); };
+  ["#cnx","#cp","#cf","#cg","#cv"].forEach(q=>{ const i=el.querySelector(q); if(i) i.onchange=autosave; });
+  cd.oninput=()=>{ const v=Math.max(10,Math.min(60,+cd.value||15)); el.querySelector("#cdb").textContent=Math.max(2,Math.round(v/5))+" blocos de roteiro"; };
+  cd.onchange=autosave;
+  el.querySelector("#csave").onclick=()=>{ S.config=readCfg(); save(); toast("Canal salvo · vídeos em "+S.config.idioma); renderPanel(); };
   const ni=el.querySelector("#ni");
   const add=()=>{ const v=ni.value.trim(); if(!v) return; const id=Date.now()+Math.random(); S.ideias.unshift({id,tema:v,origem:"Sua ideia"}); S.selIdea=id; save(); renderPanel(); };
   el.querySelector("#nadd").onclick=add; ni.onkeydown=e=>{ if(e.key==="Enter") add(); };
@@ -581,7 +584,7 @@ function renderVoices(el,list){
     try{
       let url=v.preview||sampleUrls[AI.get().voice.provider+":"+id];
       if(!url){ b.innerHTML=`<span class="spin"></span>`; const txt=(P.script[0]||P.title||"").split(/(?<=[.!?])\s+/).slice(0,2).join(" ").slice(0,220)||"This is how this voice sounds.";
-        const r=await Voice.synth(txt,{voiceId:id,speed:P.speed,style:P.voiceStyle}); url=URL.createObjectURL(r.blob); sampleUrls[AI.get().voice.provider+":"+id]=url; }
+        const r=await Voice.synth(txt,{voiceId:id,speed:P.speed,style:P.voiceStyle,lang:LANG_EN[P.config.idioma]}); url=URL.createObjectURL(r.blob); sampleUrls[AI.get().voice.provider+":"+id]=url; }
       b.innerHTML="▶"; playing=new Audio(url); playing.play();
     }catch(err){ b.innerHTML="▶"; toast(err.message||"Não deu pra tocar a amostra"); }
   });
@@ -624,7 +627,7 @@ async function runNarracao(onlyFailed){
   const jobs=idx.map(i=>async()=>{
     const ch=N.chunks[i];
     try{
-      const r=await Voice.synth(ch.text,{voiceId:N.voiceId,speed:N.speed,style:N.style,prev:N.chunks[i-1]?.text||"",next:N.chunks[i+1]?.text||"",signal:busy.ctl.signal});
+      const r=await Voice.synth(ch.text,{voiceId:N.voiceId,speed:N.speed,style:N.style,lang:LANG_EN[P.config.idioma],prev:N.chunks[i-1]?.text||"",next:N.chunks[i+1]?.text||"",signal:busy.ctl.signal});
       await Store.put(`p${P.id}:audio:${i}`,r.blob);
       const f=await Voice.decode(r.blob); ch.dur=f.length/Voice.SR; ch.words=r.words||null; ch.tw=null; ch.st="ok";
     }catch(e){ if(e.code==="cancelled"){ ch.st=null; throw e; } ch.st=e.message||"Falhou"; if(e.code==="rate_limited"||e.code==="overloaded") throw e; }
@@ -663,7 +666,7 @@ VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem";
   </div>
   <div class="btns"><button class="btn" id="mrender" ${busy||!sup?"disabled":""}>⬇ Renderizar o vídeo (MP4 ${esc(P.res||"1080p")})</button></div>
   <p class="m" style="font-size:12px;color:var(--muted)">O render roda aqui no seu computador. Deixe esta aba aberta até terminar.</p>`:""}
-  ${P.render?`<div class="card"><div class="t">✓ Vídeo renderizado</div><div class="m">${esc(P.render.name)} · ${esc(P.render.res)}${P.render.mb?` · ${P.render.mb} MB`:""} · ${fmtT(P.render.secs||0)}</div></div>`:""}
+  ${P.render?`<div class="card"><div class="t">✓ Vídeo renderizado</div><div class="m">${esc(P.render.name)} · ${esc(P.render.res)}${P.render.mb?` · ${P.render.mb} MB`:""} · ${fmtT(P.render.secs||0)}</div>${P.render.stored?`<div class="btns"><button class="btn small" id="mvid">🎬 Baixar o vídeo (.mp4)</button></div>`:""}</div>`:""}
   <div class="btns">
     <button class="btn" id="mok" ${!P.render||working?"disabled":""}>Salvar na Biblioteca</button>
     <button class="btn ghost small" id="mdl">⬇ Baixar pacote (.zip)</button>
@@ -675,8 +678,9 @@ BIND.montagem=el=>{
   bindPills(el,"res",v=>{P.res=v; save(); const b=el.querySelector("#mrender"); if(b) b.textContent=`⬇ Renderizar o vídeo (MP4 ${v})`;});
   el.querySelector("#mprep").onclick=runPrepare;
   el.querySelector("#mdl").onclick=e=>downloadPack(P,e.currentTarget);
+  const mv=el.querySelector("#mvid"); if(mv) mv.onclick=async()=>{ const v=await Store.get(mkey(P.id,"video",0)); if(v) saveBlob(v,`${slug(P.title)}.mp4`); };
   el.querySelector("#mok").onclick=()=>{
-    stopPreview(); P.done.montagem=true; const item={...P,savedAt:Date.now()}; S.library.unshift(item); S.project=null; Cut._R=null; save();
+    stopPreview(); P.done.montagem=true; S.library.unshift(slimForLibrary(P)); S.project=null; Cut._R=null; save();
     courier("montagem","arquivo"); toast("+1 vídeo pronto na Biblioteca"); renderProd(); openPanel("arquivo");
   };
   paintImgs(el);
@@ -716,11 +720,22 @@ async function runRender(){
       const el=document.getElementById("pbody"); const bar=el&&el.querySelector(".bar>i"); const st=el&&el.querySelector(".status");
       if(bar&&st){ bar.style.width=(P.renderProg*100)+"%"; st.innerHTML=`<span class="spin"></span>${esc(busy.action)}…`; } else renderPanel();
     }});
-    let mb=null;
-    if(out.blob){ mb=(out.blob.size/1048576).toFixed(0); saveBlob(out.blob,name); }
-    P.render={name:fh?fh.name:name,res:P.res||"1080p",mb,secs:R.dur,at:Date.now()}; save(); toast("Vídeo pronto: "+(fh?fh.name:name));
+    const vb=await keepVideo(P,out,fh);
+    if(out.blob) saveBlob(out.blob,name);
+    P.render={name:fh?fh.name:name,res:P.res||"1080p",mb:vb?(vb.size/1048576).toFixed(0):null,secs:R.dur,at:Date.now(),stored:!!vb}; save(); toast("Vídeo pronto: "+(fh?fh.name:name));
   }catch(e){ if(e.code!=="cancelled") ui.cutErr=e.message||"O render falhou."; }
   P.renderProg=null; clearBusy(); renderPanel();
+}
+// guarda o MP4 no navegador pra Biblioteca e pro .zip
+async function keepVideo(P,out,fh){
+  try{ const b=out.blob||(fh?await fh.getFile():null); if(!b) return null; await Store.put(mkey(P.id,"video",0),b); return b; }catch(e){ return null; }
+}
+// a Biblioteca guarda só o que importa (o localStorage tem limite)
+function slimForLibrary(P){
+  const L=JSON.parse(JSON.stringify(P));
+  delete L.titles; delete L.imgPhase; delete L.renderProg; delete L.selScene;
+  if(L.narr) L.narr.chunks=L.narr.chunks.map(c=>({text:c.text,st:c.st,dur:c.dur}));
+  L.savedAt=Date.now(); return L;
 }
 function slug(t){ return (t||"video").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w]+/g,"-").replace(/^-|-$/g,"").slice(0,50)||"video"; }
 function saveBlob(blob,name){
@@ -739,12 +754,13 @@ async function downloadPack(P,btn){
   const old=btn&&btn.innerHTML; if(btn){ btn.disabled=true; btn.innerHTML=`<span class="spin"></span> Empacotando…`; }
   try{
     const z=new JSZip();
+    const vid=await Store.get(mkey(P.id,"video",0)); if(vid) z.file(`VIDEO - ${slug(P.title)}.mp4`,vid);
     z.file("roteiro.txt",P.script.join("\n\n"));
     z.file("descricao.txt",(P.description||"")+"\n\n"+(P.hashtags||[]).join(" "));
     z.file("titulo.txt",P.title||"");
     z.file("onion-tudo.txt",packText(P));
     if(P.thumbSel!=null){ const b=await Store.get(mkey(P.id,"thumb",P.thumbSel)); if(b) z.file("capa.jpg",b); }
-    if(P.narr&&P.narr.chunks.every(x=>x.st==="ok")){ try{ z.file("narracao.wav",await fullNarration(P)); }catch(e){} }
+    if(P.narr&&P.narr.chunks.every(x=>x.st==="ok")){ try{ z.file("narracao-somente-audio.wav",await fullNarration(P)); }catch(e){} }
     const f=z.folder("cenas");
     for(let i=0;i<P.scenes.length;i++){ const b=await Store.get(mkey(P.id,"scene",i)); if(b) f.file(`${String(i+1).padStart(2,"0")}.jpg`,b); }
     f.file("prompts.txt",P.scenes.map((s,i)=>`${String(i+1).padStart(2,"0")}. ${s.trecho}\n    ${s.prompt}`).join("\n\n"));
@@ -760,11 +776,12 @@ VIEWS.arquivo=()=>`<div class="lib">
     ${P.thumbSel!=null&&(P.thumbImg||[])[P.thumbSel]==="ok"?`<div class="big" data-img="${mkey(P.id,"thumb",P.thumbSel)}" style="margin-top:8px"></div>`:""}
     <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
-    <div class="btns"><button class="btn small" data-dl="${i}">⬇ Baixar pacote (.zip)</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
   <p class="m" id="usage" style="font-size:12px;color:var(--muted)"></p>
 </div>`;
 BIND.arquivo=el=>{
   el.querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>downloadPack(S.library[+b.dataset.dl],b));
+  el.querySelectorAll("[data-vid]").forEach(b=>b.onclick=async()=>{ const P=S.library[+b.dataset.vid]; const v=await Store.get(mkey(P.id,"video",0)); if(v) saveBlob(v,`${slug(P.title)}.mp4`); else toast("O vídeo não está mais guardado neste navegador"); });
   el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{ const P=S.library[+b.dataset.rm]; if(!confirm(`Remover “${P.title}” e as imagens dele deste navegador?`)) return; S.library.splice(+b.dataset.rm,1); save(); await Store.delPrefix(`p${P.id}:`); renderPanel(); });
   paintImgs(el);
   Store.usage().then(u=>{ const n=el.querySelector("#usage"); if(u&&n&&u.usage!=null) n.textContent=`Espaço usado neste navegador: ${(u.usage/1048576).toFixed(0)} MB de ${(u.quota/1048576/1024).toFixed(1)} GB disponíveis.`; });

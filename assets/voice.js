@@ -1,4 +1,5 @@
 /* Onion · narração (TTS), transcrição e utilitários de áudio */
+const LANG_EN={"Português":"Brazilian Portuguese","Inglês":"American English","Espanhol":"Spanish","Francês":"French","Alemão":"German","Japonês":"Japanese","Hindi":"Hindi","Árabe":"Arabic"};
 const Voice = (() => {
   const fail = (code, message) => ({ code, message });
 
@@ -74,7 +75,7 @@ const Voice = (() => {
   async function errText(r) { try { const j = await r.json(); return j.error?.message || j.detail?.message || (typeof j.detail === "string" ? j.detail : "") || ""; } catch (e) { return ""; } }
 
   // devolve {blob, words?:[{w,s,e}]} — words só quando o provedor dá o tempo exato
-  async function synth(text, { voiceId, speed = 1, style = "", prev = "", next = "", signal } = {}) {
+  async function synth(text, { voiceId, speed = 1, style = "", prev = "", next = "", signal, lang = "" } = {}) {
     const c = AI.get(), p = c.voice.provider, k = c.keys[p], model = c.voice.model;
     if (!k) throw fail("no_key", "Cole a chave de " + AI.PROVIDERS[p].name + " no cartão Narração.");
     if (!model) throw fail("model", "Escolha o modelo de narração na Administração.");
@@ -82,7 +83,7 @@ const Voice = (() => {
     try {
       if (p === "google") {
         const pace = speed < .95 ? "at a slightly slower, unhurried pace" : speed > 1.05 ? "at a slightly faster, energetic pace" : "at a natural pace";
-        const instr = `Read the following narration aloud ${pace}${style ? ", " + style : ""}. Read only the text, exactly as written:\n\n`;
+        const instr = `Read the following narration aloud${lang ? " in " + lang + ", with a native " + lang + " accent" : ""} ${pace}${style ? ", " + style : ""}. Read only the text, exactly as written:\n\n`;
         const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
           method: "POST", signal, headers: { "content-type": "application/json", "x-goog-api-key": k },
           body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: instr + text }] }],
@@ -100,7 +101,7 @@ const Voice = (() => {
       }
       if (p === "openai") {
         const body = { model, voice: voiceId, input: text, response_format: "mp3", speed };
-        if (/gpt-4o/i.test(model) && style) body.instructions = style;
+        if (/gpt-4o/i.test(model) && (style || lang)) body.instructions = [lang ? "Speak in " + lang + " with a native accent." : "", style].filter(Boolean).join(" ");
         const r = await fetch("https://api.openai.com/v1/audio/speech", { method: "POST", signal,
           headers: { "content-type": "application/json", Authorization: "Bearer " + k }, body: JSON.stringify(body) });
         if (!r.ok) throw httpFail(r.status, p, await errText(r));
