@@ -769,11 +769,38 @@ async function downloadPack(P,btn){
   if(btn){ btn.disabled=false; btn.innerHTML=old; }
 }
 
+/* ---- Assistir na Biblioteca ---- */
+let libUrl=null;
+async function playLibrary(box,P){
+  stopPreview(); if(libUrl){ URL.revokeObjectURL(libUrl); libUrl=null; }
+  const vid=P.render&&P.render.stored?await Store.get(mkey(P.id,"video",0)):null;
+  if(vid){
+    libUrl=URL.createObjectURL(vid);
+    box.outerHTML=`<video controls autoplay playsinline src="${libUrl}" style="width:100%;border-radius:10px;background:#000;margin-top:8px;display:block"></video>`;
+    return;
+  }
+  // sem o MP4 guardado: monta a prévia com as imagens e a narração que estão no navegador
+  box.onclick=null; box.innerHTML=`<div class="status" style="margin-top:8px"><span class="spin"></span>Montando a prévia…</div>`;
+  try{
+    const R=await Cut.prepare(P,{}); R.pid=P.id;
+    box.outerHTML=`<div class="libprev"><canvas width="640" height="360" style="width:100%;border-radius:10px;background:#000;display:block;margin-top:8px"></canvas>
+      <div class="btns" style="margin-top:6px"><button class="btn ghost small" data-lp>⏸ Pausar</button><input type="range" min="0" max="${Math.ceil(R.dur)}" step="0.1" value="0" style="flex:1" data-ls><span class="m" style="font-size:12px;color:var(--muted)" data-lt>0:00 / ${fmtT(R.dur)}</span></div>
+      <p class="m" style="font-size:12px;color:var(--muted)">Prévia montada na hora. O MP4 deste vídeo não ficou guardado no navegador.</p></div>`;
+    const wrap=[...document.querySelectorAll(".libprev")].pop(), c=wrap.querySelector("canvas"), b=wrap.querySelector("[data-lp]"), sk=wrap.querySelector("[data-ls]"), tm=wrap.querySelector("[data-lt]");
+    const o={template:P.template,captions:P.captions,res:"720p"}; let pos=0;
+    const start=()=>{ b.textContent="⏸ Pausar"; cutPrev=Cut.preview(R,c,o,{from:pos,onTime:t=>{ pos=t; sk.value=t; tm.textContent=`${fmtT(t)} / ${fmtT(R.dur)}`; },onEnd:()=>{ cutPrev=null; pos=0; b.textContent="▶ Assistir"; }}); };
+    b.onclick=()=>{ if(cutPrev){ stopPreview(); b.textContent="▶ Continuar"; } else start(); };
+    sk.oninput=()=>{ pos=+sk.value; tm.textContent=`${fmtT(pos)} / ${fmtT(R.dur)}`; if(cutPrev){ stopPreview(); start(); } else Cut.still(R,c,o,Math.max(.6,pos)); };
+    start();
+  }catch(e){ box.innerHTML=`<div class="err" style="margin-top:8px">${esc(e.message||"Não deu pra montar a prévia deste vídeo.")}</div>`; }
+}
 /* ---- Arquivo / Biblioteca ---- */
 VIEWS.arquivo=()=>`<div class="lib">
   <p class="lead">Vídeos que já passaram por todo o campus. ${S.library.length?`${S.library.length} no total.`:""}</p>
   ${S.library.length?S.library.map((P,i)=>`<details><summary>${esc(P.title)}</summary>
-    ${P.thumbSel!=null&&(P.thumbImg||[])[P.thumbSel]==="ok"?`<div class="big" data-img="${mkey(P.id,"thumb",P.thumbSel)}" style="margin-top:8px"></div>`:""}
+    <div class="player" data-play="${i}" role="button" tabindex="0" aria-label="Assistir ${esc(P.title)}">
+      <div class="big" ${P.thumbSel!=null&&(P.thumbImg||[])[P.thumbSel]==="ok"?`data-img="${mkey(P.id,"thumb",P.thumbSel)}"`:""} style="margin:8px 0 0;background-color:#1a1424"></div>
+      <span class="playbtn">▶</span><span class="playlbl">${P.render&&P.render.stored?"Assistir o vídeo":"Assistir a prévia"}</span></div>
     <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
     <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
@@ -781,6 +808,7 @@ VIEWS.arquivo=()=>`<div class="lib">
 </div>`;
 BIND.arquivo=el=>{
   el.querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>downloadPack(S.library[+b.dataset.dl],b));
+  el.querySelectorAll("[data-play]").forEach(box=>{ const go=()=>playLibrary(box,S.library[+box.dataset.play]); box.onclick=go; box.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } }; });
   el.querySelectorAll("[data-vid]").forEach(b=>b.onclick=async()=>{ const P=S.library[+b.dataset.vid]; const v=await Store.get(mkey(P.id,"video",0)); if(v) saveBlob(v,`${slug(P.title)}.mp4`); else toast("O vídeo não está mais guardado neste navegador"); });
   el.querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{ const P=S.library[+b.dataset.rm]; if(!confirm(`Remover “${P.title}” e as imagens dele deste navegador?`)) return; S.library.splice(+b.dataset.rm,1); save(); await Store.delPrefix(`p${P.id}:`); renderPanel(); });
   paintImgs(el);

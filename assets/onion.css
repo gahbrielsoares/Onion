@@ -155,3 +155,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .scene.has-img span{background:rgba(0,0,0,.55)}
 .big{aspect-ratio:16/9;border-radius:10px;background:var(--surface-2) center/cover no-repeat;margin:8px 0}
 .tl .track i[data-img]{background-size:cover;background-position:center}
+.player{position:relative;cursor:pointer;border-radius:10px}
+.player .playbtn{position:absolute;left:50%;top:calc(50% + 4px);transform:translate(-50%,-50%);width:58px;height:58px;border-radius:50%;background:rgba(20,14,30,.72);color:#fff;display:grid;place-items:center;font-size:22px;padding-left:4px;border:2px solid rgba(255,255,255,.85);transition:transform .15s}
+.player:hover .playbtn,.player:focus-visible .playbtn{transform:translate(-50%,-50%) scale(1.08)}
+.player .playlbl{position:absolute;left:8px;bottom:8px;background:rgba(20,14,30,.72);color:#fff;font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px}
