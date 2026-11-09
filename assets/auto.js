@@ -217,7 +217,8 @@ async function runAuto() {
       if (AP.mode === "both" && S.library[0] && S.library[0].kind !== "short") {
         await apDerivedShort(S.library[0]);
         for (const step of [apTitulos, apRoteiro, apDescricao, apImagens, apNarracao, apMontagem]) { apCheck(); await step(); if (panelKey === "auto") renderAutoHead(); }
-        apLog("Gerente", `✓ short do vídeo ${AP.cur} pronto`, "ok");
+        if (S.library[0] && S.library[0].kind === "short" && S.library[1] && S.library[1].kind !== "short") { const sh = S.library.shift(); S.library[0].sub = sh; save(); }
+        apLog("Gerente", `✓ short do vídeo ${AP.cur} pronto (junto do vídeo longo na Biblioteca)`, "ok");
       }
     }
     apLog("Gerente", `terminei: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} pronto${AP.done > 1 ? "s" : ""}`, "ok"); toast(`Piloto automático: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} pronto${AP.done > 1 ? "s" : ""}`);

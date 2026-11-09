@@ -71,5 +71,7 @@ assets/vendor/      JSZip e mp4-muxer (MIT)
 - [x] Trilha gerada sem direitos autorais (4 climas) ou música própria, efeitos de transição (whoosh, impacto, riser, clique) e música que abaixa sob a voz
 - [x] Estilo colagem animada (explicador desenhado) com imagens reais de domínio público do Wikimedia Commons e créditos automáticos
 - [x] Shorts verticais (1080×1920), formato Batalha (X vs Y) e Short derivado de cada vídeo longo reaproveitando o elenco
+- [x] Produção casada: cada etapa do vídeo longo já faz a do Short que leva pra ele (abas Longo/Short)
+- [x] .zip organizado em pastas VIDEO LONGO e SHORT
 - [x] Piloto automático: gera N vídeos sozinho, o gerente decide cada etapa e caminha entre os prédios
 - [x] Render em MP4 (H.264) direto no navegador, com WebCodecs (Chrome ou Edge no computador)
