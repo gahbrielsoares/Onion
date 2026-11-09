@@ -13,8 +13,14 @@ const STAGE_LABEL = {titulos:"Título",roteiro:"Roteiro",descricao:"Descrição"
 function isUnlocked(k){
   if (k==="virais"||k==="ideias"||k==="arquivo"||k==="admin"||k==="auto") return true;
   const P=S.project; if(!P) return false;
-  const i=STAGES.indexOf(k); for(let j=0;j<i;j++) if(!P.done[STAGES[j]]) return false;
-  return true;
+  const i=STAGES.indexOf(k); let ok=true; for(let j=0;j<i;j++) if(!P.done[STAGES[j]]) ok=false;
+  P.reached=P.reached||{};
+  if(ok){ P.reached[k]=true; return true; }
+  if(P.reached[k]) return true;
+  // projetos antigos: se a etapa já tem trabalho feito, ela continua aberta
+  const has={titulos:!!P.title,roteiro:P.script.length>0,descricao:!!P.description,capa:(P.thumbs||[]).length>0||P.kind==="short",imagens:!!P.board||P.scenes.length>0,narracao:!!P.narr,montagem:!!(P.cut||P.render)}[k];
+  if(has){ P.reached[k]=true; return true; }
+  return false;
 }
 function nextStage(){
   if(!AI.ready()) return "admin";
@@ -334,29 +340,72 @@ Responda só com JSON: {"titulos":[...]}`;
 function nBlocks(){ return S.project.kind==="short"?1:Math.max(2,Math.round(S.project.config.duracao/5)); }
 function scriptText(){ return S.project.script.join("\n\n"); }
 function wc(s){ return (s.match(/\S+/g)||[]).length; }
-VIEWS.roteiro=()=>{ const P=S.project, n=nBlocks(), have=P.script.length; const working=busy&&busy.k==="roteiro"; return `
-  <p class="lead">Título: <b>${esc(P.title)}</b><br>${n} blocos · cerca de ${P.config.duracao} min em ${esc(P.config.idioma)}</p>
+// mudanças no roteiro não apagam o resto: marcam o que ficou desatualizado
+function markStale(P,from){
+  P.stale=P.stale||{};
+  if(from==="roteiro"){ if(P.description) P.stale.descricao=true; if(P.board||P.scenes.length) P.stale.imagens=true; if(P.narr) P.stale.narracao=true; if(P.cut||P.render) P.stale.montagem=true; }
+  if(from==="narracao"||from==="imagens"){ if(P.cut||P.render) P.stale.montagem=true; }
+  Cut._R=null;
+}
+function staleNote(P,k){
+  const s=(P.stale||{})[k]; if(!s) return "";
+  const msg={descricao:"O roteiro mudou depois da descrição. Ela continua valendo; se quiser, gere de novo pra combinar com o texto novo.",
+    imagens:"O roteiro mudou. As imagens continuam valendo; se mudou muito, refaça a lista só das cenas novas ou mantenha as atuais.",
+    narracao:"O roteiro mudou depois da narração. Gere a narração de novo (só ela): roteiro, capa e imagens continuam.",
+    montagem:"Algo mudou depois da montagem. Clique em Montar de novo e renderize: não gasta nada."}[k];
+  return `<div class="note" style="border:1px solid var(--gold)">✎ ${msg} <button class="btn ghost small" style="margin-left:6px;padding:3px 9px" onclick="clearStale('${k}')">ok, manter</button></div>`;
+}
+function clearStale(k){ const P=S.project; if(P&&P.stale){ delete P.stale[k]; save(); renderPanel(); } }
+window.clearStale=clearStale;
+VIEWS.roteiro=()=>{ const P=S.project, n=nBlocks(), have=P.script.filter(Boolean).length; const working=busy&&busy.k==="roteiro"; const full=have>=n&&!working; return `
+  <p class="lead">Título: <b>${esc(P.title)}</b><br>${n} bloco${n>1?"s":""} · cerca de ${P.kind==="short"?"1":P.config.duracao} min em ${esc(P.config.idioma)}</p>
   ${aiNote()}
   <div class="btns">
     ${have<n?`<button class="btn" id="rgo" ${busy||!AI.ready()?"disabled":""}>✦ ${have?`Continuar do bloco ${have+1}`:"Escrever roteiro"}</button>`:""}
-    ${have&&!working?`<button class="btn ghost small" id="rre">Reescrever do zero</button>`:""}
     ${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}
     ${have?`<button class="btn ghost small" id="rcopy">Copiar roteiro</button>`:""}
+    ${have&&!working?`<button class="btn ghost small" id="rre">Reescrever tudo do zero</button>`:""}
   </div>
   ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>`:""}
   ${ui.rotErr?`<div class="err">${esc(ui.rotErr)}</div>`:""}
-  ${(have||working)?`<div class="script" id="scr">${P.script.map((t,i)=>`<div class="blk">Bloco ${i+1}</div>${esc(t)}`).join("\n")}${working?`<div class="blk">Bloco ${have+1}</div><span id="live"></span>`:""}</div>
-  <p class="m" style="font-size:12.5px;color:var(--muted)">${wc(scriptText())} palavras · ~${Math.round(wc(scriptText())/140)} min de narração</p>`:""}
+  ${working?`<div class="script" id="scr">${P.script.map((t,i)=>`<div class="blk">Bloco ${i+1}</div>${esc(t)}`).join("\n")}<div class="blk">Bloco ${have+1}</div><span id="live"></span></div>`:""}
+  ${have&&!working?`<p class="m" style="font-size:12.5px;margin:4px 0 8px">Edite à vontade: mexer no roteiro não apaga capa nem imagens. Só a narração precisa ser gerada de novo depois.</p>
+    ${P.script.map((t,i)=>`<div class="card" style="padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b class="blk" style="margin:0">Bloco ${i+1}</b><span class="m" style="font-size:12px">${wc(t)} palavras</span></div>
+      <textarea class="rblk" data-b="${i}" rows="8" style="width:100%;margin-top:6px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;line-height:1.55">${esc(t)}</textarea>
+      <div class="btns" style="margin-top:6px"><input class="rinstr" data-b="${i}" placeholder="Pedir mudança à IA (ex.: mais curto, gancho mais forte, tirar a parte X)" style="flex:1;min-width:180px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:7px 10px">
+      <button class="btn ghost small" data-rw="${i}" ${busy||!AI.ready()?"disabled":""}>✦ Reescrever este bloco</button></div></div>`).join("")}
+    <div class="btns"><button class="btn" id="rsave" style="display:none">💾 Salvar as alterações</button></div>
+    <p class="m" style="font-size:12.5px;color:var(--muted)">${wc(scriptText())} palavras · ~${Math.round(wc(scriptText())/140)} min de narração</p>`:""}
   ${!have&&!working?`<details class="card" style="margin-top:14px"><summary style="cursor:pointer;font-weight:600">Já tenho o roteiro</summary><div class="field" style="margin-top:10px"><textarea id="rown" rows="6" placeholder="Cole o roteiro aqui. Separe os blocos com uma linha em branco dupla."></textarea></div><button class="btn small" id="ruse">Usar este roteiro</button></details>`:""}
-  ${have>=n?`<div class="btns"><button class="btn" id="rok" ${P.done.roteiro?"disabled":""}>${P.done.roteiro?"Roteiro aprovado ✓":"Aprovar roteiro e mandar pra Redação"}</button></div>`:""}`; };
+  ${full?`<div class="btns"><button class="btn" id="rok" ${P.done.roteiro?"disabled":""}>${P.done.roteiro?"Roteiro aprovado ✓":"Aprovar roteiro e mandar pra Redação"}</button></div>`:""}`; };
 BIND.roteiro=el=>{
   const P=S.project;
   const go=el.querySelector("#rgo"); if(go) go.onclick=runRoteiro;
-  const re=el.querySelector("#rre"); if(re) re.onclick=()=>{ P.script=[]; STAGES.slice(1).forEach(s=>P.done[s]=false); save(); renderProd(); runRoteiro(); };
+  const re=el.querySelector("#rre"); if(re) re.onclick=()=>{ if(!confirm("Reescrever o roteiro inteiro com a IA? Capa e imagens continuam; a narração vai precisar ser refeita.")) return; P.script=[]; markStale(P,"roteiro"); save(); renderProd(); runRoteiro(); };
   const cp=el.querySelector("#rcopy"); if(cp) cp.onclick=()=>{ navigator.clipboard?.writeText(scriptText()).then(()=>toast("Roteiro copiado"),()=>toast("Não deu pra copiar neste navegador")); };
-  const ru=el.querySelector("#ruse"); if(ru) ru.onclick=()=>{ const t=el.querySelector("#rown").value.trim(); if(!t) return toast("Cole o roteiro primeiro"); let parts=t.split(/\n\s*\n\s*\n/).map(x=>x.trim()).filter(Boolean); const n=nBlocks(); while(parts.length<n) parts.push(""); if(parts.length>n){ parts=[...parts.slice(0,n-1),parts.slice(n-1).join("\n\n")]; } P.script=parts; save(); renderPanel(); };
-  const ok=el.querySelector("#rok"); if(ok) ok.onclick=()=>{ P.done.roteiro=true; save(); courier("roteiro","descricao"); toast("Roteiro enviado pra Redação"); renderProd(); openPanel("descricao"); };
+  const ru=el.querySelector("#ruse"); if(ru) ru.onclick=()=>{ const t=el.querySelector("#rown").value.trim(); if(!t) return toast("Cole o roteiro primeiro"); let parts=t.split(/\n\s*\n\s*\n/).map(x=>x.trim()).filter(Boolean); const n=nBlocks(); while(parts.length<n) parts.push(""); if(parts.length>n){ parts=[...parts.slice(0,n-1),parts.slice(n-1).join("\n\n")]; } P.script=parts; markStale(P,"roteiro"); save(); renderPanel(); };
+  const sv=el.querySelector("#rsave");
+  el.querySelectorAll(".rblk").forEach(ta=>ta.oninput=()=>{ if(sv) sv.style.display=""; });
+  if(sv) sv.onclick=()=>{ el.querySelectorAll(".rblk").forEach(ta=>{ P.script[+ta.dataset.b]=ta.value.trim(); }); markStale(P,"roteiro"); save(); toast("Roteiro salvo. Só a narração precisa ser refeita."); renderProd(); renderPanel(); };
+  el.querySelectorAll("[data-rw]").forEach(b=>b.onclick=()=>{ const i=+b.dataset.rw; const ins=el.querySelector(`.rinstr[data-b="${i}"]`).value.trim();
+    el.querySelectorAll(".rblk").forEach(ta=>{ P.script[+ta.dataset.b]=ta.value.trim(); }); rewriteBlock(i,ins); });
+  const ok=el.querySelector("#rok"); if(ok) ok.onclick=()=>{ P.done.roteiro=true; save(); courier("roteiro","descricao"); toast("Roteiro aprovado"); renderProd(); openPanel(P.done.descricao?"narracao":"descricao"); };
 };
+async function rewriteBlock(i,instr){
+  const P=S.project; ui.rotErr=null; setBusy("roteiro",`reescrevendo o bloco ${i+1}`); renderPanel();
+  const prompt=`Você é roteirista de um canal faceless de YouTube. Canal: ${cfgText()}
+Título: "${P.title}". Abaixo está o roteiro inteiro e o bloco ${i+1} que precisa ser reescrito.
+Pedido do criador: ${instr||"melhore o ritmo, a clareza e o gancho, mantendo o conteúdo e o tamanho"}.
+Regras: escreva SÓ o novo texto do bloco ${i+1}, no idioma ${P.config.idioma}, pronto pra ser narrado, sem títulos, marcações ou comentários. Mantenha a ligação com o que vem antes e depois.
+ROTEIRO INTEIRO:
+"""${P.script.map((t,k)=>`[Bloco ${k+1}]\n${t}`).join("\n\n").slice(0,24000)}"""
+BLOCO ${i+1} ATUAL:
+"""${P.script[i]}"""`;
+  try{ const r=await ask(prompt); if(r.text.trim()){ P.script[i]=r.text.trim(); markStale(P,"roteiro"); save(); toast(`Bloco ${i+1} reescrito`); } }
+  catch(e){ ui.rotErr=errMsg(e); }
+  clearBusy(); renderPanel();
+}
 async function runRoteiro(){
   const P=S.project, n=nBlocks(); ui.rotErr=null;
   const words=P.kind==="short"?140:Math.round(P.config.duracao*140/n);
@@ -388,7 +437,7 @@ ${prev?`\nRoteiro até aqui (continue a partir dele sem repetir):\n"""${prev.sli
 }
 
 /* ---- Descrição ---- */
-VIEWS.descricao=()=>{ const P=S.project; const working=busy&&busy.k==="descricao"; return `
+VIEWS.descricao=()=>{ const P=S.project; const working=busy&&busy.k==="descricao"; return staleNote(P,"descricao")+`
   <p class="lead">Até 5 linhas, com convite pra se inscrever e uma pergunta, lida do roteiro inteiro.</p>
   ${aiNote()}
   <div class="btns"><button class="btn" id="dgo" ${busy||!AI.ready()?"disabled":""}>✦ ${P.description?"Gerar de novo":"Gerar descrição"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
@@ -412,7 +461,7 @@ Roteiro (início e fim):
 """${s.slice(0,4000)}\n…\n${s.slice(-1500)}"""
 Regras: no máximo 5 linhas; primeira linha forte com a palavra-chave principal; um convite natural pra se inscrever; termine com uma pergunta pros comentários. Depois, 3 a 5 hashtags relevantes.
 Responda só com JSON: {"descricao":"...","hashtags":["#...", "..."]}`;
-  try{ const r=await ask(prompt,{json:true,tier:"quick"}); P.description=r.descricao||""; P.hashtags=r.hashtags||[]; save(); }
+  try{ const r=await ask(prompt,{json:true,tier:"quick"}); P.description=r.descricao||""; P.hashtags=r.hashtags||[]; if(P.stale) delete P.stale.descricao; save(); }
   catch(e){ ui.desErr=errMsg(e); }
   clearBusy(); renderPanel();
 }
@@ -609,7 +658,8 @@ async function drawScenes(idx){
 /* ---- Imagens no estilo colagem ---- */
 function boardStats(P){ const a=(P.board&&P.board.assets)||[]; return {n:a.length,ok:a.filter(x=>x.img==="ok").length,real:a.filter(x=>x.img==="ok"&&x.real&&!x.own).length,own:a.filter(x=>x.img==="ok"&&x.own).length,ai:a.filter(x=>x.img==="ok"&&!x.real&&!x.own).length,bad:a.filter(x=>x.img&&!["ok","wait","nofound"].includes(x.img)).length,nofound:a.filter(x=>x.img==="nofound").length,pend:a.filter(x=>x.img!=="ok").length,beats:((P.board&&P.board.beats)||[]).length}; }
 const gImg=q=>`https://www.google.com/search?tbm=isch&tbs=sur:fmc&q=${encodeURIComponent(q)}`;
-function colagemView(){
+function colagemView(){ return staleNote(S.project,"imagens")+colagemView0(); }
+function colagemView0(){
   const P=S.project, working=busy&&busy.k==="imagens", st=boardStats(P), doc=isDoc(P), tp=doc?{bg:"#15181d",ink:"#eee"}:(Collage.TPL[P.template]||Collage.TPL["Azul explicador"]);
   const sel=P.board&&P.selAsset?P.board.assets.find(a=>a.id===P.selAsset):null;
   return `
@@ -757,8 +807,8 @@ function stopAudio(){ if(playing){ try{ playing.pause(); }catch(e){} playing=nul
 VIEWS.narracao=()=>{ const P=S.project; const working=busy&&busy.k==="narracao"; const c=AI.get(); const prov=c.voice.provider;
   const N=P.narr; const okN=N?N.chunks.filter(x=>x.st==="ok").length:0, badN=N?N.chunks.filter(x=>x.st&&x.st!=="ok"&&x.st!=="wait").length:0;
   const words=wc(scriptText()); const est=(words/(140*P.speed)).toFixed(1);
-  if(!AI.stageReady("voice")) return `<p class="lead">O roteiro narrado com voz realista.</p><div class="note">Configure o cartão Narração na Administração pra escolher as vozes. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
-  return `
+  if(!AI.stageReady("voice")) return staleNote(P,"narracao")+`<p class="lead">O roteiro narrado com voz realista.</p><div class="note">Configure o cartão Narração na Administração pra escolher as vozes. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
+  return staleNote(P,"narracao")+`
   <p class="lead">O roteiro narrado com voz realista. Voz por <b>${esc(AI.PROVIDERS[prov].name)}</b> · ${esc(c.voice.model)} <a href="#" onclick="openPanel('admin');return false" style="color:var(--accent)">trocar</a></p>
   <div class="row" style="align-items:end"><div class="field" style="margin:0"><label for="vq">Buscar voz</label><input id="vq" placeholder="nome, estilo, sotaque" value="${esc(ui.vq||"")}"></div>
   <div class="field" style="margin:0"><label for="vg">Mostrar</label><select id="vg"><option value="canal" ${ui.vg!=="todas"?"selected":""}>Vozes ${esc((P.config.voz||"").toLowerCase())}s</option><option value="todas" ${ui.vg==="todas"?"selected":""}>Todas</option></select></div></div>
@@ -852,7 +902,7 @@ async function runNarracao(onlyFailed){
   N.chunks.forEach(x=>{ if(x.st==="wait") x.st=null; });
   if(N.chunks.every(x=>x.st==="ok")){
     const tot=N.chunks.reduce((a,x)=>a+x.dur,0)+.35*(N.chunks.length-1);
-    P.narration={voice:N.voiceName,provider:N.provider,mins:(tot/60).toFixed(1),secs:tot};
+    P.narration={voice:N.voiceName,provider:N.provider,mins:(tot/60).toFixed(1),secs:tot}; if(P.stale){ delete P.stale.narracao; } markStale(P,"narracao");
   } else { const b=N.chunks.find(x=>x.st&&x.st!=="ok"); ui.narErr=b?b.st:"A narração foi interrompida. Clique em gerar pra continuar."; }
   save(); clearBusy(); renderPanel();
 }
@@ -862,7 +912,7 @@ const RES=["1080p","720p"];
 let cutPrev=null;
 function fmtT(s){ s=Math.max(0,s); return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`; }
 function cutOpts(P){ return {template:P.template,captions:P.captions,res:P.res||"1080p"}; }
-VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem"; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null; const sup=Cut.supported(); return `
+VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem"; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null; const sup=Cut.supported(); return staleNote(P,"montagem")+`
   <p class="lead">O OnionCut junta cenas, voz e legendas, troca as imagens nas pausas da narração e exporta o vídeo em MP4.</p>
   ${sup?"":`<div class="err">Este navegador não consegue gerar vídeo. Abra o Onion no Chrome ou no Edge, no computador.</div>`}
   <h3>Template</h3>${pills("tpl",isDoc(P)?Object.keys(Doc.TPL):isColagem(P)?Object.keys(Collage.TPL):TEMPLATES,P.template)}
@@ -926,7 +976,7 @@ async function runPrepare(){
   const P=S.project; ui.cutErr=null; stopPreview();
   if(!P.narr||!P.narration){ ui.cutErr="Gere a narração no Estúdio antes de montar."; return renderPanel(); }
   setBusy("montagem","abrindo o áudio"); P.renderProg=null; renderPanel();
-  try{ const R=await Cut.prepare(P,{onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal}); R.pid=P.id; Cut._R=R; ui.pt=0; P.cut=true; save(); }
+  try{ const R=await Cut.prepare(P,{onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal}); R.pid=P.id; Cut._R=R; ui.pt=0; P.cut=true; if(P.stale) delete P.stale.montagem; save(); }
   catch(e){ if(e.code!=="cancelled") ui.cutErr=e.message||"A montagem falhou."; }
   clearBusy(); renderPanel();
 }
