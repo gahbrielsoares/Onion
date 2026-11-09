@@ -621,13 +621,13 @@ function colagemView(){
   ${ui.imgErr?`<div class="err">${esc(ui.imgErr)}</div>`:""}
   ${P.board?`<p class="m" style="font-size:12.5px;color:var(--muted)">${st.beats} batidas · ${isDoc(P)?"imagens":"elenco"}: ${st.n} (${st.ok} prontos${st.real?`, ${st.real} imagens reais grátis`:""}${st.bad?`, ${st.bad} com erro`:""}) · toque num elemento pra ver e refazer</p>
   <div class="scenes">${P.board.assets.map(a=>`<button type="button" class="scene ${P.selAsset===a.id?"cur":""}" data-as="${esc(a.id)}" ${a.img==="ok"?`data-img="${mkey(P.id,"asset",a.id)}"`:""} style="background-color:${tp.bg};background-size:${isDoc(P)?"cover":"contain"}!important;background-repeat:no-repeat;color:${tp.ink}" title="${esc(a.nome)}">
-    <span>${(a.real||a.tipo==="real")?"📷":(isDoc(P)?"🎨":"✏️")}</span>${a.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(a.img&&a.img!=="ok"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}<small style="position:absolute;left:4px;right:4px;bottom:2px;font-size:10px;text-shadow:0 0 3px ${tp.bg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.nome)}</small></button>`).join("")}</div>
+    <span>${a.own?"📁":(a.real||a.tipo==="real")?"📷":(isDoc(P)?"🎨":"✏️")}</span>${a.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(a.img&&a.img!=="ok"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}<small style="position:absolute;left:4px;right:4px;bottom:2px;font-size:10px;text-shadow:0 0 3px ${tp.bg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.nome)}</small></button>`).join("")}</div>
   ${sel?`<div class="card" style="margin-top:10px"><div class="t">${esc(sel.nome)} <span class="tag">${sel.tipo==="real"?"imagem real":"desenho"}</span></div>
     ${sel.img==="ok"?`<div class="big" data-img="${mkey(P.id,"asset",sel.id)}" style="background-color:${tp.bg};background-size:contain!important;background-repeat:no-repeat"></div>`:""}
     ${sel.credit?`<div class="m" style="font-size:12px">${esc(sel.credit)}</div>`:""}
     ${sel.img&&sel.img!=="ok"&&sel.img!=="wait"?`<div class="err">${esc(sel.img)}</div>`:""}
     <div class="field" style="margin-top:8px"><label for="adesc">${sel.tipo==="real"?"Busca no Wikimedia Commons":(isDoc(P)?"Descrição da imagem gerada (inglês)":"Descrição do desenho (inglês)")}</label><textarea id="adesc" rows="2">${esc(sel.tipo==="real"?sel.busca:sel.descricao)}</textarea></div>
-    <div class="btns"><button class="btn small" id="aredo" ${busy?"disabled":""}>↻ Refazer</button><button class="btn ghost small" id="aswap" ${busy?"disabled":""}>${sel.tipo==="real"?(isDoc(P)?"Gerar com IA":"Trocar por desenho"):"Tentar imagem real"}</button></div></div>`:""}
+    <div class="btns"><button class="btn small" id="aredo" ${busy?"disabled":""}>↻ Refazer</button><label class="btn ghost small" style="cursor:pointer">📁 Enviar imagem minha<input type="file" id="aup" accept="image/*" style="display:none"></label><button class="btn ghost small" id="aswap" ${busy?"disabled":""}>${sel.tipo==="real"?(isDoc(P)?"Gerar com IA":"Trocar por desenho"):"Tentar imagem real"}</button></div></div>`:""}
   ${P.credits&&P.credits.length?"":""}`:""}
   <div class="btns"><button class="btn" id="iok" ${!P.board||!st.ok||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Elenco aprovado ✓":"Aprovar e mandar pro Estúdio"}</button></div>`;
 }
@@ -639,6 +639,9 @@ function bindColagem(el){
   const sel=P.board&&P.board.assets.find(a=>a.id===P.selAsset);
   const ad=el.querySelector("#adesc"); if(ad&&sel) ad.oninput=()=>{ if(sel.tipo==="real") sel.busca=ad.value; else sel.descricao=ad.value; save(); };
   const rd=el.querySelector("#aredo"); if(rd) rd.onclick=()=>{ P.done.imagens=false; drawAssets([sel.id]); };
+  const up=el.querySelector("#aup"); if(up) up.onchange=async e=>{ const f=e.target.files[0]; if(!f) return;
+    let b=await toJpeg(f,0,0,.9); if(!isDoc(P)&&!sel.real) b=await Collage.cutout(f);
+    await Store.put(mkey(P.id,"asset",sel.id),b); Object.assign(sel,{img:"ok",real:isDoc(P),own:true,credit:""}); Cut._R=null; save(); toast("Imagem trocada pela sua"); renderPanel(); };
   const sw=el.querySelector("#aswap"); if(sw) sw.onclick=()=>{ sel.tipo=sel.tipo==="real"?(isDoc(P)?"ia":"desenho"):"real"; if(isDoc(P)&&sel.tipo==="ia"&&!sel.descricao) sel.descricao=sel.nome; if(sel.tipo==="real"&&!sel.busca) sel.busca=sel.nome; if(sel.tipo==="desenho"&&!sel.descricao) sel.descricao=sel.nome; P.done.imagens=false; drawAssets([sel.id]); };
   el.querySelector("#iok").onclick=()=>{ P.done.imagens=true; save(); courier("imagens","narracao"); toast("Elenco aprovado"); renderProd(); openPanel("narracao"); };
   paintImgs(el);
@@ -692,10 +695,11 @@ async function drawAssets(ids){
       let blob=null;
       if(P.board.kind==="doc"){
         if(a.tipo==="real"){
-          let r=await Collage.commons(a.busca||a.nome,1920); if(!r&&a.busca&&a.nome&&a.busca!==a.nome) r=await Collage.commons(a.nome,1920);
+          const r=await Collage.findReal(a.busca||a.nome,a.nome,1920);
           if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; }
-          else throw {code:"not_found",message:"Não achei uma imagem livre no Wikimedia Commons. Mude a busca ou gere com IA."};
-        } else {
+          else { a.tipo="ia"; a.auto=true; a.estilo=a.estilo||"reconstrucao"; a.descricao=a.descricao||`${a.busca||a.nome}. If a person appears, show an anonymous figure (from behind, silhouette or in shadow) with no recognizable face.`; }
+        }
+        if(!blob){
           if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas na Administração pra gerar as reconstruções."};
           const raw=await AI.image(`${Doc.STYLE[a.estilo]||Doc.STYLE.reconstrucao} Scene: ${a.descricao||a.nome}.`,{aspect:"16:9",signal:busy.ctl.signal});
           blob=await toJpeg(raw,0,0,.9); a.real=false; a.credit="";
@@ -703,7 +707,7 @@ async function drawAssets(ids){
         await Store.put(mkey(P.id,"asset",a.id),blob); a.img="ok";
         done++; setAction(`buscando e criando as imagens: ${done} de ${ids.length}`); save(); renderPanel(); return;
       }
-      if(a.tipo==="real"){ const r=await Collage.commons(a.busca||a.nome); if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; } else { a.tipo="desenho"; a.descricao=a.descricao||a.nome; } }
+      if(a.tipo==="real"){ const r=await Collage.findReal(a.busca||a.nome,a.nome); if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; } else { a.tipo="desenho"; a.descricao=a.descricao||a.nome; } }
       if(!blob){
         if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas na Administração pra desenhar os elementos."};
         const raw=await AI.image(`${Collage.DRAW_STYLE} Subject: ${a.descricao||a.nome}.`,{aspect:"3:4",signal:busy.ctl.signal});

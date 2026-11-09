@@ -68,6 +68,30 @@ const Collage = (() => {
     return null;
   }
 
+  /* ---------- Openverse: 800+ milhões de imagens com licença livre (Flickr, museus, etc.) ---------- */
+  async function openverse(query, width = 1280) {
+    const u = "https://api.openverse.org/v1/images/?" + new URLSearchParams({ q: query, license_type: "commercial,modification", page_size: "12", mature: "false" });
+    let r; try { r = await fetch(u); } catch (e) { return null; } if (!r.ok) return null;
+    for (const it of (await r.json()).results || []) {
+      if ((it.width || 0) && it.width < 400) continue;
+      for (const src of [it.url, it.thumbnail]) {
+        if (!src) continue;
+        try { const img = await fetch(src); if (!img.ok) continue; const blob = await img.blob(); if (!/image/.test(blob.type) || blob.size < 8000) continue;
+          const lic = `${(it.license || "").toUpperCase()} ${it.license_version || ""}`.trim();
+          return { blob, credit: `“${it.title || "sem título"}” — ${it.creator || "autor desconhecido"} (${lic}), via ${it.source || "Openverse"}` }; } catch (e) {}
+      }
+    }
+    return null;
+  }
+  // tenta a busca exata, depois versões mais simples, em dois bancos de imagens livres
+  function simpler(q) { const w = String(q).replace(/\b(1[5-9]\d\d|20\d\d)s?\b/g, "").replace(/\b(photo|photograph|image|picture|research|historical|archive|old)\b/gi, "").split(/\s+/).filter(Boolean); return [w.join(" "), w.length > 4 ? w.slice(0, 4).join(" ") : ""].filter((x, i, a) => x && a.indexOf(x) === i && x !== q); }
+  async function findReal(busca, nome, width = 1280, onTry) {
+    const qs = [busca, ...simpler(busca), nome].filter((x, i, a) => x && a.indexOf(x) === i);
+    for (const q of qs) { onTry && onTry("Wikimedia: " + q); const r = await commons(q, width); if (r) return r; }
+    for (const q of qs.slice(0, 3)) { onTry && onTry("Openverse: " + q); const r = await openverse(q, width); if (r) return r; }
+    return null;
+  }
+
   /* ---------- storyboard ---------- */
   function storyboardPrompt(P, { maxAssets, beats, reuse, isShort, battle }) {
     return `Você é o diretor de arte de um canal de vídeos explicativos em estilo "colagem animada": fundo liso, personagens e objetos desenhados e recortados que entram na tela no ritmo da narração, uma palavra-chave curta às vezes, o nome do assunto atual no topo e, quando fizer sentido, imagens reais de domínio público (retratos históricos antigos, pinturas, mapas, monumentos e lugares famosos).
@@ -171,5 +195,5 @@ Responda só com JSON: {"elenco":[...],"batidas":[...]}`;
     if (t > R.dur) { g.fillStyle = `rgba(0,0,0,${Math.min(1, (t - R.dur) / .6)})`; g.fillRect(0, 0, W, H); }
   }
 
-  return { TPL, DRAW_STYLE, cutout, commons, storyboardPrompt, frame };
+  return { TPL, DRAW_STYLE, cutout, commons, openverse, findReal, storyboardPrompt, frame };
 })();
