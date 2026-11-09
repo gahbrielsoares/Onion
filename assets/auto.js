@@ -298,3 +298,46 @@ BIND.auto = el => {
 // fecha o painel pra deixar a animação à vista (o diário continua no botão 🤖)
 function closePanelSoft() { if (window.innerWidth < 900) closePanel(); }
 setInterval(() => { if (AP.on && panelKey === "auto") renderAutoHead(); }, 1000);
+
+/* ---------- Biblioteca: gerar o par que falta (Short → longo, ou longo → Short) ---------- */
+async function apLongFromShort(Sh) {
+  await walk("ideias", "levando o Short pro Laboratório de Ideias");
+  const P = newProject({ ...Sh.idea, id: Date.now() + 3, tema: Sh.title || Sh.idea.tema }, "long");
+  Object.assign(P, { seedScript: (Sh.script || []).join("\n\n"), voice: Sh.voice, voiceName: Sh.voiceName, speed: Sh.speed || 1, voiceStyle: Sh.voiceStyle });
+  if (Sh.board) {
+    const base = [];
+    for (const a of Sh.board.assets) { if (a.img !== "ok") continue; const b = await Store.get(mkey(Sh.id, "asset", a.id)); if (b) { const id = "b" + a.id; await Store.put(mkey(P.id, "asset", id), b); base.push({ ...a, id }); } }
+    if (base.length) P.baseAssets = base;
+  }
+  S.project = P; save(); renderProd();
+  apLog("Ideias", `vídeo longo a partir do Short${P.baseAssets ? `, reaproveitando ${P.baseAssets.length} imagens` : ""}`, "ok");
+  courier("ideias", "titulos");
+}
+async function libGenerate(id, target) {
+  if (AP.on || busy) return toast("Espere a produção atual terminar");
+  if (S.main()) return toast("Termine ou descarte o vídeo em produção antes");
+  const L = S.library.find(x => x.id === id); if (!L) return;
+  Object.assign(AP, { on: true, stop: false, total: 1, cur: 1, done: 0, err: null, startedAt: Date.now(), usedTopics: [], log: [] });
+  apLog("Gerente", target === "long" ? `vídeo longo a partir do Short “${L.title}”` : `Short a partir de “${L.title}”`, "head");
+  openPanel("auto"); renderProd();
+  try {
+    if (target === "short") {
+      await apDerivedShort(L);
+      Object.assign(S.project, { voice: L.voice, voiceName: L.voiceName, speed: L.speed || 1, linkToLong: true, parentTitle: L.title });
+      for (const step of [apTitulos, apRoteiro, apDescricao, apImagens, apNarracao, apMontagem]) { apCheck(); await step(); if (panelKey === "auto") renderAutoHead(); }
+      const sh = S.library.shift(), host = S.library.find(x => x.id === id); if (host) host.sub = sh; else S.library.unshift(sh);
+    } else {
+      await apLongFromShort(L);
+      for (const step of [apTitulos, apRoteiro, apDescricao, apCapa, apImagens, apNarracao, apMontagem]) { apCheck(); await step(); if (panelKey === "auto") renderAutoHead(); }
+      const lg = S.library[0], k = S.library.findIndex(x => x.id === id);
+      if (k > 0) { const sh = S.library.splice(k, 1)[0]; sh.parentTitle = lg.title; lg.sub = sh; }
+    }
+    save(); AP.done = 1; apLog("Gerente", "✓ pronto: os dois estão juntos na Biblioteca", "ok"); toast("Pronto! Os dois estão juntos na Biblioteca");
+  } catch (e) {
+    AP.err = e.message || "Algo deu errado."; apLog("Gerente", AP.err, e.code === "stopped" ? "warn" : "err");
+    if (e.code !== "stopped") toast("Parou: " + AP.err);
+  }
+  AP.on = false; mgrSay(AP.err ? "parado" : "tudo pronto!"); setTimeout(() => { if (!AP.on) mgrLeave(); }, 6000);
+  renderProd(); renderPanel();
+}
+window.libGenerate = libGenerate;

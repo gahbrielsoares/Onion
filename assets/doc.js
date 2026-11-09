@@ -16,7 +16,7 @@ const Doc = (() => {
     objeto: "Studio photograph of a single historical object on a dark neutral background, dramatic side light, high detail, 16:9. No text, no watermark."
   };
 
-  function storyboardPrompt(P, { maxAssets, maxAI, beats, isShort, reuse }) {
+  function storyboardPrompt(P, { maxAssets, maxAI, beats, isShort, reuse, base }) {
     return `Você é o diretor de arte de um documentário de YouTube no estilo "história contada com material de arquivo": fotos e filmes históricos reais tratados em tons frios, molduras de filme antigo, nomes de pessoas com legenda dourada, títulos grandes em serifa dourada nos momentos de impacto, cartões de capítulo, citações e diagramas 3D quando o assunto é um lugar ou uma estrutura.
 Canal: ${cfgText()}
 Título: "${P.title}".${isShort ? " Formato: SHORT vertical de ~1 minuto, cortes rápidos." : ""}
@@ -31,7 +31,7 @@ Crie:
    - "estilo": para "ia": "reconstrucao", "diagrama" ou "objeto".
    - "descricao": para "ia", prompt em inglês da cena. NUNCA reconstrua o rosto de pessoas reais e não imite fotos de arquivo de eventos reais: uma reconstrução deve parecer reconstrução.
    - Pessoas vivas ou que morreram há menos de 70 anos: só como "real" se a foto for de domínio público; senão não use.
-${reuse ? `   Use APENAS estas imagens que já existem: ${reuse}\n` : ""}2) "batidas": cerca de ${beats} batidas consecutivas cobrindo o roteiro inteiro, uma a cada ${isShort ? "2 a 3" : "3 a 5"} segundos de fala. Cada batida:
+${reuse ? `   Use APENAS estas imagens que já existem: ${reuse}\n` : ""}${base ? `   Já existem estas imagens (de um Short do mesmo assunto). Reaproveite com o MESMO id sempre que fizer sentido e crie novas só pro que faltar: ${base}\n` : ""}2) "batidas": cerca de ${beats} batidas consecutivas cobrindo o roteiro inteiro, uma a cada ${isShort ? "2 a 3" : "3 a 5"} segundos de fala. Cada batida:
    - "trecho": as primeiras 6 a 10 palavras daquele pedaço do roteiro, exatamente como estão no texto,
    - "tipo": um destes:
      "foto" (imagem em tela cheia com movimento lento; a maioria das batidas),

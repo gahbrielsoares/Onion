@@ -483,6 +483,7 @@ Título do vídeo: "${P.title}".
 ${P.kind==="short"?`Escreva o roteiro do short, com cerca de ${words} palavras`:`Escreva o bloco ${i+1} de ${n} do roteiro, com cerca de ${words} palavras`}, no idioma ${P.config.idioma}.
 ${role}
 Regras: escreva SÓ o texto que o narrador vai ler, em parágrafos, sem títulos, marcações, colchetes, emojis ou indicações de cena. Tom humano e específico ao público (${P.config.publico}). Proibido abertura genérica tipo "Olá pessoal" ou "neste vídeo vamos". Frases de tamanhos variados, boas pra ouvir em voz alta.
+${P.seedScript&&P.kind!=="short"?`\nEste vídeo longo aprofunda um Short já publicado do canal sobre o mesmo assunto. Mantenha os fatos e o tom dele e vá muito além (contexto, detalhes, personagens, consequências):\n"""${P.seedScript.slice(0,3000)}"""`:""}
 ${prev?`\nRoteiro até aqui (continue a partir dele sem repetir):\n"""${prev.slice(-6000)}"""`:""}`;
       const live=()=>document.getElementById("live");
       const r=await ask(prompt,{onText:({text})=>{ const l=live(); if(l){ l.textContent=text; const s=document.getElementById("scr"); if(s) s.scrollTop=s.scrollHeight; } }});
@@ -780,14 +781,15 @@ async function runColagem(){
   const P=S.project; ui.imgErr=null; P.selAsset=null; P.done.imagens=false;
   const isShort=P.kind==="short";
   setBusy("imagens","lendo o roteiro e montando o storyboard"); renderPanel();
-  const keep=P.parentAssets||null;
+  const keep=P.parentAssets||null, base=P.baseAssets||null, baseTxt=base?base.map(a=>`${a.id} = ${a.nome}`).join("; "):"";
+  const mergeBase=list=>{ if(!base) return list; const ids=new Set(base.map(a=>a.id)); return [...base.map(a=>({...a})),...list.filter(a=>!ids.has(a.id))]; };
   if(!keep) await Store.delPrefix(`p${P.id}:asset:`);
   const dur=isShort?1:P.config.duracao;
   if(isDoc(P)){
     try{
       const r=await ask(Doc.storyboardPrompt(P,{maxAssets:isShort?14:Math.min(80,Math.round(dur*5.5)),maxAI:isShort?4:Math.max(4,Math.round(dur*1.4)),beats:isShort?20:Math.round(dur*15),isShort,
-        reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):""}),{json:true,maxTokens:20000});
-      let assets=keep?keep.map(a=>({...a})):(r.imagens||[]).map((a,i)=>({id:String(a.id||("i"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="ia"?"ia":"real",busca:String(a.busca||a.nome||""),estilo:["reconstrucao","diagrama","objeto"].includes(a.estilo)?a.estilo:"reconstrucao",descricao:String(a.descricao||""),img:null}));
+        reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):"",base:baseTxt}),{json:true,maxTokens:20000});
+      let assets=keep?keep.map(a=>({...a})):(r.imagens||[]).map((a,i)=>({id:String(a.id||("i"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="ia"?"ia":"real",busca:String(a.busca||a.nome||""),estilo:["reconstrucao","diagrama","objeto"].includes(a.estilo)?a.estilo:"reconstrucao",descricao:String(a.descricao||""),img:null})); assets=mergeBase(assets);
       const has=id=>assets.some(a=>a.id===id);
       const TIPOS=["foto","filme","nome","titulo","data","capitulo","citacao","retrato","diagrama"];
       const beats=(r.batidas||[]).map(b=>({trecho:String(b.trecho||""),tipo:TIPOS.includes(b.tipo)?b.tipo:"foto",img:has(String(b.img||""))?String(b.img):"",imgs:(b.imgs||[]).map(String).filter(has).slice(0,3),texto:String(b.texto||""),subtexto:String(b.subtexto||"")}))
@@ -801,8 +803,8 @@ async function runColagem(){
   }
   try{
     const r=await ask(Collage.storyboardPrompt(P,{maxAssets:isShort?10:Math.min(45,Math.round(dur*3.2)),beats:isShort?18:Math.round(dur*14),isShort,battle:isBattle(P),
-      reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):""}),{json:true,maxTokens:16000});
-    let assets=keep?keep.map(a=>({...a})):(r.elenco||[]).map((a,i)=>({id:String(a.id||("a"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="real"?"real":"desenho",busca:String(a.busca||""),descricao:String(a.descricao||a.nome||""),img:null}));
+      reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):"",base:baseTxt}),{json:true,maxTokens:16000});
+    let assets=keep?keep.map(a=>({...a})):(r.elenco||[]).map((a,i)=>({id:String(a.id||("a"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="real"?"real":"desenho",busca:String(a.busca||""),descricao:String(a.descricao||a.nome||""),img:null})); assets=mergeBase(assets);
     const has=id=>assets.some(a=>a.id===id);
     const beats=(r.batidas||[]).map(b=>({trecho:String(b.trecho||""),elementos:(b.elementos||[]).map(String).filter(has).slice(0,3),texto:String(b.texto||""),titulo:String(b.titulo||""),avatar:has(String(b.avatar||""))?String(b.avatar):""})).filter(b=>b.elementos.length||b.texto);
     if(!beats.length) throw {message:"O storyboard veio vazio. Tente de novo."};
@@ -1176,7 +1178,7 @@ VIEWS.arquivo=()=>`<div class="lib">
     <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
     ${P.sub?`<div class="m" style="font-size:12.5px;margin:6px 0">📱 Short junto: <b>${esc(P.sub.title||"")}</b>${P.sub.render&&P.sub.render.stored?` · <a href="#" data-splay="${i}" style="color:var(--accent)">assistir</a> · <a href="#" data-svid="${i}" style="color:var(--accent)">baixar .mp4</a>`:" · ainda sem vídeo renderizado"}</div><div data-sbox="${i}"></div>`:""}
-    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}<button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}${!P.sub&&!AP.on?`<button class="btn small" data-pair="${i}">${P.kind==="short"?"🎬 Gerar o vídeo longo deste Short":"📱 Gerar o Short deste vídeo"}</button>`:""}<button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
   <p class="m" id="usage" style="font-size:12px;color:var(--muted)"></p>
 </div>`;
 BIND.arquivo=el=>{
@@ -1205,6 +1207,9 @@ BIND.arquivo=el=>{
     P.config.idioma=P.config.idioma||(S.config&&S.config.idioma); S.project=P; Cut._R=null; save(); renderProd();
     courier("arquivo","narracao"); toast("Vídeo de volta no Estúdio de Narração"); openPanel("narracao");
   });
+  el.querySelectorAll("[data-pair]").forEach(b=>b.onclick=()=>{ const L=S.library[+b.dataset.pair];
+    if(!confirm(L.kind==="short"?`Gerar o vídeo longo de “${L.title}”? O gerente passa por todos os departamentos usando o Short como base (ideia, roteiro e imagens).`:`Gerar o Short de “${L.title}”? Ele reaproveita as imagens do vídeo e termina chamando pro vídeo completo.`)) return;
+    libGenerate(L.id,L.kind==="short"?"long":"short"); });
   el.querySelectorAll("[data-svid]").forEach(a=>a.onclick=async e=>{ e.preventDefault(); const P=S.library[+a.dataset.svid].sub; const v=await Store.get(mkey(P.id,"video",0)); if(v) saveBlob(v,`${slug(P.title)}-short.mp4`); });
   el.querySelectorAll("[data-splay]").forEach(a=>a.onclick=async e=>{ e.preventDefault(); const i=+a.dataset.splay, P=S.library[i].sub; const v=await Store.get(mkey(P.id,"video",0)); if(!v) return; if(libUrl) URL.revokeObjectURL(libUrl); libUrl=URL.createObjectURL(v);
     el.querySelector(`[data-sbox="${i}"]`).innerHTML=`<video controls autoplay playsinline src="${libUrl}" style="width:56%;margin:6px 22%;border-radius:10px;background:#000;display:block"></video>`; });

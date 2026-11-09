@@ -93,7 +93,7 @@ const Collage = (() => {
   }
 
   /* ---------- storyboard ---------- */
-  function storyboardPrompt(P, { maxAssets, beats, reuse, isShort, battle }) {
+  function storyboardPrompt(P, { maxAssets, beats, reuse, isShort, battle, base }) {
     return `Você é o diretor de arte de um canal de vídeos explicativos em estilo "colagem animada": fundo liso, personagens e objetos desenhados e recortados que entram na tela no ritmo da narração, uma palavra-chave curta às vezes, o nome do assunto atual no topo e, quando fizer sentido, imagens reais de domínio público (retratos históricos antigos, pinturas, mapas, monumentos e lugares famosos).
 Canal: ${cfgText()}
 Título: "${P.title}".${isShort ? " Formato: SHORT vertical de ~1 minuto, cortes rápidos." : ""}${battle ? " Formato: BATALHA entre dois lados. Na 1ª batida mostre os dois lutadores com o texto \"VS\". Em cada rodada mostre os dois e use o texto pra placar curto (ex.: \"FORÇA: A +1\"). No final, o vencedor sozinho." : ""}
@@ -106,7 +106,7 @@ Crie:
    - "tipo": "real" só para retratos/pinturas históricas antigas, mapas, monumentos e lugares famosos que certamente existem em domínio público; "desenho" para todo o resto. NUNCA "real" para pessoas vivas ou que morreram há menos de 70 anos.
    - "busca": para "real", o termo de busca no Wikimedia Commons em inglês (ex.: "Hypatia portrait 1908", "Pyramids of Giza"); vazio para desenho.
    - "descricao": prompt em inglês descrevendo SÓ o elemento isolado, corpo inteiro se for pessoa, roupa e época corretas (ex.: "ancient Greek female philosopher in a grey himation holding a scroll"). Personagens de pessoas vivas viram personagens genéricos, sem imitar a aparência real.
-${reuse ? `   Use APENAS estes elementos que já existem (não crie novos): ${reuse}\n` : ""}2) "batidas": cerca de ${beats} batidas consecutivas cobrindo o roteiro inteiro, uma a cada ${isShort ? "2 a 3" : "3 a 5"} segundos de fala. Cada batida:
+${reuse ? `   Use APENAS estes elementos que já existem (não crie novos): ${reuse}\n` : ""}${base ? `   Já existem estes elementos (de um Short do mesmo assunto). Reaproveite com o MESMO id sempre que fizer sentido e crie novos só pro que faltar: ${base}\n` : ""}2) "batidas": cerca de ${beats} batidas consecutivas cobrindo o roteiro inteiro, uma a cada ${isShort ? "2 a 3" : "3 a 5"} segundos de fala. Cada batida:
    - "trecho": as primeiras 6 a 10 palavras daquele pedaço do roteiro, exatamente como estão no texto,
    - "elementos": 1 a 3 ids do elenco que aparecem juntos (em ordem da esquerda pra direita),
    - "texto": 0 a 4 palavras de destaque (data, número, palavra-chave) ou "" ,
