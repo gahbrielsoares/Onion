@@ -26,7 +26,7 @@ const Trends = (() => {
       const reason = j.error?.errors?.[0]?.reason || j.error?.status || "", msg = j.error?.message || "";
       if (/accessNotConfigured|SERVICE_DISABLED|API_KEY_SERVICE_BLOCKED|blocked/i.test(reason + msg)) throw fail("yt_off", "A YouTube Data API v3 não está ativada pra essa chave. Ative em console.cloud.google.com (APIs e serviços › Biblioteca › YouTube Data API v3) no mesmo projeto da chave.");
       if (/quota/i.test(reason + msg)) throw fail("yt_quota", "A cota diária da YouTube Data API acabou. Ela renova amanhã.");
-      if (r.status === 400 || r.status === 403) throw fail("auth", "O YouTube recusou a chave: " + (msg || r.status));
+      if (r.status === 401 || r.status === 400 || r.status === 403) throw fail("auth", "O YouTube recusou a chave (" + r.status + "). Chaves criadas no AI Studio costumam servir só pro Gemini. Não precisa disso: deixe o YouTube desligado e use os Sites de tendência, que já trazem o que está em alta.");
       throw fail("http", "YouTube respondeu " + r.status);
     }
     return r.json();

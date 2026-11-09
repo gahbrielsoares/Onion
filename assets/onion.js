@@ -207,6 +207,7 @@ async function runVirais(){
   let sig=null;
   try{
     sig=await Trends.collect({region:S.viraisRegion,niche,sources:{sites:src.sites&&ok.sites,youtube:src.youtube&&ok.youtube,google:src.google&&ok.google,wiki:src.wiki},onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal});
+    if(sig&&sig.avisos.some(a=>/^YouTube: .*recusou|^YouTube: .*não está ativada/.test(a))){ vSources().youtube=false; }
     S.viraisSig=sig; save();
   }catch(e){ if(e.code==="cancelled"){ clearBusy(); return renderPanel(); } }
   if(busy&&busy.cancel){ clearBusy(); return renderPanel(); }
