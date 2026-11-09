@@ -479,7 +479,7 @@ async function runCapa(){
 Título: "${P.title}". Público: ${P.config.publico}. Nicho: ${P.config.nicho}.
 ${P.thumbOwn?`O texto da capa já foi definido: "${P.thumbOwn}". Crie 4 variações bem próximas dele.`:`Crie 4 textos de capa diferentes, de 3 a 6 palavras, no idioma ${P.config.idioma}. Eles devem complementar o título, não repetir.`}
 ${P.thumbVisual?`Ideia visual do criador: ${P.thumbVisual}.`:""}
-Descreva a composição da imagem em português (1-2 frases) e também escreva um prompt de imagem em inglês para ela ("prompt_en"): personagem, expressão, luz, cores, fundo, deixando o terço direito livre para o texto. Não inclua o texto da capa no prompt_en.
+Descreva a composição da imagem em português (1-2 frases) e também escreva um prompt de imagem em inglês para ela ("prompt_en"): personagem, expressão, luz, cores, fundo, deixando o terço direito livre para o texto. Não inclua o texto da capa no prompt_en. Se o tema envolver uma pessoa real, não retrate a aparência dela: use um personagem anônimo, silhueta ou objeto simbólico.
 Responda só com JSON: {"textos":["...","...","...","..."],"cena":"...","prompt_en":"..."}`;
   try{
     const r=await ask(prompt,{json:true,tier:"quick"});
@@ -554,7 +554,7 @@ async function runImagens(){
   P.imgPhase=2; setAction("escrevendo os prompts"); renderPanel();
   const prompt=`Divida este roteiro em exatamente ${n} cenas consecutivas, na ordem, cobrindo o texto inteiro.
 Para cada cena: "trecho" (as primeiras 8 a 12 palavras daquele trecho, no idioma do roteiro) e "prompt" (prompt de imagem em inglês, 1-2 frases, descrevendo uma imagem única e específica daquele momento).
-Antes, defina mentalmente os personagens principais (idade, aparência, roupa) e descreva-os do mesmo jeito em todas as cenas em que aparecem, pra manter consistência. Varie enquadramento e cenário pra não ficar repetitivo. Nada de texto escrito dentro das imagens.
+Antes, defina mentalmente os personagens principais (idade, aparência, roupa) e descreva-os do mesmo jeito em todas as cenas em que aparecem, pra manter consistência. Varie enquadramento e cenário pra não ficar repetitivo. Nada de texto escrito dentro das imagens. Se o roteiro falar de pessoas reais (famosos, vítimas, autoridades), NUNCA retrate o rosto ou a aparência delas: use personagens anônimos, silhuetas, mãos, objetos, lugares e reconstituições genéricas.
 Roteiro:
 """${scriptText().slice(0,24000)}"""
 Responda só com JSON: {"cenas":[{"trecho":"...","prompt":"..."}]}`;
