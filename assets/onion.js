@@ -1097,6 +1097,8 @@ VIEWS.admin=()=>{ const c=AI.get(); return `
         <div style="display:flex;gap:6px"><input id="k-${st}" data-key="${p}" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(P2.keyHint)}" value="${esc(c.keys[p])}"><button type="button" class="btn ghost small" data-show="k-${st}" aria-label="Mostrar chave">👁</button></div>
         <p class="m" style="font-size:12px;margin:5px 0 0">Crie em ${esc(P2.where)}${others.length?` · esta chave também é usada em ${others.join(" e ")}`:""}</p></div>
       ${st==="text"?`<div class="row">${modelField(st,"model","Modelo principal")}${modelField(st,"quick","Modelo rápido")}</div>`:modelField(st,"model","Modelo")}
+      ${st==="image"&&p==="google_free"?`<div class="note" style="margin-top:4px">A cota grátis do Gemini tem limite por minuto e por dia, e o Google pode usar os pedidos pra melhorar os modelos. O Onion gera no máximo uma imagem a cada 5 s pra não estourar o limite. Veja a sua cota em aistudio.google.com/rate-limit.</div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:6px 0"><input type="checkbox" data-fbpaid ${c.image.fallbackPaid!==false?"checked":""} style="margin-top:3px"> <span>Quando a cota grátis acabar, continuar com a chave paga do Google${c.keys.google?"":" (cole a chave paga no cartão Textos ou Narração)"}</span></label>`:""}
       <div class="btns" style="margin-top:4px"><button class="btn small" data-test="${st}">Salvar e testar</button></div>
       ${msg?`<div class="${msg.ok?"status":"err"}" style="${msg.ok?"color:var(--ok)":""}">${esc(msg.text)}</div>`:""}`}
     </section>`;}).join("")}
@@ -1115,6 +1117,7 @@ BIND.admin=el=>{
       if(!ids.length && !AI.PROVIDERS[v].noKey && AI.get().keys[v]){ const b=document.querySelector(`[data-test="${st}"]`); if(b) b.click(); } });
   });
   el.querySelectorAll("[data-key]").forEach(i=>i.onchange=()=>{ AI.setKey(i.dataset.key,i.value); });
+  const fb=el.querySelector("[data-fbpaid]"); if(fb) fb.onchange=()=>AI.setStage("image",{fallbackPaid:fb.checked});
   el.querySelectorAll("[data-show]").forEach(b=>b.onclick=()=>{ const i=el.querySelector("#"+b.dataset.show); i.type=i.type==="password"?"text":"password"; });
   el.querySelectorAll("[data-model]").forEach(i=>i.onchange=()=>{ const [st,f]=i.dataset.model.split(":"); AI.setStage(st,{[f]:i.value.trim()}); renderPanel(); showInfo(null); });
   el.querySelectorAll("[data-test]").forEach(b=>b.onclick=async()=>{

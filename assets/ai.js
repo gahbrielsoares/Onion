@@ -9,6 +9,7 @@ const AI = (() => {
   const PROVIDERS = {
     anthropic:  { name: "Anthropic (Claude)", keyHint: "sk-ant-…", where: "console.anthropic.com" },
     google:     { name: "Google Gemini",      keyHint: "AIza…",    where: "aistudio.google.com" },
+    google_free:{ name: "Gemini grátis",      keyHint: "AIza… (de um projeto SEM faturamento)", where: "aistudio.google.com › Criar chave › Criar em um projeto novo, sem ativar o faturamento" },
     openai:     { name: "OpenAI",             keyHint: "sk-…",     where: "platform.openai.com" },
     elevenlabs: { name: "ElevenLabs",         keyHint: "sk_…",     where: "elevenlabs.io" },
     local:      { name: "Sem IA (no navegador)", noKey: true }
@@ -19,7 +20,7 @@ const AI = (() => {
     text:  { name: "Textos", what: "Temas, títulos, roteiro, descrição, textos da capa e prompts das cenas",
              providers: ["anthropic", "google", "openai"] },
     image: { name: "Imagens e capas", what: "Gera as imagens de cada cena e a arte da thumbnail",
-             providers: ["google", "openai"],
+             providers: ["google", "google_free", "openai"],
              blocked: { anthropic: "O Claude escreve os prompts, mas não gera imagens." } },
     voice: { name: "Narração", what: "Transforma o roteiro em áudio com voz realista",
              providers: ["elevenlabs", "google", "openai"],
@@ -30,7 +31,7 @@ const AI = (() => {
   };
 
   const DEFAULTS = {
-    keys: { anthropic: "", google: "", openai: "", elevenlabs: "" },
+    keys: { anthropic: "", google: "", google_free: "", openai: "", elevenlabs: "" },
     text:  { provider: "anthropic", model: "", quick: "" },
     image: { provider: "google", model: "" },
     voice: { provider: "elevenlabs", model: "" },
@@ -81,7 +82,7 @@ const AI = (() => {
       const r = await fetch("https://api.anthropic.com/v1/models?limit=100", { headers: { "x-api-key": k, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" } });
       if (!r.ok) throw await httpErr(r, provider);
       ids = (await r.json()).data.map(m => m.id);
-    } else if (provider === "google") {
+    } else if (provider === "google" || provider === "google_free") {
       const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000", { headers: { "x-goog-api-key": k } });
       if (!r.ok) throw await httpErr(r, provider);
       const all = (await r.json()).models || [];
@@ -195,12 +196,27 @@ const AI = (() => {
     for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
     return new Blob([arr], { type: type || "image/png" });
   }
-  async function image(prompt, { aspect = "16:9", signal } = {}) {
-    const st = cfg.image, p = st.provider, k = cfg.keys[p];
+  let lastFree = 0, freeQ = Promise.resolve();
+  async function image(prompt, opts = {}) {
+    const st = cfg.image;
+    if (st.provider !== "google_free") return imageWith(st.provider, prompt, opts);
+    // cota grátis: no máximo ~1 imagem a cada 5 s; se a cota do dia acabar, usa a chave paga (se permitido)
+    const ticket = freeQ.then(async () => { const w = lastFree + 5000 - Date.now(); if (w > 0) await new Promise(r => setTimeout(r, w)); lastFree = Date.now(); });
+    freeQ = ticket.catch(() => {}); await ticket;
+    try { return await imageWith("google_free", prompt, opts); }
+    catch (e) {
+      if ((e.code === "rate_limited" || /quota|exhausted|limit/i.test(e.message || "")) && st.fallbackPaid !== false && cfg.keys.google) { usedPaid++; return imageWith("google", prompt, opts); }
+      if (e.code === "rate_limited") throw fail("rate_limited", "A cota grátis de imagens do Gemini acabou por hoje (ou por este minuto). Ela renova à meia-noite (horário do Pacífico). Ative a reserva paga ou tente mais tarde.");
+      throw e;
+    }
+  }
+  let usedPaid = 0;
+  async function imageWith(p, prompt, { aspect = "16:9", signal } = {}) {
+    const st = cfg.image, k = cfg.keys[p];
     if (!k) throw fail("no_key", "Cole a chave de " + PROVIDERS[p].name + " no cartão Imagens e capas da Administração.");
     if (!st.model) throw fail("model", "Escolha o modelo de imagem na Administração.");
     try {
-      if (p === "google") {
+      if (p === "google" || p === "google_free") {
         const go = (withCfg) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(st.model)}:generateContent`, {
           method: "POST", signal, headers: { "content-type": "application/json", "x-goog-api-key": k },
           body: JSON.stringify({
@@ -244,6 +260,6 @@ const AI = (() => {
     }
   }
 
-  return { image, PROVIDERS, STAGES, get, setKey, setStage, clearAll, ready, stageReady,
+  return { image, paidFallbacks: () => usedPaid, PROVIDERS, STAGES, get, setKey, setStage, clearAll, ready, stageReady,
            listModels, cachedModels, pickDefault, pickQuick, call, json };
 })();
