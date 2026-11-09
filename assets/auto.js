@@ -190,7 +190,7 @@ async function runAuto() {
       for (const step of [apIdea, apTitulos, apRoteiro, apDescricao, apCapa, apImagens, apNarracao, apMontagem]) { apCheck(); await step(); if (panelKey === "auto") renderAutoHead(); }
       AP.done++; apLog("Gerente", `✓ vídeo ${AP.cur} pronto`, "ok");
     }
-    apLog("Gerente", `terminei: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} pronto${AP.done > 1 ? "s" : ""}`, "ok"); toast(`Piloto automático: ${AP.done} vídeo(s) prontos`);
+    apLog("Gerente", `terminei: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} pronto${AP.done > 1 ? "s" : ""}`, "ok"); toast(`Piloto automático: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} pronto${AP.done > 1 ? "s" : ""}`);
   } catch (e) {
     AP.err = e.message || "Algo deu errado."; apLog("Gerente", AP.err, e.code === "stopped" ? "warn" : "err");
     if (e.code !== "stopped") toast("Piloto automático parou: " + AP.err);

@@ -4,14 +4,14 @@
  */
 const Trends = (() => {
   const REG = {
-    "Mundo todo":     { yt: "US", wiki: "en.wikipedia", lang: "en", nome: "no mundo todo (principalmente EUA e Europa)" },
-    "Estados Unidos": { yt: "US", wiki: "en.wikipedia", lang: "en", nome: "nos Estados Unidos" },
-    "Reino Unido":    { yt: "GB", wiki: "en.wikipedia", lang: "en", nome: "no Reino Unido" },
-    "Canadá":         { yt: "CA", wiki: "en.wikipedia", lang: "en", nome: "no Canadá" },
-    "Austrália":      { yt: "AU", wiki: "en.wikipedia", lang: "en", nome: "na Austrália" },
-    "Brasil":         { yt: "BR", wiki: "pt.wikipedia", lang: "pt", nome: "no Brasil" },
-    "Índia":          { yt: "IN", wiki: "en.wikipedia", lang: "en", nome: "na Índia" },
-    "Alemanha":       { yt: "DE", wiki: "de.wikipedia", lang: "de", nome: "na Alemanha" }
+    "Mundo todo":     { yt: "US", wiki: "en.wikipedia", lang: "en", nome: "no mundo todo (principalmente EUA e Europa)", t24: "", news: "hl=en-US&gl=US&ceid=US:en" },
+    "Estados Unidos": { yt: "US", wiki: "en.wikipedia", lang: "en", nome: "nos Estados Unidos", t24: "united-states/", news: "hl=en-US&gl=US&ceid=US:en" },
+    "Reino Unido":    { yt: "GB", wiki: "en.wikipedia", lang: "en", nome: "no Reino Unido", t24: "united-kingdom/", news: "hl=en-GB&gl=GB&ceid=GB:en" },
+    "Canadá":         { yt: "CA", wiki: "en.wikipedia", lang: "en", nome: "no Canadá", t24: "canada/", news: "hl=en-CA&gl=CA&ceid=CA:en" },
+    "Austrália":      { yt: "AU", wiki: "en.wikipedia", lang: "en", nome: "na Austrália", t24: "australia/", news: "hl=en-AU&gl=AU&ceid=AU:en" },
+    "Brasil":         { yt: "BR", wiki: "pt.wikipedia", lang: "pt", nome: "no Brasil", t24: "brazil/", news: "hl=pt-BR&gl=BR&ceid=BR:pt-419" },
+    "Índia":          { yt: "IN", wiki: "en.wikipedia", lang: "en", nome: "na Índia", t24: "india/", news: "hl=en-IN&gl=IN&ceid=IN:en" },
+    "Alemanha":       { yt: "DE", wiki: "de.wikipedia", lang: "de", nome: "na Alemanha", t24: "germany/", news: "hl=de&gl=DE&ceid=DE:de" }
   };
   const fail = (code, message) => ({ code, message });
   const ytKey = () => AI.get().keys.youtube || AI.get().keys.google || "";
@@ -74,6 +74,48 @@ Liste 15 assuntos específicos (nada genérico). Para cada um: o assunto, por qu
     return { text, fontes };
   }
 
+  // os sites de tendência são lidos pelos servidores do Google (Gemini com leitura de páginas
+  // e Pesquisa Google), porque o navegador não pode abrir esses sites direto
+  function siteList(region) {
+    const R = REG[region] || REG["Estados Unidos"];
+    return [
+      ["Google Trends", `https://trends.google.com/trending/rss?geo=${R.yt}`],
+      ["X (Twitter) · trends24", `https://trends24.in/${R.t24}`],
+      ["TikTok Creative Center", `https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en?region=${R.yt}&period=7`],
+      ["Reddit", `https://old.reddit.com/r/popular/?geo_filter=${R.yt}`],
+      ["Google Notícias", `https://news.google.com/rss?${R.news}`],
+      ["Exploding Topics", "https://explodingtopics.com/"]
+    ];
+  }
+  const nk = s => (s || "").toLowerCase().normalize("NFD").replace(/[^a-z0-9]/g, "");
+  async function sites(region, niche, signal) {
+    const k = AI.get().keys.google; if (!k) throw fail("no_key", "Precisa da chave do Google (Gemini) pra ler os sites de tendência.");
+    const R = REG[region] || REG["Estados Unidos"], list = siteList(region), hoje = new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+    const prompt = `Hoje é ${hoje}. Você é um analista de tendências. Abra e leia AGORA estas páginas, que mostram o que está em alta ${R.nome}:
+${list.map(([n, u]) => `- ${n}: ${u}`).join("\n")}
+Se uma página não abrir ou vier vazia, pesquise no Google o equivalente de hoje (por exemplo "hashtags em alta TikTok ${region} hoje", "assuntos do momento X ${region}").${niche ? `
+Dê atenção extra ao que tiver ligação com: ${niche}.` : ""}
+Responda SÓ com linhas neste formato, até 8 por fonte, do mais quente pro menos quente:
+FONTE | ASSUNTO | EVIDÊNCIA (posição, volume de buscas, número de posts, upvotes ou data)
+Use exatamente estes nomes de fonte: ${list.map(l => l[0]).join(", ")}. Não invente números: se a página não mostrar número, escreva a posição.`;
+    const model = await googleModel();
+    const call = tools => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST", signal, headers: { "content-type": "application/json", "x-goog-api-key": k },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], tools })
+    });
+    let r = await call([{ url_context: {} }, { google_search: {} }]);
+    if (r.status === 400) r = await call([{ google_search: {} }]);   // modelo sem leitura de páginas: só Pesquisa Google
+    if (!r.ok) { let m = ""; try { m = (await r.json()).error?.message || ""; } catch (e) {} throw fail("http", "Leitura dos sites falhou: " + (m || r.status)); }
+    const j = await r.json(), c = j.candidates?.[0];
+    const text = (c?.content?.parts || []).map(p => p.text || "").join("").trim();
+    const meta = (c?.urlContextMetadata || c?.url_context_metadata || {});
+    const got = (meta.urlMetadata || meta.url_metadata || []).map(m => ({ url: m.retrievedUrl || m.retrieved_url, ok: /SUCCESS/i.test(m.urlRetrievalStatus || m.url_retrieval_status || "") }));
+    const itens = text.split("\n").map(l => l.split("|").map(x => x.trim())).map(p => { p[0] = (p[0] || "").replace(/^[-*•\d.\s]+/, ""); return p; }).filter(p => p.length >= 2 && p[1])
+      .map(([fonte, assunto, ev]) => ({ fonte, assunto, ev: ev || "" }));
+    const porFonte = list.map(([n, u]) => ({ nome: n, url: u, lido: got.some(g => g.ok && g.url && g.url.split("?")[0].replace(/\/$/, "") === u.split("?")[0].replace(/\/$/, "")), itens: itens.filter(i => { const a = nk(i.fonte), b = nk(n); return a.startsWith(b.slice(0, 10)) || b.startsWith(a.slice(0, 10)); }) }));
+    return { porFonte, itens, fontes: (c?.groundingMetadata?.groundingChunks || []).map(g => g.web).filter(Boolean).map(w => ({ titulo: w.title, url: w.uri })).slice(0, 10) };
+  }
+
   async function wikipedia(region) {
     const R = REG[region] || REG["Estados Unidos"];
     for (let back = 1; back <= 3; back++) {
@@ -93,6 +135,7 @@ Liste 15 assuntos específicos (nada genérico). Para cada um: o assunto, por qu
   async function collect({ region, niche, sources, onStatus, signal }) {
     const out = { region, at: Date.now(), avisos: [] };
     if (sources.youtube) { onStatus && onStatus("lendo o YouTube em alta"); try { out.youtube = await youtube(region, niche); } catch (e) { out.avisos.push("YouTube: " + e.message); } }
+    if (sources.sites) { onStatus && onStatus("lendo Google Trends, X, TikTok, Reddit e notícias"); try { out.sites = await sites(region, niche, signal); } catch (e) { if (e.name === "AbortError") throw fail("cancelled", "Interrompido"); out.avisos.push("Sites: " + e.message); } }
     if (sources.google) { onStatus && onStatus("pesquisando no Google o que bomba agora"); try { out.google = await google(region, niche, signal); } catch (e) { if (e.name === "AbortError") throw fail("cancelled", "Interrompido"); out.avisos.push("Google: " + e.message); } }
     if (sources.wiki) { onStatus && onStatus("vendo o que o povo mais leu ontem"); try { out.wiki = await wikipedia(region); } catch (e) { out.avisos.push("Wikipedia: " + e.message); } }
     return out;
@@ -103,6 +146,7 @@ Liste 15 assuntos específicos (nada genérico). Para cada um: o assunto, por qu
       parts.push("VÍDEOS EM ALTA NO YOUTUBE AGORA (título | canal | views | views por hora | dias no ar):\n" + sig.youtube.pop.slice(0, 25).map(v => `- ${v.titulo} | ${v.canal} | ${fmtN(v.views)} | ${fmtN(v.porHora)}/h | ${v.dias}d`).join("\n"));
       if (sig.youtube.nicho.length) parts.push("VÍDEOS DO NICHO QUE MAIS CRESCERAM NA ÚLTIMA SEMANA:\n" + sig.youtube.nicho.map(v => `- ${v.titulo} | ${v.canal} | ${fmtN(v.views)} | ${fmtN(v.porHora)}/h`).join("\n"));
     }
+    if (sig.sites && sig.sites.itens.length) parts.push("EM ALTA NOS SITES DE TENDÊNCIA (fonte | assunto | evidência):\n" + sig.sites.itens.slice(0, 50).map(i => `- ${i.fonte} | ${i.assunto} | ${i.ev}`).join("\n"));
     if (sig.google && sig.google.text) parts.push("O QUE ESTÁ EM ALTA NO GOOGLE (pesquisa feita agora):\n" + sig.google.text.slice(0, 6000));
     if (sig.wiki) parts.push(`ARTIGOS MAIS LIDOS NA WIKIPEDIA EM ${sig.wiki.dia} (título | views):\n` + sig.wiki.artigos.map(a => `- ${a.titulo} | ${fmtN(a.views)}`).join("\n"));
     return parts.join("\n\n");

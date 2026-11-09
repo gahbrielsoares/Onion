@@ -63,6 +63,6 @@ assets/vendor/      JSZip e mp4-muxer (MIT)
 - [x] Pacote .zip com capa, cenas, roteiro e descrição
 - [x] Narração com Gemini, ElevenLabs ou OpenAI (em trechos, com amostra de voz)
 - [x] OnionCut: cortes nas pausas da voz, Ken Burns, templates, legendas animadas, prévia ao vivo
-- [x] Tendências ao vivo: YouTube em alta (Data API v3), Google agora (Gemini + Pesquisa Google) e Wikipedia mais lidas
+- [x] Tendências ao vivo: sites de tendência (Google Trends, X/trends24, TikTok Creative Center, Reddit, Google Notícias, Exploding Topics) lidos pelo Gemini, YouTube em alta (Data API v3), Google agora (Gemini + Pesquisa Google) e Wikipedia mais lidas
 - [x] Piloto automático: gera N vídeos sozinho, o gerente decide cada etapa e caminha entre os prédios
 - [x] Render em MP4 (H.264) direto no navegador, com WebCodecs (Chrome ou Edge no computador)

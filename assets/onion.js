@@ -150,17 +150,18 @@ const VIEWS={}, BIND={};
 let ui={}; // transient UI errors etc
 
 /* ---- Virais ---- */
-function vSources(){ if(!S.viraisSources) S.viraisSources={youtube:true,google:true,wiki:true}; return S.viraisSources; }
+function vSources(){ if(!S.viraisSources||S.viraisSources.v!==2) S.viraisSources={v:2,sites:true,youtube:false,google:true,wiki:true}; return S.viraisSources; }
 function srcStatus(){
   const k=AI.get().keys;
-  return { youtube: !!(k.youtube||k.google), google: !!k.google, wiki: true };
+  return { sites: !!k.google, youtube: !!(k.youtube||k.google), google: !!k.google, wiki: true };
 }
-VIEWS.virais=()=>{ const src=vSources(), ok=srcStatus(), sig=S.viraisSig; const live=(src.youtube&&ok.youtube)||(src.google&&ok.google)||src.wiki; return `
+VIEWS.virais=()=>{ const src=vSources(), ok=srcStatus(), sig=S.viraisSig; const live=(src.sites&&ok.sites)||(src.youtube&&ok.youtube)||(src.google&&ok.google)||src.wiki; return `
   <p class="lead">A equipe lê o que está bombando agora e transforma em temas de vídeo. Mande os melhores pro Laboratório de Ideias.</p>
   <h3>Região</h3>${pills("reg",REGIOES,S.viraisRegion)}
   <h3>Fontes ao vivo</h3>
   <div class="card" style="padding:10px 12px">
-    ${[["youtube","▶ YouTube em alta","vídeos que mais ganham views por hora na região",ok.youtube?"":"precisa da chave do Google com a YouTube Data API ativada"],
+    ${[["sites","🌐 Sites de tendência","Google Trends, X (trends24), TikTok Creative Center, Reddit, Google Notícias e Exploding Topics, lidos pelo Gemini agora",ok.sites?"":"precisa da chave do Google"],
+       ["youtube","▶ YouTube em alta","vídeos que mais ganham views por hora na região",ok.youtube?"":"precisa da chave do Google com a YouTube Data API ativada"],
        ["google","🔎 Google agora","o Gemini pesquisa no Google o que está em alta nos últimos 7 dias",ok.google?"":"precisa da chave do Google"],
        ["wiki","📖 Wikipedia mais lidas","o que mais gente leu ontem (grátis, sem chave)",""]].map(([k,t,d,need])=>`
       <label style="display:flex;gap:10px;align-items:flex-start;padding:5px 0;${need?"opacity:.55":""}"><input type="checkbox" data-src="${k}" ${src[k]&&!need?"checked":""} ${need?"disabled":""} style="margin-top:3px">
@@ -175,6 +176,8 @@ VIEWS.virais=()=>{ const src=vSources(), ok=srcStatus(), sig=S.viraisSig; const 
   ${sig&&sig.avisos&&sig.avisos.length?`<div class="note">${sig.avisos.map(a=>"⚠ "+esc(a)).join("<br>")}</div>`:""}
   ${!live?`<div class="note">Sem fontes ao vivo ligadas, os temas vêm só do conhecimento da IA, sem dados de agora.</div>`:""}
   ${sig?`<details class="card" style="padding:10px 12px"><summary style="cursor:pointer;font-weight:700">Sinais coletados · ${new Date(sig.at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})} · ${esc(sig.region)}</summary>
+    ${sig.sites?`<h3>🌐 Sites de tendência</h3>${sig.sites.porFonte.map(f=>`<div style="margin:6px 0"><b style="font-size:13px">${f.lido?"✓":"🔎"} <a href="${esc(f.url)}" target="_blank" rel="noopener" style="color:var(--text)">${esc(f.nome)}</a></b>${f.lido?"":` <span class="m" style="font-size:11.5px">(via Pesquisa Google)</span>`}
+      <div class="m" style="font-size:12.5px">${f.itens.length?f.itens.slice(0,6).map(i=>`${esc(i.assunto)}${i.ev?` <span style="opacity:.75">(${esc(i.ev)})</span>`:""}`).join(" · "):"nada encontrado agora"}</div></div>`).join("")}`:""}
     ${sig.youtube?`<h3>▶ YouTube em alta (mais views por hora)</h3>${sig.youtube.pop.slice(0,10).map(v=>`<div class="m" style="font-size:12.5px;padding:3px 0"><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener" style="color:var(--text)">${esc(v.titulo)}</a> · ${Trends.fmtN(v.views)} views · <b>${Trends.fmtN(v.porHora)}/h</b></div>`).join("")}
       ${sig.youtube.nicho.length?`<h3>No nicho, última semana</h3>${sig.youtube.nicho.slice(0,8).map(v=>`<div class="m" style="font-size:12.5px;padding:3px 0"><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener" style="color:var(--text)">${esc(v.titulo)}</a> · ${Trends.fmtN(v.views)} · <b>${Trends.fmtN(v.porHora)}/h</b></div>`).join("")}`:""}`:""}
     ${sig.google&&sig.google.fontes.length?`<h3>🔎 Fontes do Google</h3>${sig.google.fontes.map(f=>`<div class="m" style="font-size:12.5px;padding:2px 0"><a href="${esc(f.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(f.titulo)}</a></div>`).join("")}`:""}
@@ -203,7 +206,7 @@ async function runVirais(){
   const niche=(S.viraisNicho||"").trim()||(S.viraisModo==="Qualquer assunto bombando"?"":(S.config?S.config.nicho:""));
   let sig=null;
   try{
-    sig=await Trends.collect({region:S.viraisRegion,niche,sources:{youtube:src.youtube&&ok.youtube,google:src.google&&ok.google,wiki:src.wiki},onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal});
+    sig=await Trends.collect({region:S.viraisRegion,niche,sources:{sites:src.sites&&ok.sites,youtube:src.youtube&&ok.youtube,google:src.google&&ok.google,wiki:src.wiki},onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal});
     S.viraisSig=sig; save();
   }catch(e){ if(e.code==="cancelled"){ clearBusy(); return renderPanel(); } }
   if(busy&&busy.cancel){ clearBusy(); return renderPanel(); }
