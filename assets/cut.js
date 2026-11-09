@@ -71,6 +71,7 @@ const Cut = (() => {
   /* ---------- preparar: áudio, palavras, cenas, legendas ---------- */
   const norm = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\p{L}\p{N}]+/gu, "");
   async function prepare(P, { onStatus, signal } = {}) {
+    try { await Promise.all(["80px Anton", "700 80px Cinzel", "700 40px \"Space Mono\"", "800 40px Figtree"].map(f => document.fonts.load(f))); } catch (e) {}
     const N = P.narr; if (!N || !N.chunks?.length) throw { code: "no_audio", message: "Gere a narração no Estúdio antes de montar." };
     const pcm = [];
     for (let i = 0; i < N.chunks.length; i++) {
@@ -141,7 +142,10 @@ const Cut = (() => {
     // imagens
     onStatus && onStatus("carregando as imagens");
     const assets = {};
-    if (col) for (const a of P.board.assets) { if (a.img !== "ok") continue; const b = await Store.get(`p${P.id}:asset:${a.id}`); try { if (b) assets[a.id] = { bmp: await createImageBitmap(b), real: !!a.real, nome: a.real ? a.nome : "" }; } catch (e) {} }
+    const doc = col && P.board.kind === "doc";
+    if (col) for (const a of P.board.assets) { if (a.img !== "ok") continue; const b = await Store.get(`p${P.id}:asset:${a.id}`); try { if (b) assets[a.id] = { bmp: await createImageBitmap(b), real: !!a.real, nome: (a.real || doc) ? a.nome : "" }; } catch (e) {} }
+    // documentário: batida sem imagem usa a última imagem válida
+    if (doc) { let lastImg = Object.keys(assets)[0] || ""; scenes.forEach(s => { const b = s.beat; if (!b) return; if (b.img && assets[b.img]) lastImg = b.img; else if (b.tipo !== "retrato") b.img = lastImg; }); }
     const bitmaps = [];
     for (let j = 0; j < sc; j++) {
       const b = col ? null : await Store.get(`p${P.id}:scene:${j}`);
@@ -152,7 +156,17 @@ const Cut = (() => {
     // forma de onda pra linha do tempo
     const env = envelope(audio, Math.max(480, Math.floor(audio.length / 240))); const mx = Math.max(...env) || 1;
     const wave = Array.from(env).map(v => v / mx);
-    return { audio, dur, words, scenes, caps, bitmaps, assets, mode: col ? "colagem" : "cinema", pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: col ? Object.keys(assets).length : sc };
+    // trilha e efeitos sonoros
+    let mixed = audio; const snd = P.sound || {};
+    if (snd.mood !== "Sem trilha" || snd.sfx) {
+      onStatus && onStatus("mixando trilha e efeitos");
+      let music = null;
+      if (snd.custom) { const mb = await Store.get(`p${P.id}:music:0`); if (mb) try { music = await Sound.custom(mb); } catch (e) {} }
+      if (!music && snd.mood && snd.mood !== "Sem trilha") music = await Sound.loop(snd.mood);
+      const ev = snd.sfx === false ? [] : doc ? Doc.events(scenes) : col ? scenes.filter((s, i) => i > 0 && i % 2 === 0).map(s => ({ t: s.s - .25, kind: "whoosh", gain: .35 })) : [];
+      mixed = await Sound.mix(audio, { music, events: ev, musicGain: snd.custom ? .14 : .11 });
+    }
+    return { audio: mixed, voice: audio, dur, words, scenes, caps, bitmaps, assets, mode: doc ? "doc" : col ? "colagem" : "cinema", pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: col ? Object.keys(assets).length : sc };
   }
 
   /* ---------- desenhar um quadro ---------- */
@@ -182,6 +196,7 @@ const Cut = (() => {
     g.drawImage(bmp, fx, fy, dw, dh);
   }
   function frame(g, t, R, o) {
+    if (R.mode === "doc") { Doc.frame(g, t, R, o); if (o.captions !== "Sem legenda") drawCaption(g, t, R, o); return; }
     if (R.mode === "colagem") { Collage.frame(g, t, R, o); if (o.captions !== "Sem legenda") drawCaption(g, t, R, o); return; }
     const { W, H } = o, tp = TEMPLATES[o.template] || TEMPLATES["Clean"];
     g.save();
@@ -268,7 +283,7 @@ const Cut = (() => {
   async function render(R, o, { fileHandle, onProgress, signal } = {}) {
     const W = o.res === "short" ? 1080 : o.res === "720p" ? 1280 : 1920, H = o.res === "short" ? 1920 : o.res === "720p" ? 720 : 1080;
     const cfg = await pickConfigs(W, H);
-    try { await document.fonts.load(`80px Anton`); } catch (e) {}
+    try { await Promise.all(["80px Anton", "700 80px Cinzel", "700 40px \"Space Mono\"", "800 40px Figtree"].map(f => document.fonts.load(f))); } catch (e) {}
     const writable = fileHandle ? await fileHandle.createWritable() : null;
     const target = writable ? new Mp4Muxer.FileSystemWritableFileStreamTarget(writable) : new Mp4Muxer.ArrayBufferTarget();
     const muxer = new Mp4Muxer.Muxer({ target, fastStart: writable ? false : "in-memory", firstTimestampBehavior: "offset",
@@ -276,7 +291,7 @@ const Cut = (() => {
     let err = null;
     const ve = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: e => err = e }); ve.configure(cfg.video);
     const ae = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: e => err = e }); ae.configure(cfg.audio);
-    const totalDur = R.dur + .6, audioAll = new Float32Array(Math.ceil(totalDur * SR)); audioAll.set(R.audio);
+    const totalDur = R.dur + .6, audioAll = new Float32Array(Math.ceil(totalDur * SR)); audioAll.set(R.audio.subarray(0, audioAll.length));
     for (let off = 0; off < audioAll.length; off += SR) {
       const n = Math.min(SR, audioAll.length - off);
       const ad = new AudioData({ format: "f32-planar", sampleRate: SR, numberOfFrames: n, numberOfChannels: 1, timestamp: Math.round(off / SR * 1e6), data: audioAll.slice(off, off + n) });

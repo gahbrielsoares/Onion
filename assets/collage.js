@@ -49,10 +49,10 @@ const Collage = (() => {
 
   /* ---------- imagens reais de domínio público (Wikimedia Commons) ---------- */
   const strip = h => (h || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
-  async function commons(query) {
+  async function commons(query, width = 1280) {
     const u = "https://commons.wikimedia.org/w/api.php?" + new URLSearchParams({
       action: "query", format: "json", origin: "*", generator: "search", gsrsearch: query + " filetype:bitmap",
-      gsrnamespace: "6", gsrlimit: "10", prop: "imageinfo", iiprop: "url|extmetadata|size", iiurlwidth: "1280"
+      gsrnamespace: "6", gsrlimit: "10", prop: "imageinfo", iiprop: "url|extmetadata|size", iiurlwidth: String(width)
     });
     const r = await fetch(u); if (!r.ok) return null;
     const pages = Object.values((await r.json()).query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0));

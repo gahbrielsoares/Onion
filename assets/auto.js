@@ -146,7 +146,7 @@ async function apNarracao() {
 async function apMontagem() {
   const P = S.project;
   await walk("montagem", "indo pro OnionCut");
-  const tpls = isColagem(P) ? Object.keys(Collage.TPL) : TEMPLATES;
+  const tpls = isDoc(P) ? Object.keys(Doc.TPL) : isColagem(P) ? Object.keys(Collage.TPL) : TEMPLATES;
   const d = await decide(`Qual template de edição combina com o vídeo “${P.title}”?`, tpls);
   P.template = tpls[d.i]; if (P.kind !== "short") P.res = AP.res || "1080p"; save();
   apLog("OnionCut", `template “${P.template}”, legenda: ${P.captions.toLowerCase()}. ${d.motivo}`, "decision");

@@ -26,9 +26,11 @@ function nextStage(){
 /* ============ OPTIONS ============ */
 const NICHOS=["Orações","Histórias Bíblicas","Mistérios e Casos Não Resolvidos","História Antiga","Curiosidades Científicas","Espaço e Astronomia","Psicologia e Comportamento","Finanças Pessoais","Milionários e Histórias de Sucesso","Motivação e Disciplina","Meditação e Mindfulness","Realeza e Dinastias","True Crime","Saúde 60+","Receitas e Culinária","Outro"];
 const PUBLICOS=["Americanos 50+","Americanos 25–45","Britânicos 40+","Global em inglês","Hispânicos nos EUA","Brasileiros adultos"];
-const FORMATOS=["Lista (Como morreram, Top 10…)","Narrativa / História","Documentário","Explicativo","Batalha (X vs Y)","Motivacional / Discurso","Oração guiada"];
-const VISUAIS=[["colagem","Colagem animada (explicador desenhado)"],["cinema","Cenas cinematográficas (imagem inteira)"]];
-const isColagem=P=>((P&&P.config)||S.config||{}).visual!=="cinema";
+const FORMATOS=["Documentário contado (estilo história/tour)","Lista (Como morreram, Top 10…)","Narrativa / História","Documentário","Explicativo","Batalha (X vs Y)","Motivacional / Discurso","Oração guiada"];
+const VISUAIS=[["documentario","Documentário cinematográfico (fotos de arquivo, títulos dourados, trilha e efeitos)"],["colagem","Colagem animada (explicador desenhado)"],["cinema","Cenas geradas por IA (imagem inteira)"]];
+const visOf=P=>(((P&&P.config)||S.config||{}).visual)||"documentario";
+const isColagem=P=>visOf(P)!=="cinema";
+const isDoc=P=>visOf(P)==="documentario";
 const isBattle=P=>/batalha/i.test((P.config||{}).formato||"");
 const GANCHOS=["História pessoal","Pergunta intrigante","Fato chocante","Promessa direta","Mistério em aberto"];
 const IDIOMAS=[["Português","🇧🇷","pt-BR"],["Inglês","🇺🇸","en-US"],["Espanhol","🇪🇸","es-ES"],["Francês","🇫🇷","fr-FR"],["Alemão","🇩🇪","de-DE"],["Japonês","🇯🇵","ja-JP"],["Hindi","🇮🇳","hi-IN"],["Árabe","🇸🇦","ar-SA"]];
@@ -114,9 +116,10 @@ function aiNote(){
 }
 
 function newProject(idea,kind){
-  kind=kind||"long"; const col=(S.config||{}).visual!=="cinema";
-  const P={id:Date.now(),kind,idea,config:{...S.config},done:{},titles:[],script:[],scenes:[],style:STYLES[0][0],voice:null,voiceName:null,speed:1,
-    res:kind==="short"?"short":"1080p",template:col?"Azul explicador":TEMPLATES[0],captions:kind==="short"?"Palavra por palavra":(col?"Sem legenda":CAPTIONS[0])};
+  kind=kind||"long"; const v=visOf(null), col=v!=="cinema", doc=v==="documentario";
+  const P={id:Date.now(),kind,idea,config:{...S.config,visual:v},done:{},titles:[],script:[],scenes:[],style:STYLES[0][0],voice:null,voiceName:null,speed:1,
+    res:kind==="short"?"short":"1080p",template:doc?"Azul noturno":col?"Azul explicador":TEMPLATES[0],captions:kind==="short"?"Palavra por palavra":(col?"Sem legenda":CAPTIONS[0]),
+    sound:{mood:doc?"Tensão (documentário)":col?"Leve (curiosidades)":"Inspirador",sfx:true,custom:false}};
   if(kind==="short"){ P.config.duracao=1; P.done.capa=true; }
   return P;
 }
@@ -251,8 +254,8 @@ VIEWS.ideias=()=>{
   <div class="row"><div class="field"><label for="cg">Estilo do gancho</label><select id="cg">${GANCHOS.map(n=>`<option ${n===c.gancho?"selected":""}>${n}</option>`).join("")}</select></div>
   <div class="field"><label for="cv">Voz</label><select id="cv">${["Masculina","Feminina"].map(n=>`<option ${n===c.voz?"selected":""}>${n}</option>`).join("")}</select></div></div>
   <div class="field"><label for="cd">Duração, de 10 a 60 min</label><input id="cd" type="number" min="10" max="60" value="${c.duracao}"><div class="m" style="font-size:12px;color:var(--muted);margin-top:4px" id="cdb">${blocks} blocos de roteiro</div></div>
-  <div class="field"><label for="cvis2">Estilo visual</label><select id="cvis2">${VISUAIS.map(([v,t])=>`<option value="${v}" ${(c.visual||"colagem")===v?"selected":""}>${t}</option>`).join("")}</select>
-  <div class="m" style="font-size:12px;color:var(--muted);margin-top:4px">Colagem: fundo liso, personagens e objetos desenhados entrando no ritmo da fala, como nos canais explicativos. Usa imagens reais de domínio público quando existem (grátis).</div></div>
+  <div class="field"><label for="cvis2">Estilo visual</label><select id="cvis2">${VISUAIS.map(([v,t])=>`<option value="${v}" ${(c.visual||"documentario")===v?"selected":""}>${t}</option>`).join("")}</select>
+  <div class="m" style="font-size:12px;color:var(--muted);margin-top:4px">Documentário: fotos e filmes históricos reais tratados, nomes e títulos em dourado, capítulos, diagramas 3D, trilha e efeitos de transição. Colagem: fundo liso, personagens e objetos desenhados entrando no ritmo da fala, como nos canais explicativos. Usa imagens reais de domínio público quando existem (grátis).</div></div>
   <div class="field"><label for="cipm">Imagens por minuto (estilo cinematográfico)</label><select id="cipm">${[["2","2 por minuto · econômico"],["3","3 por minuto · mais variado"],["4","4 por minuto · bem dinâmico"]].map(([v,t])=>`<option value="${v}" ${String(c.ipm||2)===v?"selected":""}>${t}</option>`).join("")}</select>
   <div class="m" style="font-size:12px;color:var(--muted);margin-top:4px">Cada imagem é uma chamada paga. Entre uma imagem e outra o OnionCut muda o enquadramento a cada ~7 s, de graça.</div></div>
   <div class="field"><label>Idioma dos vídeos</label>${pills("lang",IDIOMAS.map(i=>i[0]),c.idioma).replace(/data-v="([^"]+)">([^<]+)</g,(m,v,t)=>`data-v="${v}">${(IDIOMAS.find(i=>i[0]===v)||["","" ])[1]} ${t}<`)}</div>
@@ -273,7 +276,7 @@ BIND.ideias=el=>{
   let lang=(S.config&&S.config.idioma)||"Inglês";
   const cn=el.querySelector("#cn"), cd=el.querySelector("#cd");
   const readCfg=()=>{ const nicho=cn.value==="Outro"?(el.querySelector("#cnx").value.trim()||"Outro"):cn.value;
-    return {nicho,publico:el.querySelector("#cp").value,formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,duracao:Math.max(10,Math.min(60,+cd.value||15)),idioma:lang,ipm:+(el.querySelector("#cipm")||{}).value||2,visual:(el.querySelector("#cvis2")||{}).value||"colagem"}; };
+    return {nicho,publico:el.querySelector("#cp").value,formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,duracao:Math.max(10,Math.min(60,+cd.value||15)),idioma:lang,ipm:+(el.querySelector("#cipm")||{}).value||2,visual:(el.querySelector("#cvis2")||{}).value||"documentario"}; };
   // depois do primeiro "Salvar canal", toda mudança é salva na hora
   const autosave=()=>{ if(S.config){ S.config=readCfg(); save(); renderProd(); } };
   bindPills(el,"lang",v=>{ lang=v; autosave(); if(S.config) toast("Idioma dos vídeos: "+v); });
@@ -362,7 +365,8 @@ async function runRoteiro(){
     while(P.script.length<n){
       const i=P.script.length; setAction(`escrevendo o bloco ${i+1} de ${n}`); renderPanel();
       const prev=P.script.join("\n\n");
-      const battle=isBattle(P)?` FORMATO BATALHA: compare os dois lados rodada por rodada (ex.: força, velocidade, inteligência, resistência, poder especial), diga a vantagem e a desvantagem de cada um em cada rodada, mantenha um placar falado e anuncie o vencedor com um argumento forte no final.`:"";
+      const docStyle=/documentário contado/i.test(P.config.formato||"")?` ESTILO DE NARRAÇÃO: conte como um contador de histórias carismático e muito bem informado. Abra no meio da ação, com data e lugar (ex.: "16 de julho de 1945. Berlim está em ruínas…"). Apresente cada pessoa com nome e quem ela é. Use números, datas e detalhes concretos e sensoriais, perguntas retóricas, ironia leve na medida certa e frases curtas de impacto. Organize em capítulos anunciados com naturalidade (ex.: "Capítulo 2: o mundo lá de baixo"), cada um terminando com um gancho. Fale com o espectador ("você"), sem parecer aula.`:"";
+      const battle=(isBattle(P)?` FORMATO BATALHA: compare os dois lados rodada por rodada (ex.: força, velocidade, inteligência, resistência, poder especial), diga a vantagem e a desvantagem de cada um em cada rodada, mantenha um placar falado e anuncie o vencedor com um argumento forte no final.`:"")+docStyle;
       const role = P.kind==="short" ? `Isto é um SHORT vertical de cerca de 55 segundos (~140 palavras). A primeira frase É o gancho e prende em 2 segundos, sem introdução. Frases curtas, ritmo rápido, uma informação surpreendente atrás da outra. Termine com uma frase que faça a pessoa querer comentar ou assistir de novo.${battle}${P.parentScript?`\nBaseie-se neste vídeo longo do canal e pegue a parte mais impressionante dele:\n"""${P.parentScript.slice(0,5000)}"""`:""}`
         : (i===0 ? `Este é o PRIMEIRO bloco. Abra com um gancho no estilo "${P.config.gancho}" nas 2-3 primeiras frases, que prenda nos primeiros 15 segundos. Prometa o que o espectador vai ganhar ficando até o fim e abra um "loop" (uma pergunta ou história) que só será resolvido no último bloco. Termine o bloco com uma virada que puxe pro próximo.`
         : i===n-1 ? `Este é o ÚLTIMO bloco. Feche o loop aberto no início, entregue o clímax e a lição. Inclua de forma natural um convite pra se inscrever e uma pergunta específica pra responder nos comentários. Termine com uma frase memorável.`
@@ -605,25 +609,25 @@ async function drawScenes(idx){
 /* ---- Imagens no estilo colagem ---- */
 function boardStats(P){ const a=(P.board&&P.board.assets)||[]; return {n:a.length,ok:a.filter(x=>x.img==="ok").length,real:a.filter(x=>x.img==="ok"&&x.real).length,bad:a.filter(x=>x.img&&x.img!=="ok"&&x.img!=="wait").length,beats:((P.board&&P.board.beats)||[]).length}; }
 function colagemView(){
-  const P=S.project, working=busy&&busy.k==="imagens", st=boardStats(P), tp=Collage.TPL[P.template]||Collage.TPL["Azul explicador"];
+  const P=S.project, working=busy&&busy.k==="imagens", st=boardStats(P), tp=isDoc(P)?{bg:"#15181d",ink:"#eee"}:(Collage.TPL[P.template]||Collage.TPL["Azul explicador"]);
   const sel=P.board&&P.selAsset?P.board.assets.find(a=>a.id===P.selAsset):null;
   return `
-  <p class="lead">Estilo colagem: a equipe lê o roteiro, monta o storyboard e cria o elenco de personagens, objetos e lugares que vão entrando na tela no ritmo da fala. Retratos, mapas e monumentos históricos vêm do Wikimedia Commons (domínio público, grátis).</p>
+  <p class="lead">${isDoc(P)?"Estilo documentário: a equipe lê o roteiro, monta o storyboard cena a cena (fotos, filmes antigos, nomes, títulos, capítulos, citações, retratos e diagramas) e busca fotos históricas reais no Wikimedia Commons (grátis). Só o que não tem foto vira reconstrução por IA.":"Estilo colagem: a equipe lê o roteiro, monta o storyboard e cria o elenco de personagens, objetos e lugares que vão entrando na tela no ritmo da fala. Retratos, mapas e monumentos históricos vêm do Wikimedia Commons (domínio público, grátis)."}</p>
   ${aiNote()}${imgNote()}
-  <div class="btns"><button class="btn" id="cgo2" ${busy||!AI.ready()?"disabled":""}>✦ ${P.board?"Refazer o storyboard do zero":"Criar o storyboard e o elenco"}</button>
+  <div class="btns"><button class="btn" id="cgo2" ${busy||!AI.ready()?"disabled":""}>✦ ${P.board?"Refazer o storyboard do zero":(isDoc(P)?"Criar o storyboard e buscar as imagens":"Criar o storyboard e o elenco")}</button>
     ${P.board&&st.ok<st.n&&!working?`<button class="btn ghost small" id="cmiss">Gerar os ${st.n-st.ok} que faltam</button>`:""}
     ${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
   ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>`:""}
   ${ui.imgErr?`<div class="err">${esc(ui.imgErr)}</div>`:""}
-  ${P.board?`<p class="m" style="font-size:12.5px;color:var(--muted)">${st.beats} batidas · elenco de ${st.n} (${st.ok} prontos${st.real?`, ${st.real} imagens reais grátis`:""}${st.bad?`, ${st.bad} com erro`:""}) · toque num elemento pra ver e refazer</p>
-  <div class="scenes">${P.board.assets.map(a=>`<button type="button" class="scene ${P.selAsset===a.id?"cur":""}" data-as="${esc(a.id)}" ${a.img==="ok"?`data-img="${mkey(P.id,"asset",a.id)}"`:""} style="background-color:${tp.bg};background-size:contain!important;background-repeat:no-repeat;color:${tp.ink}" title="${esc(a.nome)}">
-    <span>${(a.real||a.tipo==="real")?"📷":"✏️"}</span>${a.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(a.img&&a.img!=="ok"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}<small style="position:absolute;left:4px;right:4px;bottom:2px;font-size:10px;text-shadow:0 0 3px ${tp.bg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.nome)}</small></button>`).join("")}</div>
+  ${P.board?`<p class="m" style="font-size:12.5px;color:var(--muted)">${st.beats} batidas · ${isDoc(P)?"imagens":"elenco"}: ${st.n} (${st.ok} prontos${st.real?`, ${st.real} imagens reais grátis`:""}${st.bad?`, ${st.bad} com erro`:""}) · toque num elemento pra ver e refazer</p>
+  <div class="scenes">${P.board.assets.map(a=>`<button type="button" class="scene ${P.selAsset===a.id?"cur":""}" data-as="${esc(a.id)}" ${a.img==="ok"?`data-img="${mkey(P.id,"asset",a.id)}"`:""} style="background-color:${tp.bg};background-size:${isDoc(P)?"cover":"contain"}!important;background-repeat:no-repeat;color:${tp.ink}" title="${esc(a.nome)}">
+    <span>${(a.real||a.tipo==="real")?"📷":(isDoc(P)?"🎨":"✏️")}</span>${a.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(a.img&&a.img!=="ok"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}<small style="position:absolute;left:4px;right:4px;bottom:2px;font-size:10px;text-shadow:0 0 3px ${tp.bg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.nome)}</small></button>`).join("")}</div>
   ${sel?`<div class="card" style="margin-top:10px"><div class="t">${esc(sel.nome)} <span class="tag">${sel.tipo==="real"?"imagem real":"desenho"}</span></div>
     ${sel.img==="ok"?`<div class="big" data-img="${mkey(P.id,"asset",sel.id)}" style="background-color:${tp.bg};background-size:contain!important;background-repeat:no-repeat"></div>`:""}
     ${sel.credit?`<div class="m" style="font-size:12px">${esc(sel.credit)}</div>`:""}
     ${sel.img&&sel.img!=="ok"&&sel.img!=="wait"?`<div class="err">${esc(sel.img)}</div>`:""}
-    <div class="field" style="margin-top:8px"><label for="adesc">${sel.tipo==="real"?"Busca no Wikimedia Commons":"Descrição do desenho (inglês)"}</label><textarea id="adesc" rows="2">${esc(sel.tipo==="real"?sel.busca:sel.descricao)}</textarea></div>
-    <div class="btns"><button class="btn small" id="aredo" ${busy?"disabled":""}>↻ Refazer</button><button class="btn ghost small" id="aswap" ${busy?"disabled":""}>${sel.tipo==="real"?"Trocar por desenho":"Tentar imagem real"}</button></div></div>`:""}
+    <div class="field" style="margin-top:8px"><label for="adesc">${sel.tipo==="real"?"Busca no Wikimedia Commons":(isDoc(P)?"Descrição da imagem gerada (inglês)":"Descrição do desenho (inglês)")}</label><textarea id="adesc" rows="2">${esc(sel.tipo==="real"?sel.busca:sel.descricao)}</textarea></div>
+    <div class="btns"><button class="btn small" id="aredo" ${busy?"disabled":""}>↻ Refazer</button><button class="btn ghost small" id="aswap" ${busy?"disabled":""}>${sel.tipo==="real"?(isDoc(P)?"Gerar com IA":"Trocar por desenho"):"Tentar imagem real"}</button></div></div>`:""}
   ${P.credits&&P.credits.length?"":""}`:""}
   <div class="btns"><button class="btn" id="iok" ${!P.board||!st.ok||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Elenco aprovado ✓":"Aprovar e mandar pro Estúdio"}</button></div>`;
 }
@@ -635,7 +639,7 @@ function bindColagem(el){
   const sel=P.board&&P.board.assets.find(a=>a.id===P.selAsset);
   const ad=el.querySelector("#adesc"); if(ad&&sel) ad.oninput=()=>{ if(sel.tipo==="real") sel.busca=ad.value; else sel.descricao=ad.value; save(); };
   const rd=el.querySelector("#aredo"); if(rd) rd.onclick=()=>{ P.done.imagens=false; drawAssets([sel.id]); };
-  const sw=el.querySelector("#aswap"); if(sw) sw.onclick=()=>{ sel.tipo=sel.tipo==="real"?"desenho":"real"; if(sel.tipo==="real"&&!sel.busca) sel.busca=sel.nome; if(sel.tipo==="desenho"&&!sel.descricao) sel.descricao=sel.nome; P.done.imagens=false; drawAssets([sel.id]); };
+  const sw=el.querySelector("#aswap"); if(sw) sw.onclick=()=>{ sel.tipo=sel.tipo==="real"?(isDoc(P)?"ia":"desenho"):"real"; if(isDoc(P)&&sel.tipo==="ia"&&!sel.descricao) sel.descricao=sel.nome; if(sel.tipo==="real"&&!sel.busca) sel.busca=sel.nome; if(sel.tipo==="desenho"&&!sel.descricao) sel.descricao=sel.nome; P.done.imagens=false; drawAssets([sel.id]); };
   el.querySelector("#iok").onclick=()=>{ P.done.imagens=true; save(); courier("imagens","narracao"); toast("Elenco aprovado"); renderProd(); openPanel("narracao"); };
   paintImgs(el);
 }
@@ -646,6 +650,22 @@ async function runColagem(){
   const keep=P.parentAssets||null;
   if(!keep) await Store.delPrefix(`p${P.id}:asset:`);
   const dur=isShort?1:P.config.duracao;
+  if(isDoc(P)){
+    try{
+      const r=await ask(Doc.storyboardPrompt(P,{maxAssets:isShort?14:Math.min(80,Math.round(dur*5.5)),maxAI:isShort?4:Math.max(4,Math.round(dur*1.4)),beats:isShort?20:Math.round(dur*15),isShort,
+        reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):""}),{json:true,maxTokens:20000});
+      let assets=keep?keep.map(a=>({...a})):(r.imagens||[]).map((a,i)=>({id:String(a.id||("i"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="ia"?"ia":"real",busca:String(a.busca||a.nome||""),estilo:["reconstrucao","diagrama","objeto"].includes(a.estilo)?a.estilo:"reconstrucao",descricao:String(a.descricao||""),img:null}));
+      const has=id=>assets.some(a=>a.id===id);
+      const TIPOS=["foto","filme","nome","titulo","data","capitulo","citacao","retrato","diagrama"];
+      const beats=(r.batidas||[]).map(b=>({trecho:String(b.trecho||""),tipo:TIPOS.includes(b.tipo)?b.tipo:"foto",img:has(String(b.img||""))?String(b.img):"",imgs:(b.imgs||[]).map(String).filter(has).slice(0,3),texto:String(b.texto||""),subtexto:String(b.subtexto||"")}))
+        .filter(b=>b.img||b.imgs.length||b.texto);
+      if(!beats.length) throw {message:"O storyboard veio vazio. Tente de novo."};
+      const used=new Set(beats.flatMap(b=>[b.img,...b.imgs]).filter(Boolean)); assets=assets.filter(a=>used.has(a.id)||keep);
+      P.board={kind:"doc",assets,beats}; P.scenes=beats.map(b=>({trecho:b.trecho,prompt:b.tipo,img:"ok"})); save();
+    }catch(e){ ui.imgErr=errMsg(e)||e.message; clearBusy(); return renderPanel(); }
+    clearBusy();
+    return drawAssets(P.board.assets.filter(a=>a.img!=="ok").map(a=>a.id));
+  }
   try{
     const r=await ask(Collage.storyboardPrompt(P,{maxAssets:isShort?10:Math.min(45,Math.round(dur*3.2)),beats:isShort?18:Math.round(dur*14),isShort,battle:isBattle(P),
       reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):""}),{json:true,maxTokens:16000});
@@ -670,6 +690,19 @@ async function drawAssets(ids){
     const a=A(id);
     try{
       let blob=null;
+      if(P.board.kind==="doc"){
+        if(a.tipo==="real"){
+          let r=await Collage.commons(a.busca||a.nome,1920); if(!r&&a.busca&&a.nome&&a.busca!==a.nome) r=await Collage.commons(a.nome,1920);
+          if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; }
+          else throw {code:"not_found",message:"Não achei uma imagem livre no Wikimedia Commons. Mude a busca ou gere com IA."};
+        } else {
+          if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas na Administração pra gerar as reconstruções."};
+          const raw=await AI.image(`${Doc.STYLE[a.estilo]||Doc.STYLE.reconstrucao} Scene: ${a.descricao||a.nome}.`,{aspect:"16:9",signal:busy.ctl.signal});
+          blob=await toJpeg(raw,0,0,.9); a.real=false; a.credit="";
+        }
+        await Store.put(mkey(P.id,"asset",a.id),blob); a.img="ok";
+        done++; setAction(`buscando e criando as imagens: ${done} de ${ids.length}`); save(); renderPanel(); return;
+      }
       if(a.tipo==="real"){ const r=await Collage.commons(a.busca||a.nome); if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; } else { a.tipo="desenho"; a.descricao=a.descricao||a.nome; } }
       if(!blob){
         if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas na Administração pra desenhar os elementos."};
@@ -685,7 +718,8 @@ async function drawAssets(ids){
   const bad=P.board.assets.find(a=>a.img&&a.img!=="ok"); if(bad) ui.imgErr=bad.img;
   save(); clearBusy(); renderPanel();
 }
-function creditsText(P){ const c=((P.board&&P.board.assets)||[]).filter(a=>a.real&&a.credit).map(a=>"• "+a.credit); return c.length?"\n\nImagens: "+"\n"+c.join("\n"):""; }
+function creditsText(P){ const A=(P.board&&P.board.assets)||[], c=A.filter(a=>a.real&&a.credit).map(a=>"• "+a.credit); const ia=P.board&&P.board.kind==="doc"&&A.some(a=>a.img==="ok"&&!a.real);
+  return (c.length?"\n\nImagens:\n"+c.join("\n"):"")+(ia?"\n\nAlgumas imagens são reconstruções feitas com IA.":""); }
 
 /* ---- Narração ---- */
 let voiceCache={}, sampleUrls={}, playing=null, fullUrl=null;
@@ -801,7 +835,11 @@ function cutOpts(P){ return {template:P.template,captions:P.captions,res:P.res||
 VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem"; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null; const sup=Cut.supported(); return `
   <p class="lead">O OnionCut junta cenas, voz e legendas, troca as imagens nas pausas da narração e exporta o vídeo em MP4.</p>
   ${sup?"":`<div class="err">Este navegador não consegue gerar vídeo. Abra o Onion no Chrome ou no Edge, no computador.</div>`}
-  <h3>Template</h3>${pills("tpl",isColagem(P)?Object.keys(Collage.TPL):TEMPLATES,P.template)}
+  <h3>Template</h3>${pills("tpl",isDoc(P)?Object.keys(Doc.TPL):isColagem(P)?Object.keys(Collage.TPL):TEMPLATES,P.template)}
+  <h3>Trilha</h3>${pills("mood",[...Object.keys(Sound.MOODS),"Sem trilha"],(P.sound||{}).custom?"":((P.sound||{}).mood||"Sem trilha"))}
+  <div class="btns" style="margin-top:6px"><label class="btn ghost small" style="cursor:pointer">🎵 ${(P.sound||{}).custom?"Trocar a minha música":"Usar uma música minha (mp3)"}<input type="file" id="mfile" accept="audio/*" style="display:none"></label>${(P.sound||{}).custom?`<span class="tag gold">usando a sua música</span><button class="btn ghost small" id="mfilex">tirar</button>`:""}</div>
+  <p class="m" style="font-size:12px;color:var(--muted)">As trilhas prontas são criadas aqui mesmo, sem direitos autorais. Se usar uma música sua, prefira a Biblioteca de Áudio do YouTube.</p>
+  <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:6px 0"><input type="checkbox" id="msfx" ${(P.sound||{}).sfx!==false?"checked":""}> Efeitos sonoros nas transições (whoosh, impacto, clique)</label>
   <h3>Legendas</h3>${pills("cap",CAPTIONS,P.captions)}
   ${P.kind==="short"?`<p class="m" style="font-size:12.5px">Short vertical 1080×1920.</p>`:`<h3>Resolução</h3>${pills("res",RES,P.res||"1080p")}`}
   <div class="btns"><button class="btn" id="mprep" ${busy?"disabled":""}>🎬 ${R?"Montar de novo":"Montar no OnionCut"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
@@ -826,6 +864,12 @@ BIND.montagem=el=>{
   const P=S.project; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null;
   const redraw=()=>{ const c=el.querySelector("#pv"); if(c&&R&&!cutPrev) Cut.still(R,c,cutOpts(P),Math.max(.6,ui.pt||0)); };
   bindPills(el,"tpl",v=>{P.template=v; save(); redraw();}); bindPills(el,"cap",v=>{P.captions=v; save(); redraw();});
+  P.sound=P.sound||{mood:"Tensão (documentário)",sfx:true,custom:false};
+  const soundChanged=()=>{ if(Cut._R&&Cut._R.pid===P.id){ Cut._R=null; toast("Trilha alterada: clique em Montar de novo"); renderPanel(); } };
+  bindPills(el,"mood",v=>{ P.sound.mood=v; P.sound.custom=false; save(); soundChanged(); });
+  el.querySelector("#msfx").onchange=e=>{ P.sound.sfx=e.target.checked; save(); soundChanged(); };
+  el.querySelector("#mfile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await Store.put(mkey(P.id,"music",0),f); P.sound.custom=true; save(); toast("Música carregada"); soundChanged(); renderPanel(); };
+  const mx=el.querySelector("#mfilex"); if(mx) mx.onclick=async()=>{ await Store.delPrefix(`p${P.id}:music:`); P.sound.custom=false; save(); soundChanged(); renderPanel(); };
   bindPills(el,"res",v=>{P.res=v; save(); const b=el.querySelector("#mrender"); if(b) b.textContent=`⬇ Renderizar o vídeo (MP4 ${v})`;});
   el.querySelector("#mprep").onclick=runPrepare;
   el.querySelector("#mdl").onclick=e=>downloadPack(P,e.currentTarget);
