@@ -161,7 +161,7 @@ Responda só com JSON: {"elenco":[...],"batidas":[...]}`;
     });
     // palavra de destaque
     if (b.texto) {
-      const p = Math.min(1, Math.max(0, (t - S0.s - .25) / .25)), txt = b.texto.trim();
+      const p = Math.min(1, Math.max(0, (t - S0.s - .25) / .25)), txt = b.texto.replace(/\*/g, "").trim();
       g.save(); g.globalAlpha = p; g.textAlign = "center"; g.textBaseline = "middle";
       if (vs) {
         const fs = Math.round(H * (portrait ? .1 : .16));

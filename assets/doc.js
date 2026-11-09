@@ -67,13 +67,21 @@ Responda só com JSON: {"imagens":[...],"batidas":[...]}`;
     let cx = align === "center" ? x - total / 2 : x; g.textAlign = "left";
     parts.forEach(p => { const b = p.startsWith("*"); g.font = font(b); g.fillStyle = b ? GOLD2 : ink; const t = p.replace(/\*/g, ""); g.fillText(b ? t.toUpperCase() : t, cx, y); cx += g.measureText(b ? t.toUpperCase() : t).width; });
   }
+  // *palavra* = destaque: a palavra sai em branco no meio do dourado (sem mostrar os asteriscos)
   function serif(g, text, x, y, fs, color, align = "center", spacing = 0) {
-    g.font = `700 ${fs}px Cinzel, "Playfair Display", Georgia, serif`; g.textAlign = align; g.fillStyle = color;
+    g.font = `700 ${fs}px Cinzel, "Playfair Display", Georgia, serif`; g.fillStyle = color;
     if ("letterSpacing" in g) g.letterSpacing = spacing + "px";
-    g.shadowColor = "rgba(0,0,0,.6)"; g.shadowBlur = fs * .25; g.fillText(text, x, y); g.shadowBlur = 0;
-    if ("letterSpacing" in g) g.letterSpacing = "0px";
+    g.shadowColor = "rgba(0,0,0,.6)"; g.shadowBlur = fs * .25;
+    const parts = String(text).split(/(\*[^*]+\*)/).filter(Boolean).map(p => ({ t: p.replace(/\*/g, ""), hi: /^\*.*\*$/.test(p) }));
+    if (parts.length <= 1 && !(parts[0] && parts[0].hi)) { g.textAlign = align; g.fillText(String(text).replace(/\*/g, ""), x, y); }
+    else {
+      const total = parts.reduce((a, p) => a + g.measureText(p.t).width, 0);
+      let cx = align === "center" ? x - total / 2 : align === "right" ? x - total : x; g.textAlign = "left";
+      parts.forEach(p => { g.fillStyle = p.hi ? "#ffffff" : color; g.fillText(p.t, cx, y); cx += g.measureText(p.t).width; });
+    }
+    g.shadowBlur = 0; if ("letterSpacing" in g) g.letterSpacing = "0px";
   }
-  function wrap(g, text, maxW) { const ws = String(text).split(/\s+/), lines = []; let l = ""; ws.forEach(w => { const t = l ? l + " " + w : w; if (g.measureText(t).width > maxW && l) { lines.push(l); l = w; } else l = t; }); if (l) lines.push(l); return lines; }
+  function wrap(g, text, maxW) { const ws = String(text).split(/\s+/), lines = []; let l = ""; ws.forEach(w => { const t = l ? l + " " + w : w; if (g.measureText(t.replace(/\*/g, "")).width > maxW && l) { lines.push(l); l = w; } else l = t; }); if (l) lines.push(l); return lines; }
   function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
   function drawBeat(g, b, R, t0, t, W, H, tp, j) {
@@ -115,14 +123,14 @@ Responda só com JSON: {"imagens":[...],"batidas":[...]}`;
       g.save(); g.globalAlpha = q;
       g.fillStyle = "rgba(10,10,12,.82)"; g.fillRect(bx - 18 * S, by - fs * .95, Math.max(...lines.map(l => g.measureText(l).width)) + 36 * S, lines.length * fs * 1.08 + 22 * S);
       lines.forEach((l, k) => serif(g, l, bx, by + k * fs * 1.08, fs, GOLD, "left"));
-      if (b.subtexto) { const n2 = Math.floor(b.subtexto.length * Math.min(1, Math.max(0, (p - .55) / .7))); rich(g, b.subtexto.slice(0, n2), bx, by + lines.length * fs * 1.08 + 30 * S, Math.round(30 * S), "left", ink); }
+      if (b.subtexto) { const n2 = Math.floor(b.subtexto.length * Math.min(1, Math.max(0, (p - .55) / .7))); let sub = b.subtexto.slice(0, n2); if ((sub.match(/\*/g) || []).length % 2) sub += "*"; rich(g, sub, bx, by + lines.length * fs * 1.08 + 30 * S, Math.round(30 * S), "left", ink); }
       g.restore();
     } else if (ty === "titulo" || ty === "data") {
       g.fillStyle = "rgba(0,0,0,.42)"; g.fillRect(0, 0, W, H);
       const q = ease((p - .05) / .5), txt = (b.texto || "").toUpperCase(), fs0 = Math.round((ty === "data" ? (portrait ? 84 : 96) : (portrait ? 110 : 150)) * S);
-      g.font = `700 ${fs0}px Cinzel, Georgia, serif`; const fs = Math.min(fs0, Math.floor(fs0 * W * .86 / Math.max(1, g.measureText(txt).width)));
+      g.font = `700 ${fs0}px Cinzel, Georgia, serif`; const fs = Math.min(fs0, Math.floor(fs0 * W * .86 / Math.max(1, g.measureText(txt.replace(/\*/g, "")).width)));
       g.save(); g.globalAlpha = q; g.translate(W / 2, H / 2); g.scale(1.06 - .06 * q, 1.06 - .06 * q);
-      if (ty === "data") { g.font = `700 ${fs}px Cinzel, Georgia, serif`; const tw = g.measureText(txt).width; g.fillStyle = "rgba(8,8,10,.85)"; g.fillRect(-tw / 2 - 30 * S, -fs * .78, tw + 60 * S, fs * 1.15); }
+      if (ty === "data") { g.font = `700 ${fs}px Cinzel, Georgia, serif`; const tw = g.measureText(txt.replace(/\*/g, "")).width; g.fillStyle = "rgba(8,8,10,.85)"; g.fillRect(-tw / 2 - 30 * S, -fs * .78, tw + 60 * S, fs * 1.15); }
       serif(g, txt, 0, fs * .32, fs, GOLD, "center", ty === "titulo" ? 4 * S : 1);
       if (b.subtexto) rich(g, b.subtexto, 0, fs * .32 + 70 * S, Math.round(40 * S), "center", ink);
       g.restore();
@@ -140,9 +148,9 @@ Responda só com JSON: {"imagens":[...],"batidas":[...]}`;
       g.save(); g.globalAlpha = q; lines.forEach((l, k) => serif(g, l, W / 2, H / 2 + (k - (lines.length - 1) / 2) * fs * 1.15, fs, GOLD));
       if (b.subtexto) rich(g, "— " + b.subtexto, W / 2, H / 2 + lines.length * fs * .65 + 40 * S, Math.round(30 * S), "center", "#ddd"); g.restore();
     } else if (ty === "diagrama" && b.texto) {
-      const n2 = Math.floor(b.texto.length * Math.min(1, Math.max(0, (p - .4) / .8)));
+      const lbl = b.texto.replace(/\*/g, ""), n2 = Math.floor(lbl.length * Math.min(1, Math.max(0, (p - .4) / .8)));
       g.font = `700 ${Math.round(40 * S)}px "Space Mono", "Courier New", monospace`; g.fillStyle = "#f4f4f4"; g.textAlign = "left";
-      g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 10 * S; g.fillText(b.texto.toUpperCase().slice(0, n2), W * .58, H * .72); g.shadowBlur = 0;
+      g.shadowColor = "rgba(0,0,0,.7)"; g.shadowBlur = 10 * S; g.fillText(lbl.toUpperCase().slice(0, n2), W * .58, H * .72); g.shadowBlur = 0;
     } else if ((ty === "foto" || ty === "filme") && b.texto) {
       const q = ease((p - .2) / .5); g.save(); g.globalAlpha = q;
       serif(g, b.texto.toUpperCase(), W / 2, H * (portrait ? .3 : .5), Math.round((portrait ? 70 : 84) * S), GOLD, "center", 2 * S);
