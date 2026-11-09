@@ -82,18 +82,11 @@ const Voice = (() => {
     if (!voiceId) throw fail("voice", "Escolha uma voz.");
     try {
       if (p === "google") {
-        // a instrução vai no mesmo idioma do texto: instrução em inglês faz o modelo ler (ou traduzir) em inglês
-        const slow = speed < .95, fast = speed > 1.05;
-        let instr;
-        if (idioma === "Português") instr = `Leia em voz alta o texto abaixo, em português do Brasil, com sotaque brasileiro nativo, ${slow ? "num ritmo um pouco mais lento e calmo" : fast ? "num ritmo um pouco mais rápido e animado" : "num ritmo natural"}${style ? ", " + style : ""}. Leia somente o texto, exatamente como está escrito, sem traduzir nada:\n\n`;
-        else if (idioma === "Espanhol") instr = `Lee en voz alta el siguiente texto en español, con acento nativo, ${slow ? "a un ritmo un poco más lento y calmado" : fast ? "a un ritmo un poco más rápido" : "a un ritmo natural"}${style ? ", " + style : ""}. Lee solo el texto, exactamente como está escrito, sin traducir nada:\n\n`;
-        else {
-          const pace = slow ? "at a slightly slower, unhurried pace" : fast ? "at a slightly faster, energetic pace" : "at a natural pace";
-          instr = `Read the following narration aloud${lang ? " in " + lang + ", with a native accent" : ""} ${pace}${style ? ", " + style : ""}. Read only the text, exactly as written, and do not translate it${lang && lang !== "American English" ? " (it is in " + lang + ")" : ""}:\n\n`;
-        }
+        // SÓ o texto do roteiro vai pro modelo de voz. Qualquer instrução junto pode ser lida em voz alta.
+        // O idioma e o sotaque vêm do próprio texto.
         const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
           method: "POST", signal, headers: { "content-type": "application/json", "x-goog-api-key": k },
-          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: instr + text }] }],
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text }] }],
             generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceId } } } } })
         });
         if (!r.ok) throw httpFail(r.status, p, await errText(r));
@@ -184,11 +177,49 @@ const Voice = (() => {
     parts.forEach((p, i) => { out.set(p, o); o += p.length + (i < parts.length - 1 ? g : 0); });
     return out;
   }
+  // volume no padrão de voz pra vídeo (~ -16 LUFS), sem estourar
+  function normalize(f32) {
+    let sum = 0, n = 0, peak = 0;
+    for (let i = 0; i < f32.length; i += 4) { const x = f32[i]; if (Math.abs(x) > .01) { sum += x * x; n++; } peak = Math.max(peak, Math.abs(x)); }
+    if (!n) return f32;
+    const rms = Math.sqrt(sum / n), g = Math.min(.14 / rms, .97 / Math.max(peak, 1e-4), 4);
+    if (Math.abs(g - 1) < .03) return f32;
+    const out = new Float32Array(f32.length);
+    for (let i = 0; i < f32.length; i++) { const y = f32[i] * g; out[i] = y > .97 ? .97 + (y - .97) * .1 : y < -.97 ? -.97 + (y + .97) * .1 : y; }
+    return out;
+  }
   function wav(f32, rate = SR) {
     const bytes = new Uint8Array(f32.length * 2), v = new DataView(bytes.buffer);
     for (let i = 0; i < f32.length; i++) { const s = Math.max(-1, Math.min(1, f32[i])); v.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
     return pcmToWav(bytes, rate);
   }
 
-  return { list, synth, transcribe, chunkScript, decode, concat, wav, SR };
+  /* ---------- conserto: achar a instrução lida por engano no começo de um trecho ---------- */
+  async function googleTextModel() {
+    const c = AI.get();
+    if (c.text.provider === "google" && c.text.model) return c.text.model;
+    let ids = AI.cachedModels("google", "text"); if (!ids.length) ids = await AI.listModels("google", "text");
+    return AI.pickDefault("text", ids);
+  }
+  function b64(bytes) { let s = ""; for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768)); return btoa(s); }
+  async function findLeak(f32, firstWords) {
+    const k = AI.get().keys.google; if (!k) throw fail("no_key", "O conserto usa a sua chave do Google. Cole ela na Administração.");
+    const model = await googleTextModel();
+    const n = Math.min(f32.length, SR * 35), d16 = new Float32Array(Math.floor(n / 3));
+    for (let i = 0; i < d16.length; i++) d16[i] = (f32[i * 3] + f32[i * 3 + 1] + f32[i * 3 + 2]) / 3;
+    const audio = new Uint8Array(await wav(d16, 16000).arrayBuffer());
+    const start3 = firstWords.split(/\s+/).slice(0, 4).join(" ");
+    const prompt = `Este áudio é o começo de um trecho de narração. Por um erro, às vezes o narrador lê em voz alta uma instrução antes do texto de verdade, por exemplo "Leia em voz alta o texto abaixo, em português do Brasil..." ou "Read the following narration aloud...". O texto de verdade começa assim: "${firstWords}".
+Ouça e responda só com JSON: {"tem_instrucao": true ou false, "inicio_do_texto": segundo exato (com uma casa decimal) em que o narrador começa a dizer "${start3}"}`;
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": k },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ inline_data: { mime_type: "audio/wav", data: b64(audio) } }, { text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+    });
+    if (!r.ok) throw httpFail(r.status, "google", await errText(r));
+    const j = await r.json(); const t = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
+    let o; try { o = JSON.parse(t.replace(/```json|```/g, "").trim()); } catch (e) { throw fail("invalid_json", "O Gemini não respondeu no formato esperado."); }
+    return { has: !!o.tem_instrucao, t: +o.inicio_do_texto || 0 };
+  }
+
+  return { findLeak, list, synth, transcribe, chunkScript, decode, concat, wav, normalize, SR };
 })();

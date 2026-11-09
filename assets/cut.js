@@ -79,7 +79,7 @@ const Cut = (() => {
       if (!b) throw { code: "no_audio", message: `O trecho ${i + 1} da narração sumiu deste navegador. Gere a narração de novo.` };
       pcm.push(await Voice.decode(b));
     }
-    const audio = Voice.concat(pcm, GAP), dur = audio.length / SR;
+    const audio = Voice.normalize(Voice.concat(pcm, GAP)), dur = audio.length / SR;
     // palavras com tempo
     let words = [], off = 0, exact = 0;
     const cutP = AI.get().cut.provider;
@@ -124,7 +124,11 @@ const Cut = (() => {
       if (best != null) { starts[j] = best; hits++; }
       if (starts[j] < starts[j - 1] + 1.5) starts[j] = Math.min(dur - 1, starts[j - 1] + 1.5);
     }
-    const scenes = starts.map((s, j) => ({ s, e: j < sc - 1 ? starts[j + 1] : dur + .6 }));
+    const scenes = [];
+    starts.forEach((s, j) => { const e = j < sc - 1 ? starts[j + 1] : dur + .6, len = e - s, k = len > 10 ? Math.ceil(len / 7) : 1;
+      for (let m = 0; m < k; m++) { let a = s + len * m / k; if (m > 0) { let best = null, bd = 1.2; for (const p of ps) { const mm = (p.s + p.e) / 2, d = Math.abs(mm - a); if (d < bd) { bd = d; best = mm; } } if (best != null) a = best; }
+        scenes.push({ s: a, e: 0, j, v: (j * 2 + m * 3) % 6 }); } });
+    scenes.forEach((x, i) => x.e = i < scenes.length - 1 ? scenes[i + 1].s : dur + .6);
     // legendas: frases curtas
     const phrases = []; let cur = [];
     words.forEach((w, i) => {
@@ -145,7 +149,7 @@ const Cut = (() => {
     // forma de onda pra linha do tempo
     const env = envelope(audio, Math.max(480, Math.floor(audio.length / 240))); const mx = Math.max(...env) || 1;
     const wave = Array.from(env).map(v => v / mx);
-    return { audio, dur, words, scenes, caps, bitmaps, pauses: ps, hits, exact, chunks: N.chunks.length, wave };
+    return { audio, dur, words, scenes, caps, bitmaps, pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: sc };
   }
 
   /* ---------- desenhar um quadro ---------- */
@@ -160,14 +164,16 @@ const Cut = (() => {
     ng.putImageData(id, 0, 0);
     const o = { vig: v, noise: n }; cache.set(key, o); return o;
   }
-  function drawImg(g, bmp, j, p, W, H, fallback) {
+  function drawImg(g, bmp, kind, p, W, H, fallback) {
     if (!bmp) { g.fillStyle = fallback || "#222"; g.fillRect(0, 0, W, H); return; }
-    const base = Math.max(W / bmp.width, H / bmp.height), kind = j % 4, e = Math.min(1.2, Math.max(0, p));
+    const base = Math.max(W / bmp.width, H / bmp.height), e = Math.min(1.2, Math.max(0, p)), q = e * e * (3 - 2 * Math.min(1, e));
     let z = 1.12, x = 0, y = 0;
-    if (kind === 0) z = 1 + .12 * e;
-    else if (kind === 1) z = 1.12 - .12 * e;
-    else if (kind === 2) { z = 1.12; x = -.5 + e; }
-    else { z = 1.12; x = .5 - e; y = .2 - .4 * e; }
+    if (kind === 0) z = 1 + .12 * q;
+    else if (kind === 1) z = 1.14 - .12 * q;
+    else if (kind === 2) { z = 1.14; x = -.5 + q; }
+    else if (kind === 3) { z = 1.14; x = .5 - q; y = .2 - .4 * q; }
+    else if (kind === 4) { z = 1.18 + .1 * q; x = -.55; y = -.45; }
+    else { z = 1.18 + .1 * q; x = .55; y = -.3; }
     const s = base * z, dw = bmp.width * s, dh = bmp.height * s;
     const fx = (W - dw) / 2 + x * (dw - W) * .9, fy = (H - dh) / 2 + y * (dh - H) * .9;
     g.drawImage(bmp, fx, fy, dw, dh);
@@ -177,12 +183,12 @@ const Cut = (() => {
     g.save();
     g.filter = tp.filter || "none";
     let j = 0; while (j < R.scenes.length - 1 && t >= R.scenes[j + 1].s) j++;
-    const S0 = R.scenes[j], pj = (t - S0.s) / Math.max(.5, S0.e - S0.s);
+    const S0 = R.scenes[j], pj = (t - S0.s) / Math.max(.5, S0.e - S0.s), img = x => R.bitmaps[x.j != null ? x.j : R.scenes.indexOf(x)], kv = (x, i) => x.v != null ? x.v : i % 4;
     if (j > 0 && t - S0.s < XF) {
-      const P0 = R.scenes[j - 1]; drawImg(g, R.bitmaps[j - 1], j - 1, (t - P0.s) / Math.max(.5, P0.e - P0.s), W, H);
+      const P0 = R.scenes[j - 1]; drawImg(g, img(P0), kv(P0, j - 1), (t - P0.s) / Math.max(.5, P0.e - P0.s), W, H);
       g.globalAlpha = (t - S0.s) / XF;
     }
-    drawImg(g, R.bitmaps[j], j, pj, W, H);
+    drawImg(g, img(S0), kv(S0, j), pj, W, H);
     g.globalAlpha = 1; g.filter = "none"; g.restore();
     const ov = overlays(W, H);
     if (tp.tint) { g.fillStyle = tp.tint; g.fillRect(0, 0, W, H); }
@@ -214,10 +220,10 @@ const Cut = (() => {
     const curIdx = c.ws.findIndex(w => t >= w.s && t < w.e + .08);
     const lastSaid = c.ws.reduce((a, w, i) => (t >= w.s ? i : a), -1);
     words.forEach((w, i) => {
-      let col = "#ffffff", scale = 1;
-      if (o.captions === "Palavra por palavra") { if (i === curIdx || (curIdx < 0 && i === lastSaid)) { col = "#f2c14e"; scale = 1.08; } }
+      let col = "#ffffff", scale = 1, lift = 0;
+      if (o.captions === "Palavra por palavra") { if (i === curIdx || (curIdx < 0 && i === lastSaid)) { col = "#f2c14e"; lift = Math.round(fs * .04); } }
       else if (o.captions === "Karaokê") { if (i <= lastSaid) col = "#f2c14e"; }
-      g.save(); g.translate(x + widths[i] / 2, y); g.scale(scale, scale);
+      g.save(); g.translate(x + widths[i] / 2, y - (typeof lift === "number" ? lift : 0)); g.scale(scale, scale);
       g.lineWidth = Math.max(4, fs * .14); g.strokeStyle = "rgba(0,0,0,.85)"; g.strokeText(w, -widths[i] / 2, 0);
       g.fillStyle = col; g.fillText(w, -widths[i] / 2, 0); g.restore();
       x += widths[i] + sp * (fs / Math.round(H * .072));
@@ -242,7 +248,7 @@ const Cut = (() => {
   /* ---------- render final (MP4) ---------- */
   function supported() { return "VideoEncoder" in window && "AudioEncoder" in window && "VideoFrame" in window && !!window.Mp4Muxer; }
   async function pickConfigs(W, H) {
-    const vbr = W > 1280 ? 6_000_000 : 3_500_000;
+    const vbr = W > 1280 ? 4_500_000 : 2_800_000;
     const vc = [W > 1280 ? "avc1.640028" : "avc1.4d401f", "avc1.640028", "avc1.4d0028", "avc1.420028"];
     let video = null;
     for (const codec of vc) { const cfg = { codec, width: W, height: H, bitrate: vbr, framerate: FPS, avc: { format: "avc" } }; try { if ((await VideoEncoder.isConfigSupported(cfg)).supported) { video = cfg; break; } } catch (e) {} }
@@ -300,5 +306,5 @@ const Cut = (() => {
     }
   }
 
-  return { TEMPLATES, prepare, preview, still, render, supported };
+  return { pauses, TEMPLATES, prepare, preview, still, render, supported };
 })();

@@ -150,21 +150,45 @@ const VIEWS={}, BIND={};
 let ui={}; // transient UI errors etc
 
 /* ---- Virais ---- */
-VIEWS.virais=()=>`
-  <p class="lead">Escolha onde procurar. A equipe devolve temas com potencial de viralizar e você manda os que gostar pro Laboratório de Ideias.</p>
+function vSources(){ if(!S.viraisSources) S.viraisSources={youtube:true,google:true,wiki:true}; return S.viraisSources; }
+function srcStatus(){
+  const k=AI.get().keys;
+  return { youtube: !!(k.youtube||k.google), google: !!k.google, wiki: true };
+}
+VIEWS.virais=()=>{ const src=vSources(), ok=srcStatus(), sig=S.viraisSig; const live=(src.youtube&&ok.youtube)||(src.google&&ok.google)||src.wiki; return `
+  <p class="lead">A equipe lê o que está bombando agora e transforma em temas de vídeo. Mande os melhores pro Laboratório de Ideias.</p>
   <h3>Região</h3>${pills("reg",REGIOES,S.viraisRegion)}
-  <div class="field" style="margin-top:12px"><label for="vn">Nicho (opcional)</label><input id="vn" value="${esc(S.viraisNicho)}" placeholder="Ex.: orações, mistérios históricos, finanças pra aposentados"></div>
+  <h3>Fontes ao vivo</h3>
+  <div class="card" style="padding:10px 12px">
+    ${[["youtube","▶ YouTube em alta","vídeos que mais ganham views por hora na região",ok.youtube?"":"precisa da chave do Google com a YouTube Data API ativada"],
+       ["google","🔎 Google agora","o Gemini pesquisa no Google o que está em alta nos últimos 7 dias",ok.google?"":"precisa da chave do Google"],
+       ["wiki","📖 Wikipedia mais lidas","o que mais gente leu ontem (grátis, sem chave)",""]].map(([k,t,d,need])=>`
+      <label style="display:flex;gap:10px;align-items:flex-start;padding:5px 0;${need?"opacity:.55":""}"><input type="checkbox" data-src="${k}" ${src[k]&&!need?"checked":""} ${need?"disabled":""} style="margin-top:3px">
+      <span><b>${t}</b><br><span class="m" style="font-size:12.5px">${d}${need?` · <a href="#" onclick="openPanel('admin');return false" style="color:var(--accent)">${need}</a>`:""}</span></span></label>`).join("")}
+  </div>
+  <div class="field" style="margin-top:12px"><label for="vn">Nicho ou palavra-chave (opcional)</label><input id="vn" value="${esc(S.viraisNicho)}" placeholder="${esc(S.config?S.config.nicho:"Ex.: mistérios, golpes, games")}"></div>
+  <div class="field"><label>Temas</label>${pills("vmodo",["Ligados ao nicho do canal","Qualquer assunto bombando"],S.viraisModo||"Ligados ao nicho do canal")}</div>
   ${aiNote()}
-  <div class="btns"><button class="btn" id="vgo" ${busy||!AI.ready()?"disabled":""}>✦ ${S.viraisResults.length?"Buscar outros temas":"Buscar temas"}</button>${busy&&busy.k==="virais"?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
+  <div class="btns"><button class="btn" id="vgo" ${busy||!AI.ready()?"disabled":""}>✦ ${S.viraisResults.length?"Buscar de novo":"Buscar o que está bombando"}</button>${busy&&busy.k==="virais"?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
   ${busy&&busy.k==="virais"?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>`:""}
   ${ui.virErr?`<div class="err">${esc(ui.virErr)}</div>`:""}
-  <div class="note">Os temas vêm do que a equipe sabe sobre assuntos recorrentes e sazonais da região. Não é um painel de tendências em tempo real; a leitura ao vivo do YouTube entra numa próxima etapa.</div>
+  ${sig&&sig.avisos&&sig.avisos.length?`<div class="note">${sig.avisos.map(a=>"⚠ "+esc(a)).join("<br>")}</div>`:""}
+  ${!live?`<div class="note">Sem fontes ao vivo ligadas, os temas vêm só do conhecimento da IA, sem dados de agora.</div>`:""}
+  ${sig?`<details class="card" style="padding:10px 12px"><summary style="cursor:pointer;font-weight:700">Sinais coletados · ${new Date(sig.at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})} · ${esc(sig.region)}</summary>
+    ${sig.youtube?`<h3>▶ YouTube em alta (mais views por hora)</h3>${sig.youtube.pop.slice(0,10).map(v=>`<div class="m" style="font-size:12.5px;padding:3px 0"><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener" style="color:var(--text)">${esc(v.titulo)}</a> · ${Trends.fmtN(v.views)} views · <b>${Trends.fmtN(v.porHora)}/h</b></div>`).join("")}
+      ${sig.youtube.nicho.length?`<h3>No nicho, última semana</h3>${sig.youtube.nicho.slice(0,8).map(v=>`<div class="m" style="font-size:12.5px;padding:3px 0"><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener" style="color:var(--text)">${esc(v.titulo)}</a> · ${Trends.fmtN(v.views)} · <b>${Trends.fmtN(v.porHora)}/h</b></div>`).join("")}`:""}`:""}
+    ${sig.google&&sig.google.fontes.length?`<h3>🔎 Fontes do Google</h3>${sig.google.fontes.map(f=>`<div class="m" style="font-size:12.5px;padding:2px 0"><a href="${esc(f.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(f.titulo)}</a></div>`).join("")}`:""}
+    ${sig.wiki?`<h3>📖 Wikipedia, ${esc(sig.wiki.dia)}</h3><div class="m" style="font-size:12.5px">${sig.wiki.artigos.slice(0,15).map(a=>`${esc(a.titulo)} (${Trends.fmtN(a.views)})`).join(" · ")}</div>`:""}
+  </details>`:""}
   ${S.viraisResults.map((v,i)=>`<div class="card"><div class="t">${esc(v.tema)}</div><div class="m">${esc(v.angulo)}</div><div class="m">${esc(v.porque)}</div>
-    <div class="tags"><span class="tag ${v.potencial==="alto"?"hot":""}">potencial ${esc(v.potencial)}</span><span class="tag">${esc(v.nicho)}</span></div>
+    ${v.sinal?`<div class="m" style="margin-top:4px;color:var(--text)">📈 ${esc(v.sinal)}</div>`:""}
+    <div class="tags"><span class="tag ${v.potencial==="alto"?"hot":""}">potencial ${esc(v.potencial)}</span>${v.urgencia?`<span class="tag ${v.urgencia==="agora"?"hot":"gold"}">${v.urgencia==="agora"?"🔥 surfar agora":v.urgencia==="esta semana"?"esta semana":"perene"}</span>`:""}<span class="tag">${esc(v.nicho)}</span></div>
     <div class="btns" style="margin-top:8px">${v.enviado?`<span class="tag gold">✓ Enviado pro Laboratório de Ideias</span>`:`<button class="btn small" data-send="${i}">Enviar pro Laboratório de Ideias</button>`}</div></div>`).join("")}
-`;
+`; };
 BIND.virais=el=>{
   bindPills(el,"reg",v=>{S.viraisRegion=v; save();});
+  bindPills(el,"vmodo",v=>{S.viraisModo=v; save();});
+  el.querySelectorAll("[data-src]").forEach(c=>c.onchange=()=>{ vSources()[c.dataset.src]=c.checked; save(); renderPanel(); });
   const vn=el.querySelector("#vn"); vn.oninput=()=>{S.viraisNicho=vn.value; save();};
   const go=el.querySelector("#vgo"); if(go) go.onclick=runVirais;
   el.querySelectorAll("[data-send]").forEach(b=>b.onclick=()=>{
@@ -175,11 +199,24 @@ BIND.virais=el=>{
 };
 async function runVirais(){
   ui.virErr=null; setBusy("virais","varrendo "+S.viraisRegion); renderPanel();
-  const mes=new Date().toLocaleDateString("pt-BR",{month:"long",year:"numeric"});
-  const prompt=`Você é o analista de tendências de uma produtora de canais faceless ("dark") no YouTube.
-Região do público: ${S.viraisRegion}. Nicho de interesse: ${S.viraisNicho||"qualquer nicho com bom RPM (anunciantes fortes)"}. Mês atual: ${mes}.
-Liste 8 temas de vídeo longo (10+ min) com alto potencial de visualização para esse público agora: considere datas e estações do período, assuntos que sempre voltam a performar e curiosidades com gancho forte. Evite temas genéricos; cada tema deve ser específico o bastante pra virar um título.
-Para cada item: "tema" (em português, 1 frase curta), "angulo" (como abordar pra ser diferente do que já existe, 1 frase), "porque" (por que tende a performar com esse público, 1 frase), "nicho" (1-3 palavras), "potencial" ("alto" ou "médio").
+  const src=vSources(), ok=srcStatus();
+  const niche=(S.viraisNicho||"").trim()||(S.viraisModo==="Qualquer assunto bombando"?"":(S.config?S.config.nicho:""));
+  let sig=null;
+  try{
+    sig=await Trends.collect({region:S.viraisRegion,niche,sources:{youtube:src.youtube&&ok.youtube,google:src.google&&ok.google,wiki:src.wiki},onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal});
+    S.viraisSig=sig; save();
+  }catch(e){ if(e.code==="cancelled"){ clearBusy(); return renderPanel(); } }
+  if(busy&&busy.cancel){ clearBusy(); return renderPanel(); }
+  setAction("transformando os sinais em temas"); renderPanel();
+  const dados=sig?Trends.asPrompt(sig):"";
+  const livre=S.viraisModo==="Qualquer assunto bombando";
+  const hoje=new Date().toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"});
+  const prompt=`Você é o analista de tendências de uma produtora de canais faceless ("dark") no YouTube. Hoje é ${hoje}.
+Região do público: ${S.viraisRegion}. ${S.config?`Canal: ${cfgText()}`:""}
+${livre?"Modo: qualquer assunto que esteja bombando, mesmo fora do nicho do canal.":`Modo: ligue o que está em alta ao nicho do canal${niche?` (${niche})`:""}. Ex.: se um game está em alta e o canal é de mistérios, um tema seria “os mistérios escondidos de <game>”.`}
+${dados?`\nDADOS COLETADOS AGORA (use como base principal; prefira assuntos com mais views por hora e que aparecem em mais de uma fonte):\n${dados}\n`:"\nNão há dados ao vivo; use datas e assuntos recorrentes do período.\n"}
+Liste 8 temas de vídeo longo (10+ min) com alto potencial de clique imediato: a pessoa bate o olho e quer assistir. Nada genérico; cada tema específico o bastante pra virar um título. Priorize o que está em crescimento agora pra surfar a onda.
+Para cada item: "tema" (em português, 1 frase curta), "angulo" (como abordar pra ser diferente do que já existe), "porque" (por que vai dar views agora), "sinal" (a evidência dos dados acima: qual vídeo, busca ou artigo, com números; vazio se não houver), "urgencia" ("agora", "esta semana" ou "perene"), "nicho" (1-3 palavras), "potencial" ("alto" ou "médio").
 Responda só com JSON: {"ideias":[...]}`;
   try{ const r=await ask(prompt,{json:true}); S.viraisResults=(r.ideias||[]).slice(0,10); save(); }
   catch(e){ ui.virErr=errMsg(e); }
@@ -201,6 +238,8 @@ VIEWS.ideias=()=>{
   <div class="row"><div class="field"><label for="cg">Estilo do gancho</label><select id="cg">${GANCHOS.map(n=>`<option ${n===c.gancho?"selected":""}>${n}</option>`).join("")}</select></div>
   <div class="field"><label for="cv">Voz</label><select id="cv">${["Masculina","Feminina"].map(n=>`<option ${n===c.voz?"selected":""}>${n}</option>`).join("")}</select></div></div>
   <div class="field"><label for="cd">Duração, de 10 a 60 min</label><input id="cd" type="number" min="10" max="60" value="${c.duracao}"><div class="m" style="font-size:12px;color:var(--muted);margin-top:4px" id="cdb">${blocks} blocos de roteiro</div></div>
+  <div class="field"><label for="cipm">Imagens por minuto</label><select id="cipm">${[["2","2 por minuto · econômico"],["3","3 por minuto · mais variado"],["4","4 por minuto · bem dinâmico"]].map(([v,t])=>`<option value="${v}" ${String(c.ipm||2)===v?"selected":""}>${t}</option>`).join("")}</select>
+  <div class="m" style="font-size:12px;color:var(--muted);margin-top:4px">Cada imagem é uma chamada paga. Entre uma imagem e outra o OnionCut muda o enquadramento a cada ~7 s, de graça.</div></div>
   <div class="field"><label>Idioma dos vídeos</label>${pills("lang",IDIOMAS.map(i=>i[0]),c.idioma).replace(/data-v="([^"]+)">([^<]+)</g,(m,v,t)=>`data-v="${v}">${(IDIOMAS.find(i=>i[0]===v)||["","" ])[1]} ${t}<`)}</div>
   <div class="btns"><button class="btn" id="csave">${S.config?"Salvar alterações":"Salvar canal"}</button></div>
   </div></details>
@@ -218,12 +257,12 @@ BIND.ideias=el=>{
   let lang=(S.config&&S.config.idioma)||"Inglês";
   const cn=el.querySelector("#cn"), cd=el.querySelector("#cd");
   const readCfg=()=>{ const nicho=cn.value==="Outro"?(el.querySelector("#cnx").value.trim()||"Outro"):cn.value;
-    return {nicho,publico:el.querySelector("#cp").value,formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,duracao:Math.max(10,Math.min(60,+cd.value||15)),idioma:lang}; };
+    return {nicho,publico:el.querySelector("#cp").value,formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,duracao:Math.max(10,Math.min(60,+cd.value||15)),idioma:lang,ipm:+(el.querySelector("#cipm")||{}).value||2}; };
   // depois do primeiro "Salvar canal", toda mudança é salva na hora
   const autosave=()=>{ if(S.config){ S.config=readCfg(); save(); renderProd(); } };
   bindPills(el,"lang",v=>{ lang=v; autosave(); if(S.config) toast("Idioma dos vídeos: "+v); });
   cn.onchange=()=>{ el.querySelector("#cno").style.display=cn.value==="Outro"?"":"none"; autosave(); };
-  ["#cnx","#cp","#cf","#cg","#cv"].forEach(q=>{ const i=el.querySelector(q); if(i) i.onchange=autosave; });
+  ["#cnx","#cp","#cf","#cg","#cv","#cipm"].forEach(q=>{ const i=el.querySelector(q); if(i) i.onchange=autosave; });
   cd.oninput=()=>{ const v=Math.max(10,Math.min(60,+cd.value||15)); el.querySelector("#cdb").textContent=Math.max(2,Math.round(v/5))+" blocos de roteiro"; };
   cd.onchange=autosave;
   el.querySelector("#csave").onclick=()=>{ S.config=readCfg(); save(); toast("Canal salvo · vídeos em "+S.config.idioma); renderPanel(); };
@@ -466,7 +505,7 @@ On the right third, large bold headline text in thick condensed sans-serif, whit
 
 /* ---- Imagens ---- */
 function styleOf(name){ return STYLES.find(s=>s[0]===name)||STYLES[0]; }
-function sceneCount(){ return Math.min(40,Math.round(S.project.config.duracao*1.7)); }
+function sceneCount(){ return Math.min(60,Math.round(S.project.config.duracao*(+S.project.config.ipm||2))); }
 VIEWS.imagens=()=>{ const P=S.project; const working=busy&&busy.k==="imagens"; const n=sceneCount(); const ph=P.imgPhase||0;
   const ok=P.scenes.filter(s=>s.img==="ok").length, bad=P.scenes.filter(s=>s.img&&s.img!=="ok"&&s.img!=="wait").length;
   const sel=P.selScene!=null?P.scenes[P.selScene]:null; const st=styleOf(P.style); return `
@@ -618,7 +657,7 @@ async function runNarracao(onlyFailed){
   const c=AI.get();
   if(!onlyFailed||!P.narr){
     await Store.delPrefix(`p${P.id}:audio:`);
-    P.narr={provider:AI.PROVIDERS[c.voice.provider].name,voiceId:P.voice,voiceName:P.voiceName,speed:P.speed,style:P.voiceStyle||"",chunks:Voice.chunkScript(scriptText()).map(t=>({text:t,st:null}))};
+    P.narr={v:2,provider:AI.PROVIDERS[c.voice.provider].name,voiceId:P.voice,voiceName:P.voiceName,speed:P.speed,style:P.voiceStyle||"",chunks:Voice.chunkScript(scriptText()).map(t=>({text:t,st:null}))};
     P.narration=null; P.done.narracao=false; P.done.montagem=false; P.render=null; Cut._R=null;
   }
   const N=P.narr; const idx=N.chunks.map((_,i)=>i).filter(i=>N.chunks[i].st!=="ok");
@@ -627,9 +666,17 @@ async function runNarracao(onlyFailed){
   const jobs=idx.map(i=>async()=>{
     const ch=N.chunks[i];
     try{
-      const r=await Voice.synth(ch.text,{voiceId:N.voiceId,speed:N.speed,style:N.style,lang:LANG_EN[P.config.idioma],idioma:P.config.idioma,prev:N.chunks[i-1]?.text||"",next:N.chunks[i+1]?.text||"",signal:busy.ctl.signal});
+      // conferência: o áudio tem que ter a duração esperada pro tamanho do texto.
+      // Se vier bem mais longo, o modelo falou algo a mais: gera de novo.
+      const expected=wc(ch.text)/2.6; let r=null, f=null;
+      for(let t=0;t<3;t++){
+        r=await Voice.synth(ch.text,{voiceId:N.voiceId,speed:N.speed,style:N.style,lang:LANG_EN[P.config.idioma],idioma:P.config.idioma,prev:N.chunks[i-1]?.text||"",next:N.chunks[i+1]?.text||"",signal:busy.ctl.signal});
+        f=await Voice.decode(r.blob);
+        const d=f.length/Voice.SR; ch.check=d<=expected*1.45+5;
+        if(ch.check) break;
+      }
       await Store.put(`p${P.id}:audio:${i}`,r.blob);
-      const f=await Voice.decode(r.blob); ch.dur=f.length/Voice.SR; ch.words=r.words||null; ch.tw=null; ch.st="ok";
+      ch.dur=f.length/Voice.SR; ch.words=r.words||null; ch.tw=null; ch.st="ok";
     }catch(e){ if(e.code==="cancelled"){ ch.st=null; throw e; } ch.st=e.message||"Falhou"; if(e.code==="rate_limited"||e.code==="overloaded") throw e; }
     done++; setAction(`gravando o trecho ${Math.min(done+1,idx.length)} de ${idx.length}`); save(); renderPanel();
   });
@@ -769,6 +816,31 @@ async function downloadPack(P,btn){
   if(btn){ btn.disabled=false; btn.innerHTML=old; }
 }
 
+/* ---- Conserto da narração antiga (instrução lida em voz alta) ---- */
+async function repairNarration(P,onStatus){
+  const N=P.narr; let cut=0;
+  for(let i=0;i<N.chunks.length;i++){
+    onStatus(`ouvindo o trecho ${i+1} de ${N.chunks.length}`);
+    const blob=await Store.get(`p${P.id}:audio:${i}`); if(!blob) throw {message:`O áudio do trecho ${i+1} não está mais neste navegador.`};
+    const f=await Voice.decode(blob);
+    const first=N.chunks[i].text.split(/\s+/).slice(0,12).join(" ");
+    let res; try{ res=await Voice.findLeak(f,first); }catch(e){ if(e.code==="auth"||e.code==="no_key") throw e; res={has:false}; }
+    if(!res.has||!(res.t>1)) continue;
+    // corta numa pausa perto do ponto que o Gemini indicou
+    const ps=Cut.pauses(f.subarray(0,Math.min(f.length,Voice.SR*40)),.15);
+    let at=res.t-.15, best=null, bd=1.5;
+    ps.forEach(p=>{ const d=Math.abs(p.e-res.t); if(d<bd){ bd=d; best=p; } });
+    if(best) at=best.s+(best.e-best.s)*.6;
+    const dur=f.length/Voice.SR; if(at<1||at>Math.min(40,dur*.6)) continue;
+    const kept=f.slice(Math.floor(at*Voice.SR));
+    await Store.put(`p${P.id}:audio:${i}`,Voice.wav(kept));
+    N.chunks[i].dur=kept.length/Voice.SR; N.chunks[i].words=null; N.chunks[i].tw=null; cut++;
+  }
+  N.v=2;
+  const tot=N.chunks.reduce((a,x)=>a+(x.dur||0),0)+.35*(N.chunks.length-1);
+  P.narration={...(P.narration||{}),mins:(tot/60).toFixed(1),secs:tot};
+  return {cut,total:N.chunks.length};
+}
 /* ---- Assistir na Biblioteca ---- */
 let libUrl=null;
 async function playLibrary(box,P){
@@ -803,12 +875,25 @@ VIEWS.arquivo=()=>`<div class="lib">
       <span class="playbtn">▶</span><span class="playlbl">${P.render&&P.render.stored?"Assistir o vídeo":"Assistir a prévia"}</span></div>
     <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
-    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button><button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}<button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
   <p class="m" id="usage" style="font-size:12px;color:var(--muted)"></p>
 </div>`;
 BIND.arquivo=el=>{
   el.querySelectorAll("[data-dl]").forEach(b=>b.onclick=()=>downloadPack(S.library[+b.dataset.dl],b));
   el.querySelectorAll("[data-play]").forEach(box=>{ const go=()=>playLibrary(box,S.library[+box.dataset.play]); box.onclick=go; box.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } }; });
+  el.querySelectorAll("[data-fix]").forEach(b=>b.onclick=async()=>{
+    if(S.project) return toast("Termine ou descarte o vídeo em produção antes");
+    const idx=+b.dataset.fix, P=S.library[idx];
+    if(!confirm(`Consertar a narração de “${P.title}”? O Gemini ouve o começo de cada trecho e o Onion corta a instrução lida por engano. Depois o vídeo volta pro OnionCut pra você renderizar de novo. Roteiro, capa e imagens continuam iguais.`)) return;
+    b.disabled=true; const all=el.querySelectorAll("button"); all.forEach(x=>x.disabled=true);
+    try{
+      const out=await repairNarration(P,t=>{ b.innerHTML=`<span class="spin"></span> ${esc(t)}`; });
+      S.library.splice(idx,1); await Store.delPrefix(`p${P.id}:video:`);
+      Object.assign(P,{render:null,cut:false}); P.done.montagem=false; delete P.savedAt; S.project=P; Cut._R=null; save(); renderProd();
+      toast(out.cut?`Instrução removida em ${out.cut} de ${out.total} trechos. Agora é só renderizar.`:"Não achei instrução lida nos trechos. Nada foi cortado.");
+      courier("arquivo","montagem"); openPanel("montagem");
+    }catch(e){ toast(e.message||"Não deu pra consertar"); renderPanel(); }
+  });
   el.querySelectorAll("[data-reopen]").forEach(b=>b.onclick=async()=>{
     if(S.project) return toast("Termine ou descarte o vídeo em produção antes");
     const P=S.library[+b.dataset.reopen];
@@ -863,6 +948,13 @@ VIEWS.admin=()=>{ const c=AI.get(); return `
       <div class="btns" style="margin-top:4px"><button class="btn small" data-test="${st}">Salvar e testar</button></div>
       ${msg?`<div class="${msg.ok?"status":"err"}" style="${msg.ok?"color:var(--ok)":""}">${esc(msg.text)}</div>`:""}`}
     </section>`;}).join("")}
+  <section class="card" style="padding:14px;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><h3 style="margin:0">Tendências ao vivo</h3>${(c.keys.youtube||c.keys.google)?`<span class="tag gold">${c.keys.youtube?"chave própria":"usa a chave do Google"}</span>`:`<span class="tag">opcional</span>`}</div>
+    <p class="m" style="margin:4px 0 10px">O Laboratório de Virais lê o YouTube em alta com a YouTube Data API v3 (grátis, 10 mil unidades por dia). Pode ser a mesma chave do Google, desde que a API esteja ativada no projeto dela. A pesquisa no Google usa a chave do Gemini, e a Wikipedia não precisa de chave.</p>
+    <div class="field"><label for="k-yt">Chave da YouTube Data API (deixe vazio pra usar a do Google)</label><div style="display:flex;gap:6px"><input id="k-yt" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(c.keys.youtube||"")}"><button type="button" class="btn ghost small" data-show="k-yt" aria-label="Mostrar chave">👁</button></div></div>
+    <div class="btns" style="margin-top:4px"><button class="btn small" id="yttest">Salvar e testar o YouTube</button></div>
+    ${admMsg.yt?`<div class="${admMsg.yt.ok?"status":"err"}" style="${admMsg.yt.ok?"color:var(--ok)":""}">${esc(admMsg.yt.text)}</div>`:""}
+  </section>
   <div class="note">Defina um limite mensal de gasto no painel de cada provedor. Nunca cole chaves no código nem no repositório: o site é público, as chaves não.</div>
   <div class="btns"><button class="btn ghost small" id="aclear">Apagar todas as chaves deste navegador</button></div>`; };
 BIND.admin=el=>{
@@ -895,6 +987,9 @@ BIND.admin=el=>{
     }catch(e){ admMsg[st]={ok:false,text:e.message||"Não deu pra testar a chave."}; }
     renderPanel(); showInfo(null); renderProd();
   });
+  el.querySelector("#yttest").onclick=async e=>{ const b=e.currentTarget; AI.setKey("youtube",el.querySelector("#k-yt").value); b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando…`;
+    try{ await Trends.testYouTube(); admMsg.yt={ok:true,text:"✓ O YouTube respondeu. O Laboratório de Virais já pode ler o que está em alta."}; }
+    catch(err){ admMsg.yt={ok:false,text:err.message||"Não deu certo"}; } renderPanel(); };
   el.querySelector("#aclear").onclick=()=>{ AI.clearAll(); admMsg={}; toast("Chaves apagadas deste navegador"); renderPanel(); };
 };
 
