@@ -49,6 +49,7 @@ assets/store.js     imagens e áudios guardados no navegador (IndexedDB)
 assets/voice.js     narração (TTS), vozes, transcrição e utilitários de áudio
 assets/cut.js       OnionCut: alinhamento, cortes, legendas, prévia e render MP4
 assets/trends.js    sinais de tendência em tempo real
+assets/collage.js   colagem animada: storyboard, elenco recortado, imagens reais e quadros
 assets/park.js      o parque em pixel art 2.5D, personagens, gerente e câmera
 assets/auto.js      piloto automático e diário do gerente
 assets/vendor/      JSZip e mp4-muxer (MIT)
@@ -64,5 +65,7 @@ assets/vendor/      JSZip e mp4-muxer (MIT)
 - [x] Narração com Gemini, ElevenLabs ou OpenAI (em trechos, com amostra de voz)
 - [x] OnionCut: cortes nas pausas da voz, Ken Burns, templates, legendas animadas, prévia ao vivo
 - [x] Tendências ao vivo: sites de tendência (Google Trends, X/trends24, TikTok Creative Center, Reddit, Google Notícias, Exploding Topics) lidos pelo Gemini, YouTube em alta (Data API v3), Google agora (Gemini + Pesquisa Google) e Wikipedia mais lidas
+- [x] Estilo colagem animada (explicador desenhado) com imagens reais de domínio público do Wikimedia Commons e créditos automáticos
+- [x] Shorts verticais (1080×1920), formato Batalha (X vs Y) e Short derivado de cada vídeo longo reaproveitando o elenco
 - [x] Piloto automático: gera N vídeos sozinho, o gerente decide cada etapa e caminha entre os prédios
 - [x] Render em MP4 (H.264) direto no navegador, com WebCodecs (Chrome ou Edge no computador)

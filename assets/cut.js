@@ -125,9 +125,10 @@ const Cut = (() => {
       if (starts[j] < starts[j - 1] + 1.5) starts[j] = Math.min(dur - 1, starts[j - 1] + 1.5);
     }
     const scenes = [];
-    starts.forEach((s, j) => { const e = j < sc - 1 ? starts[j + 1] : dur + .6, len = e - s, k = len > 10 ? Math.ceil(len / 7) : 1;
+    const col = !!P.board;
+    starts.forEach((s, j) => { const e = j < sc - 1 ? starts[j + 1] : dur + .6, len = e - s, k = !col && len > 10 ? Math.ceil(len / 7) : 1;
       for (let m = 0; m < k; m++) { let a = s + len * m / k; if (m > 0) { let best = null, bd = 1.2; for (const p of ps) { const mm = (p.s + p.e) / 2, d = Math.abs(mm - a); if (d < bd) { bd = d; best = mm; } } if (best != null) a = best; }
-        scenes.push({ s: a, e: 0, j, v: (j * 2 + m * 3) % 6 }); } });
+        scenes.push({ s: a, e: 0, j, v: (j * 2 + m * 3) % 6, beat: col ? P.board.beats[j] : null }); } });
     scenes.forEach((x, i) => x.e = i < scenes.length - 1 ? scenes[i + 1].s : dur + .6);
     // legendas: frases curtas
     const phrases = []; let cur = [];
@@ -139,9 +140,11 @@ const Cut = (() => {
     const caps = phrases.map((ws, i) => ({ ws, s: ws[0].s, e: Math.min(ws[ws.length - 1].e + .35, phrases[i + 1] ? phrases[i + 1][0].s : 1e9) }));
     // imagens
     onStatus && onStatus("carregando as imagens");
+    const assets = {};
+    if (col) for (const a of P.board.assets) { if (a.img !== "ok") continue; const b = await Store.get(`p${P.id}:asset:${a.id}`); try { if (b) assets[a.id] = { bmp: await createImageBitmap(b), real: !!a.real, nome: a.real ? a.nome : "" }; } catch (e) {} }
     const bitmaps = [];
     for (let j = 0; j < sc; j++) {
-      const b = await Store.get(`p${P.id}:scene:${j}`);
+      const b = col ? null : await Store.get(`p${P.id}:scene:${j}`);
       try { bitmaps.push(b ? await createImageBitmap(b) : null); } catch (e) { bitmaps.push(null); }
     }
     // cena sem imagem usa a vizinha mais próxima
@@ -149,7 +152,7 @@ const Cut = (() => {
     // forma de onda pra linha do tempo
     const env = envelope(audio, Math.max(480, Math.floor(audio.length / 240))); const mx = Math.max(...env) || 1;
     const wave = Array.from(env).map(v => v / mx);
-    return { audio, dur, words, scenes, caps, bitmaps, pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: sc };
+    return { audio, dur, words, scenes, caps, bitmaps, assets, mode: col ? "colagem" : "cinema", pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: col ? Object.keys(assets).length : sc };
   }
 
   /* ---------- desenhar um quadro ---------- */
@@ -179,6 +182,7 @@ const Cut = (() => {
     g.drawImage(bmp, fx, fy, dw, dh);
   }
   function frame(g, t, R, o) {
+    if (R.mode === "colagem") { Collage.frame(g, t, R, o); if (o.captions !== "Sem legenda") drawCaption(g, t, R, o); return; }
     const { W, H } = o, tp = TEMPLATES[o.template] || TEMPLATES["Clean"];
     g.save();
     g.filter = tp.filter || "none";
@@ -211,12 +215,12 @@ const Cut = (() => {
   }
   function drawCaption(g, t, R, o) {
     const { W, H } = o; const c = R.caps.find(c => t >= c.s && t < c.e); if (!c) return;
-    let fs = Math.round(H * .072);
+    const portrait = H > W; let fs = Math.round(portrait ? W * .085 : H * .072);
     g.font = `${fs}px Anton, Impact, "Arial Black", sans-serif`; g.textBaseline = "alphabetic"; g.lineJoin = "round";
     const words = c.ws.map(w => w.w.replace(/[“”"]/g, "").toUpperCase());
     const sp = fs * .28; let widths = words.map(w => g.measureText(w).width); let total = widths.reduce((a, b) => a + b, 0) + sp * (words.length - 1);
     if (total > W * .86) { const k = W * .86 / total; fs = Math.floor(fs * k); g.font = `${fs}px Anton, Impact, "Arial Black", sans-serif`; widths = words.map(w => g.measureText(w).width); total = widths.reduce((a, b) => a + b, 0) + sp * k * (words.length - 1); }
-    let x = (W - total) / 2; const y = H * .86;
+    let x = (W - total) / 2; const y = portrait ? H * .8 : H * .86;
     const curIdx = c.ws.findIndex(w => t >= w.s && t < w.e + .08);
     const lastSaid = c.ws.reduce((a, w, i) => (t >= w.s ? i : a), -1);
     words.forEach((w, i) => {
@@ -226,7 +230,7 @@ const Cut = (() => {
       g.save(); g.translate(x + widths[i] / 2, y - (typeof lift === "number" ? lift : 0)); g.scale(scale, scale);
       g.lineWidth = Math.max(4, fs * .14); g.strokeStyle = "rgba(0,0,0,.85)"; g.strokeText(w, -widths[i] / 2, 0);
       g.fillStyle = col; g.fillText(w, -widths[i] / 2, 0); g.restore();
-      x += widths[i] + sp * (fs / Math.round(H * .072));
+      x += widths[i] + sp * (fs / Math.round(portrait ? W * .085 : H * .072));
     });
   }
 
@@ -248,8 +252,8 @@ const Cut = (() => {
   /* ---------- render final (MP4) ---------- */
   function supported() { return "VideoEncoder" in window && "AudioEncoder" in window && "VideoFrame" in window && !!window.Mp4Muxer; }
   async function pickConfigs(W, H) {
-    const vbr = W > 1280 ? 4_500_000 : 2_800_000;
-    const vc = [W > 1280 ? "avc1.640028" : "avc1.4d401f", "avc1.640028", "avc1.4d0028", "avc1.420028"];
+    const vbr = H > W ? 5_000_000 : W > 1280 ? 4_500_000 : 2_800_000;
+    const vc = [W * H > 1280 * 720 ? "avc1.640028" : "avc1.4d401f", "avc1.640028", "avc1.4d0028", "avc1.420028"];
     let video = null;
     for (const codec of vc) { const cfg = { codec, width: W, height: H, bitrate: vbr, framerate: FPS, avc: { format: "avc" } }; try { if ((await VideoEncoder.isConfigSupported(cfg)).supported) { video = cfg; break; } } catch (e) {} }
     if (!video) throw { code: "codec", message: "Este navegador não consegue gerar vídeo H.264. Use o Chrome ou o Edge no computador." };
@@ -262,7 +266,7 @@ const Cut = (() => {
     return { video, audio, acodec };
   }
   async function render(R, o, { fileHandle, onProgress, signal } = {}) {
-    const W = o.res === "720p" ? 1280 : 1920, H = o.res === "720p" ? 720 : 1080;
+    const W = o.res === "short" ? 1080 : o.res === "720p" ? 1280 : 1920, H = o.res === "short" ? 1920 : o.res === "720p" ? 720 : 1080;
     const cfg = await pickConfigs(W, H);
     try { await document.fonts.load(`80px Anton`); } catch (e) {}
     const writable = fileHandle ? await fileHandle.createWritable() : null;

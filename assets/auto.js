@@ -2,7 +2,7 @@
  * Produz N vídeos do começo ao fim. Em cada etapa a IA (o gerente) toma a decisão,
  * registra o motivo e caminha até o próximo prédio.
  */
-const AP = { on: false, stop: false, total: 3, cur: 0, follow: true, region: null, dir: null, dirName: "", log: [], done: 0, err: null, startedAt: 0 };
+const AP = { mode: "both", on: false, stop: false, total: 3, cur: 0, follow: true, region: null, dir: null, dirName: "", log: [], done: 0, err: null, startedAt: 0 };
 
 function apLog(stage, text, kind) {
   AP.log.unshift({ t: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }), stage, text, kind: kind || "" });
@@ -66,7 +66,7 @@ async function apIdea() {
     await walk("ideias", "levando a ideia pro Laboratório");
   }
   (AP.usedTopics = AP.usedTopics || []).push(idea.tema);
-  S.project = newProject(idea); save(); renderProd();
+  S.project = newProject(idea, AP.mode === "short" ? "short" : "long"); save(); renderProd();
   apLog("Ideias", `produção começou · vídeo em ${S.project.config.idioma}`, "ok");
   courier("ideias", "titulos");
 }
@@ -104,6 +104,15 @@ async function apCapa() {
 async function apImagens() {
   const P = S.project; if (P.done.imagens) return;
   await walk("imagens", "indo pro Prédio das Imagens");
+  if (isColagem(P)) {
+    if (!P.board) { await attempt("Storyboard", () => runColagem(), () => !!P.board); apLog("Imagens", `storyboard com ${P.board.beats.length} batidas e elenco de ${P.board.assets.length}`, "ok"); }
+    for (let t = 0; t < 2 && P.board.assets.some(a => a.img !== "ok"); t++) { apCheck(); await drawAssets(P.board.assets.filter(a => a.img !== "ok").map(a => a.id)); }
+    const st = boardStats(P);
+    if (!st.ok) throw { code: "stage", message: "Imagens: nenhum elemento do elenco foi criado. " + (ui.imgErr || "") };
+    P.done.imagens = true; save(); renderProd();
+    apLog("Imagens", `${st.ok} elementos prontos${st.real ? `, ${st.real} imagens reais de domínio público` : ""}`, "ok"); courier("imagens", "narracao");
+    return;
+  }
   if (!P.scenes.length) {
     const d = await decide(`Qual estilo visual usar nas imagens do vídeo “${P.title}”?`, STYLES.map(s => s[0]), "Começo do roteiro: " + scriptText().slice(0, 600));
     P.style = STYLES[d.i][0]; save(); apLog("Imagens", `estilo “${P.style}”. ${d.motivo}`, "decision");
@@ -137,9 +146,10 @@ async function apNarracao() {
 async function apMontagem() {
   const P = S.project;
   await walk("montagem", "indo pro OnionCut");
-  const d = await decide(`Qual template de edição combina com o vídeo “${P.title}”?`, TEMPLATES);
-  P.template = TEMPLATES[d.i]; P.captions = "Palavra por palavra"; P.res = AP.res || "1080p"; save();
-  apLog("OnionCut", `template “${P.template}”, legenda palavra por palavra. ${d.motivo}`, "decision");
+  const tpls = isColagem(P) ? Object.keys(Collage.TPL) : TEMPLATES;
+  const d = await decide(`Qual template de edição combina com o vídeo “${P.title}”?`, tpls);
+  P.template = tpls[d.i]; if (P.kind !== "short") P.res = AP.res || "1080p"; save();
+  apLog("OnionCut", `template “${P.template}”, legenda: ${P.captions.toLowerCase()}. ${d.motivo}`, "decision");
   await attempt("Montagem", () => runPrepare(), () => !!(Cut._R && Cut._R.pid === P.id));
   apLog("OnionCut", `${Cut._R.hits} de ${Math.max(0, Cut._R.scenes.length - 1)} trocas nas pausas da voz`, "ok");
   mgrSay("renderizando o vídeo");
@@ -165,7 +175,7 @@ async function apRender(P) {
     P.render = { name, res: P.res, mb: vb ? (vb.size / 1048576).toFixed(0) : null, secs: R.dur, at: Date.now(), stored: !!vb };
     // capa e descrição junto do vídeo
     const thumb = await Store.get(mkey(P.id, "thumb", P.thumbSel));
-    const desc = new Blob([`${P.title}\n\n${P.description || ""}\n\n${(P.hashtags || []).join(" ")}\n`], { type: "text/plain;charset=utf-8" });
+    const desc = new Blob([`${P.title}\n\n${P.description || ""}\n\n${(P.hashtags || []).join(" ")}${creditsText(P)}\n`], { type: "text/plain;charset=utf-8" });
     if (AP.dir) {
       const put = async (n, b) => { try { const h = await AP.dir.getFileHandle(n, { create: true }); const w = await h.createWritable(); await w.write(b); await w.close(); } catch (e) {} };
       if (thumb) await put(`${slug(P.title)}-capa.jpg`, thumb); await put(`${slug(P.title)}-descricao.txt`, desc);
@@ -176,6 +186,21 @@ async function apRender(P) {
     throw { code: "stage", message: "Render: " + (e.message || "falhou") };
   }
   P.renderProg = null; save(); clearBusy();
+}
+
+// short vertical a partir de um vídeo longo pronto: reaproveita o elenco (sem gerar imagens novas)
+async function apDerivedShort(L) {
+  await walk("ideias", "separando o melhor trecho pro Short");
+  const P = newProject({ ...L.idea, id: Date.now() + 1 }, "short");
+  P.parentScript = (L.script || []).join("\n\n"); P.idea = { ...L.idea, tema: L.title || L.idea.tema };
+  if (L.board) {
+    const keep = [];
+    for (const a of L.board.assets) { if (a.img !== "ok") continue; const b = await Store.get(mkey(L.id, "asset", a.id)); if (b) { await Store.put(mkey(P.id, "asset", a.id), b); keep.push({ ...a }); } }
+    if (keep.length) P.parentAssets = keep;
+  }
+  S.project = P; save(); renderProd();
+  apLog("Short", `short derivado de “${L.title}”${P.parentAssets ? `, reaproveitando ${P.parentAssets.length} elementos do elenco` : ""}`, "ok");
+  courier("ideias", "titulos");
 }
 
 /* ---------- laço principal ---------- */
@@ -189,6 +214,11 @@ async function runAuto() {
       renderProd(); apLog("Gerente", `vídeo ${AP.cur} de ${AP.total}`, "head");
       for (const step of [apIdea, apTitulos, apRoteiro, apDescricao, apCapa, apImagens, apNarracao, apMontagem]) { apCheck(); await step(); if (panelKey === "auto") renderAutoHead(); }
       AP.done++; apLog("Gerente", `✓ vídeo ${AP.cur} pronto`, "ok");
+      if (AP.mode === "both" && S.library[0] && S.library[0].kind !== "short") {
+        await apDerivedShort(S.library[0]);
+        for (const step of [apTitulos, apRoteiro, apDescricao, apImagens, apNarracao, apMontagem]) { apCheck(); await step(); if (panelKey === "auto") renderAutoHead(); }
+        apLog("Gerente", `✓ short do vídeo ${AP.cur} pronto`, "ok");
+      }
     }
     apLog("Gerente", `terminei: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} pronto${AP.done > 1 ? "s" : ""}`, "ok"); toast(`Piloto automático: ${AP.done} vídeo${AP.done > 1 ? "s" : ""} pronto${AP.done > 1 ? "s" : ""}`);
   } catch (e) {
@@ -222,7 +252,9 @@ VIEWS.auto = () => {
   ${miss.length ? `<div class="note"><b>Antes de começar:</b>${miss.map(([t, k]) => `<div style="margin-top:6px">• ${esc(t)} ${k ? `<button class="btn ghost small" style="padding:3px 8px" onclick="openPanel('${k}')">abrir</button>` : ""}</div>`).join("")}</div>` : ""}
   <div class="row"><div class="field"><label for="apn">Quantos vídeos</label><input id="apn" type="number" min="1" max="20" value="${AP.total}"></div>
   <div class="field"><label for="apr">Região dos temas virais</label><select id="apr">${REGIOES.map(r => `<option ${r === (AP.region || S.viraisRegion) ? "selected" : ""}>${r}</option>`).join("")}</select></div></div>
-  <div class="field"><label>Resolução</label>${pills("apres", RES, AP.res || "1080p")}</div>
+  <div class="field"><label>O que produzir</label>${pills("apmode", ["Longo + 1 Short", "Só vídeos longos", "Só Shorts"], AP.mode === "short" ? "Só Shorts" : AP.mode === "long" ? "Só vídeos longos" : "Longo + 1 Short")}
+    <p class="m" style="font-size:12px;margin:5px 0 0">O Short de cada vídeo reaproveita o elenco do vídeo longo: não gera imagens novas, só roteiro e narração.</p></div>
+  <div class="field"><label>Resolução dos vídeos longos</label>${pills("apres", RES, AP.res || "1080p")}</div>
   <div class="field"><label>Onde salvar os vídeos</label>
     <div class="btns" style="margin-top:0"><button class="btn ghost small" id="apdir" ${window.showDirectoryPicker ? "" : "disabled"}>📁 ${AP.dirName ? "Pasta: " + esc(AP.dirName) : "Escolher uma pasta"}</button>${AP.dirName ? `<button class="btn ghost small" id="apdirx">usar downloads</button>` : ""}</div>
     <p class="m" style="font-size:12px;margin:5px 0 0">${AP.dirName ? "Cada vídeo vai pra essa pasta com a capa e a descrição." : "Sem pasta, cada vídeo, capa e descrição são baixados. Escolher uma pasta evita vários avisos de download."}</p></div>
@@ -256,6 +288,7 @@ BIND.auto = el => {
   const n = el.querySelector("#apn"); n.oninput = () => { AP.total = Math.max(1, Math.min(20, +n.value || 1)); const b = el.querySelector("#apgo"); if (b) b.textContent = `🤖 Gerar ${AP.total} vídeo${AP.total > 1 ? "s" : ""} no automático`; };
   el.querySelector("#apr").onchange = e => { AP.region = e.target.value; };
   bindPills(el, "apres", v => { AP.res = v; });
+  bindPills(el, "apmode", v => { AP.mode = /Só Shorts/.test(v) ? "short" : /Só vídeos/.test(v) ? "long" : "both"; });
   el.querySelector("#apfol").onchange = e => { AP.follow = e.target.checked; };
   const dir = el.querySelector("#apdir"); if (dir) dir.onclick = async () => { try { AP.dir = await showDirectoryPicker({ mode: "readwrite" }); AP.dirName = AP.dir.name; renderPanel(); } catch (e) {} };
   const dx = el.querySelector("#apdirx"); if (dx) dx.onclick = () => { AP.dir = null; AP.dirName = ""; renderPanel(); };
