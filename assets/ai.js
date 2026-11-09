@@ -7,7 +7,7 @@ const AI = (() => {
   const KEY = "onion-ai-v2";
 
   const PROVIDERS = {
-    anthropic:  { name: "Anthropic (Claude)", keyHint: "sk-ant-…", where: "console.anthropic.com" },
+    anthropic:  { name: "Anthropic (Claude)", keyHint: "sk-ant-…", where: "platform.claude.com › Settings › API keys" },
     google:     { name: "Google Gemini",      keyHint: "AIza…",    where: "aistudio.google.com" },
     google_free:{ name: "Gemini grátis",      keyHint: "AIza… (de um projeto SEM faturamento)", where: "aistudio.google.com › Criar chave › Criar em um projeto novo, sem ativar o faturamento" },
     openai:     { name: "OpenAI",             keyHint: "sk-…",     where: "platform.openai.com" },

@@ -27,7 +27,8 @@ Crie:
 1) "imagens": no máximo ${maxAssets} imagens, cada uma com:
    - "id" curto (i1, i2…), "nome" (pessoa, lugar ou coisa, em ${P.config.idioma}),
    - "tipo": "real" (foto ou pintura histórica real de domínio público, buscada no Wikimedia Commons) ou "ia" (gerada por IA). Prefira SEMPRE "real" para pessoas, lugares e eventos históricos. Use "ia" no máximo ${maxAI} vezes, só para reconstruções do que não tem foto, diagramas de lugares e objetos.
-   - "busca": para "real", termo de busca em inglês, específico (ex.: "Winston Churchill Berlin 1945", "Führerbunker 1947 photo", "Berlin ruins 1945 aerial").
+   - "busca": termo de busca CURTO, de 2 a 5 palavras, do jeito que uma pessoa digitaria no Google (ex.: "Winston Churchill 1945", "Führerbunker", "Berlim ruínas 1945"). Nada de frases longas cheias de detalhes.
+   - "busca_ampla": uma versão ainda mais genérica, de 1 a 3 palavras, pra quando a primeira não achar (ex.: "cangaceiros mortos", "bunker", "Berlim 1945").
    - "estilo": para "ia": "reconstrucao", "diagrama" ou "objeto".
    - "descricao": para "ia", prompt em inglês da cena. NUNCA reconstrua o rosto de pessoas reais e não imite fotos de arquivo de eventos reais: uma reconstrução deve parecer reconstrução.
    - Pessoas vivas ou que morreram há menos de 70 anos: só como "real" se a foto for de domínio público; senão não use.

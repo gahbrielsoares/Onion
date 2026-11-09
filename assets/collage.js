@@ -84,11 +84,15 @@ const Collage = (() => {
     return null;
   }
   // tenta a busca exata, depois versões mais simples, em dois bancos de imagens livres
-  function simpler(q) { const w = String(q).replace(/\b(1[5-9]\d\d|20\d\d)s?\b/g, "").replace(/\b(photo|photograph|image|picture|research|historical|archive|old)\b/gi, "").split(/\s+/).filter(Boolean); return [w.join(" "), w.length > 4 ? w.slice(0, 4).join(" ") : ""].filter((x, i, a) => x && a.indexOf(x) === i && x !== q); }
-  async function findReal(busca, nome, width = 1280, onTry) {
-    const qs = [busca, ...simpler(busca), nome].filter((x, i, a) => x && a.indexOf(x) === i);
+  function simpler(q) {
+    // corta os detalhes de lugar/tempo ("… no sertão de X à beira de Y") e fica com o núcleo ("cabeças dos cangaceiros mortos")
+    const ws0 = String(q || "").split(/\s+/), cut = ws0.findIndex((x, i) => i >= 2 && /^(no|na|nos|nas|em|à|ao|às|aos|perto|durante|entre|in|at|near|during|on)$/i.test(x));
+    const core = cut > 0 ? ws0.slice(0, cut).join(" ") : String(q || "");
+    const w = String(q).replace(/\b(1[5-9]\d\d|20\d\d)s?\b/g, "").replace(/\b(photo|photograph|image|picture|research|historical|archive|old)\b/gi, "").split(/\s+/).filter(Boolean); return [w.join(" "), core !== q ? core : "", w.length > 4 ? w.slice(0, 4).join(" ") : "", w.length > 3 ? w.slice(0, 3).join(" ") : ""].filter((x, i, a) => x && a.indexOf(x) === i && x !== q); }
+  async function findReal(busca, nome, width = 1280, onTry, ampla) {
+    const qs = [busca, ampla, ...simpler(busca), nome, ...simpler(nome)].filter((x, i, a) => x && a.indexOf(x) === i);
     for (const q of qs) { onTry && onTry("Wikimedia: " + q); const r = await commons(q, width); if (r) return r; }
-    for (const q of qs.slice(0, 3)) { onTry && onTry("Openverse: " + q); const r = await openverse(q, width); if (r) return r; }
+    for (const q of qs.slice(0, 4)) { onTry && onTry("Openverse: " + q); const r = await openverse(q, width); if (r) return r; }
     return null;
   }
 
@@ -104,7 +108,8 @@ Crie:
 1) "elenco": no máximo ${maxAssets} elementos visuais REUTILIZÁVEIS (personagens, objetos, lugares, mapas). Reutilize muito: um personagem principal aparece em várias batidas. Cada um com:
    - "id" curto (a1, a2…), "nome" (como aparece na tela, em ${P.config.idioma}),
    - "tipo": "real" só para retratos/pinturas históricas antigas, mapas, monumentos e lugares famosos que certamente existem em domínio público; "desenho" para todo o resto. NUNCA "real" para pessoas vivas ou que morreram há menos de 70 anos.
-   - "busca": para "real", o termo de busca no Wikimedia Commons em inglês (ex.: "Hypatia portrait 1908", "Pyramids of Giza"); vazio para desenho.
+   - "busca": para "real", termo CURTO de 2 a 5 palavras, como uma pessoa digitaria no Google (ex.: "Hipátia retrato", "Pirâmides de Gizé"); vazio para desenho.
+   - "busca_ampla": para "real", versão ainda mais genérica de 1 a 3 palavras (ex.: "pirâmides Egito").
    - "descricao": prompt em inglês descrevendo SÓ o elemento isolado, corpo inteiro se for pessoa, roupa e época corretas (ex.: "ancient Greek female philosopher in a grey himation holding a scroll"). Personagens de pessoas vivas viram personagens genéricos, sem imitar a aparência real.
 ${reuse ? `   Use APENAS estes elementos que já existem (não crie novos): ${reuse}\n` : ""}${base ? `   Já existem estes elementos (de um Short do mesmo assunto). Reaproveite com o MESMO id sempre que fizer sentido e crie novos só pro que faltar: ${base}\n` : ""}2) "batidas": cerca de ${beats} batidas consecutivas cobrindo o roteiro inteiro, uma a cada ${isShort ? "2 a 3" : "3 a 5"} segundos de fala. Cada batida:
    - "trecho": as primeiras 6 a 10 palavras daquele pedaço do roteiro, exatamente como estão no texto,

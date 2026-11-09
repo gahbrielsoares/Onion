@@ -715,7 +715,7 @@ async function drawScenes(idx){
 
 /* ---- Imagens no estilo colagem ---- */
 function boardStats(P){ const a=(P.board&&P.board.assets)||[]; return {n:a.length,ok:a.filter(x=>x.img==="ok").length,real:a.filter(x=>x.img==="ok"&&x.real&&!x.own).length,own:a.filter(x=>x.img==="ok"&&x.own).length,ai:a.filter(x=>x.img==="ok"&&!x.real&&!x.own).length,bad:a.filter(x=>x.img&&!["ok","wait","nofound"].includes(x.img)).length,nofound:a.filter(x=>x.img==="nofound").length,pend:a.filter(x=>x.img!=="ok").length,beats:((P.board&&P.board.beats)||[]).length}; }
-const gImg=q=>`https://www.google.com/search?tbm=isch&tbs=sur:fmc&q=${encodeURIComponent(q)}`;
+const gImg=q=>`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(q)}`;
 function colagemView(){ return staleNote(S.project,"imagens")+colagemView0(); }
 function colagemView0(){
   const P=S.project, working=busy&&busy.k==="imagens", st=boardStats(P), doc=isDoc(P), tp=doc?{bg:"#15181d",ink:"#eee"}:(Collage.TPL[P.template]||Collage.TPL["Azul explicador"]);
@@ -735,7 +735,7 @@ function colagemView0(){
       <label class="btn ghost small" style="cursor:pointer">📁 Enviar várias<input type="file" id="bup" accept="image/*" multiple style="display:none"></label>
       <button class="btn ghost small" id="bai" ${busy||!AI.stageReady("image")?"disabled":""} title="${AI.stageReady("image")?"":"Configure Imagens e capas na Administração"}">🎨 Gerar ${st.pend} com IA</button>
       <button class="btn ghost small" id="bcopy">📋 Copiar a lista</button></div>
-      <p class="m" style="font-size:12px;margin:6px 0 0">Dica: busque grátis primeiro; só gere com IA o que sobrar. "Enviar várias" preenche os quadrados vazios na ordem.</p>`:""}
+      <p class="m" style="font-size:12px;margin:6px 0 0">Dica: busque grátis primeiro; só gere com IA o que sobrar. Pelo Google é rápido: toque num quadrado, clique em 🌐 Procurar no Google, copie a imagem (botão direito › Copiar imagem) e aperte <b>Ctrl+V</b> aqui.</p>`:""}
   </div>
   <div class="scenes">${P.board.assets.map(a=>{ const ok=a.img==="ok"; return `<button type="button" class="scene ${P.selAsset===a.id?"cur":""} ${ok?"":"pend"}" data-as="${esc(a.id)}" ${ok?`data-img="${mkey(P.id,"asset",a.id)}"`:""} style="background-color:${ok?tp.bg:"transparent"};background-size:${doc?"cover":"contain"}!important;background-repeat:no-repeat;color:${ok?tp.ink:"var(--text)"}" title="${esc(a.nome)}">
     <span>${a.own?"📁":ok?(a.real?"📷":"🎨"):a.img==="nofound"?"🔎":"·"}</span>${a.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(!ok&&a.img&&a.img!=="nofound"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}<small style="position:absolute;left:4px;right:4px;bottom:3px;font-size:10.5px;line-height:1.15;${ok?`text-shadow:0 0 3px #000;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`:"white-space:normal"}">${esc(a.nome)}</small></button>`; }).join("")}</div>
@@ -749,7 +749,7 @@ function colagemView0(){
       <label class="btn ghost small" style="cursor:pointer">📁 Enviar a minha<input type="file" id="aup" accept="image/*" style="display:none"></label>
       <button class="btn ghost small" id="aai" ${busy||!AI.stageReady("image")?"disabled":""}>🎨 Gerar com IA</button>
       <a class="btn ghost small" href="${gImg(sel.busca||sel.nome)}" target="_blank" rel="noopener" style="text-decoration:none">🌐 Procurar no Google</a></div>
-    <p class="m" style="font-size:11.5px;margin:6px 0 0">O link do Google já abre filtrado por imagens com licença Creative Commons. Achou? Salve e use "Enviar a minha".</p></div>`:""}
+    <p class="m" style="font-size:11.5px;margin:6px 0 0">No Google: botão direito na imagem › <b>Copiar imagem</b>. Volte aqui e aperte <b>Ctrl+V</b>: ela entra neste quadrado e o próximo já fica selecionado. Também dá pra arrastar um arquivo pro quadrado.</p></div>`:""}
   `:""}
   <div class="btns"><button class="btn" id="iok" ${!P.board||!st.ok||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Imagens aprovadas ✓":"Aprovar e mandar pro Estúdio"}</button>${P.board&&st.ok&&st.pend&&!P.done.imagens?`<span class="m" style="font-size:12px">As cenas sem imagem usam a imagem anterior.</span>`:""}</div>`;
 }
@@ -757,8 +757,24 @@ async function saveOwn(P,a,f){
   let b=await toJpeg(f,0,0,.9); if(!isDoc(P)&&a.tipo!=="real") b=await Collage.cutout(f);
   await Store.put(mkey(P.id,"asset",a.id),b); Object.assign(a,{img:"ok",real:isDoc(P)||a.tipo==="real",own:true,credit:""}); Cut._R=null;
 }
+// colar (Ctrl+V) uma imagem copiada do Google: entra no quadrado selecionado (ou no primeiro vazio) e já seleciona o próximo
+async function pasteToBoard(file){
+  const P=S.project; if(!P||!P.board) return;
+  let a=P.board.assets.find(x=>x.id===P.selAsset); if(!a||(a.img==="ok"&&!P.selAsset)) a=P.board.assets.find(x=>x.img!=="ok"); if(!a) return toast("Todos os quadrados já têm imagem. Selecione um pra trocar.");
+  await saveOwn(P,a,file);
+  const next=P.board.assets.find(x=>x.img!=="ok"); P.selAsset=next?next.id:null; save();
+  toast(next?`Colada em “${a.nome}”. Próxima: ${next.nome}`:`Colada em “${a.nome}”. Todas as imagens estão prontas!`); renderPanel();
+}
+document.addEventListener("paste",e=>{
+  if(panelKey!=="imagens"||!S.project||!S.project.board||busy) return;
+  const t=e.target; if(t&&(t.tagName==="TEXTAREA"||t.tagName==="INPUT")) return;
+  const it=[...(e.clipboardData||{}).items||[]].find(i=>i.type.startsWith("image/"));
+  if(it){ e.preventDefault(); pasteToBoard(it.getAsFile()); } else toast("Na área de transferência não tem imagem. No Google use botão direito › Copiar imagem.");
+});
 function bindColagem(el){
   const P=S.project;
+  el.querySelectorAll("[data-as]").forEach(b=>{ b.ondragover=e=>{ e.preventDefault(); b.style.outline="2px dashed var(--accent)"; }; b.ondragleave=()=>{ b.style.outline=""; };
+    b.ondrop=async e=>{ e.preventDefault(); b.style.outline=""; const f=[...(e.dataTransfer.files||[])].find(x=>x.type.startsWith("image/")); if(!f) return toast("Arraste um arquivo de imagem do computador"); P.selAsset=b.dataset.as; await pasteToBoard(f); }; });
   el.querySelector("#cgo2").onclick=()=>{ if(P.board&&!confirm("Refazer a lista apaga as imagens atuais. Continuar?")) return; runColagem(); };
   const pend=()=>P.board.assets.filter(a=>a.img!=="ok").map(a=>a.id);
   const bs=el.querySelector("#bsearch"); if(bs) bs.onclick=()=>drawAssets(pend(),"search");
@@ -789,7 +805,7 @@ async function runColagem(){
     try{
       const r=await ask(Doc.storyboardPrompt(P,{maxAssets:isShort?14:Math.min(80,Math.round(dur*5.5)),maxAI:isShort?4:Math.max(4,Math.round(dur*1.4)),beats:isShort?20:Math.round(dur*15),isShort,
         reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):"",base:baseTxt}),{json:true,maxTokens:20000});
-      let assets=keep?keep.map(a=>({...a})):(r.imagens||[]).map((a,i)=>({id:String(a.id||("i"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="ia"?"ia":"real",busca:String(a.busca||a.nome||""),estilo:["reconstrucao","diagrama","objeto"].includes(a.estilo)?a.estilo:"reconstrucao",descricao:String(a.descricao||""),img:null})); assets=mergeBase(assets);
+      let assets=keep?keep.map(a=>({...a})):(r.imagens||[]).map((a,i)=>({id:String(a.id||("i"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="ia"?"ia":"real",busca:String(a.busca||a.nome||""),ampla:String(a.busca_ampla||""),estilo:["reconstrucao","diagrama","objeto"].includes(a.estilo)?a.estilo:"reconstrucao",descricao:String(a.descricao||""),img:null})); assets=mergeBase(assets);
       const has=id=>assets.some(a=>a.id===id);
       const TIPOS=["foto","filme","nome","titulo","data","capitulo","citacao","retrato","diagrama"];
       const beats=(r.batidas||[]).map(b=>({trecho:String(b.trecho||""),tipo:TIPOS.includes(b.tipo)?b.tipo:"foto",img:has(String(b.img||""))?String(b.img):"",imgs:(b.imgs||[]).map(String).filter(has).slice(0,3),texto:String(b.texto||""),subtexto:String(b.subtexto||"")}))
@@ -804,7 +820,7 @@ async function runColagem(){
   try{
     const r=await ask(Collage.storyboardPrompt(P,{maxAssets:isShort?10:Math.min(45,Math.round(dur*3.2)),beats:isShort?18:Math.round(dur*14),isShort,battle:isBattle(P),
       reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):"",base:baseTxt}),{json:true,maxTokens:16000});
-    let assets=keep?keep.map(a=>({...a})):(r.elenco||[]).map((a,i)=>({id:String(a.id||("a"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="real"?"real":"desenho",busca:String(a.busca||""),descricao:String(a.descricao||a.nome||""),img:null})); assets=mergeBase(assets);
+    let assets=keep?keep.map(a=>({...a})):(r.elenco||[]).map((a,i)=>({id:String(a.id||("a"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="real"?"real":"desenho",busca:String(a.busca||""),ampla:String(a.busca_ampla||""),descricao:String(a.descricao||a.nome||""),img:null})); assets=mergeBase(assets);
     const has=id=>assets.some(a=>a.id===id);
     const beats=(r.batidas||[]).map(b=>({trecho:String(b.trecho||""),elementos:(b.elementos||[]).map(String).filter(has).slice(0,3),texto:String(b.texto||""),titulo:String(b.titulo||""),avatar:has(String(b.avatar||""))?String(b.avatar):""})).filter(b=>b.elementos.length||b.texto);
     if(!beats.length) throw {message:"O storyboard veio vazio. Tente de novo."};
@@ -829,7 +845,7 @@ async function drawAssets(ids,mode="auto"){
       let blob=null;
       const canSearch=doc||a.tipo==="real";
       if(mode!=="ai"&&canSearch){
-        const r=await Collage.findReal(a.busca||a.nome,a.nome,doc?1920:1280);
+        const r=await Collage.findReal(a.busca||a.nome,a.nome,doc?1920:1280,null,a.ampla);
         if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; a.own=false; }
       }
       if(!blob&&mode==="search"){ a.img="nofound"; }
