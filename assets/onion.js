@@ -449,7 +449,7 @@ async function imagePool(jobs,conc,onDone){
         try{ await j(); break; }
         catch(e){
           if(e&&e.code==="cancelled") return;
-          if(e&&(e.code==="rate_limited"||e.code==="overloaded")&&tent<2){ setAction("esperando o limite da API liberar"); await sleep(15000*(tent+1)); continue; }
+          if(e&&(e.code==="rate_limited"||e.code==="overloaded")&&!e.daily&&tent<3){ const w=Math.min(90,Math.max(5,e.retryAfter||15*(tent+1))); setAction(`limite por minuto: esperando ${Math.round(w)} s`); await sleep(w*1000); continue; }
           onDone&&onDone(e); break;
         }
       }

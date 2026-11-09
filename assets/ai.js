@@ -67,12 +67,26 @@ const AI = (() => {
     return list.sort((a, b) => ver(b) - ver(a) || a.localeCompare(b));
   }
   async function httpErr(res, p) {
-    let msg = ""; try { const j = await res.json(); msg = j.error?.message || j.detail?.message || j.detail || ""; } catch (e) {}
+    let msg = "", j = {}; try { j = await res.json(); msg = j.error?.message || j.detail?.message || j.detail || ""; } catch (e) {}
     if (res.status === 401 || res.status === 403 || (res.status === 400 && /key/i.test(msg)))
       return fail("auth", "Chave de " + PROVIDERS[p].name + " recusada. Confira se colou inteira.");
-    if (res.status === 429) return fail("rate_limited", "Limite de uso atingido em " + PROVIDERS[p].name + ". Espere um pouco.");
+    if (res.status === 429) return rateErr(p, msg, j, res);
     if (res.status >= 500) return fail("overloaded", PROVIDERS[p].name + " está instável agora. Tente de novo em instantes.");
     return fail("http_" + res.status, msg || ("Erro " + res.status + " em " + PROVIDERS[p].name));
+  }
+  // lê o motivo real do limite (por minuto, por dia, cota grátis) e quanto tempo esperar
+  function rateErr(p, msg, j, res) {
+    const det = j.error?.details || [], qf = det.find(d => /QuotaFailure/.test(d["@type"] || "")), ri = det.find(d => /RetryInfo/.test(d["@type"] || ""));
+    const v = (qf?.violations || [])[0] || {}, metric = (v.quotaMetric || "") + " " + (v.quotaId || "") + " " + msg;
+    let retry = ri?.retryDelay ? parseFloat(ri.retryDelay) : +(res.headers.get("retry-after") || 0);
+    const daily = /per.?day|PerDay|daily/i.test(metric), free = /free.?tier/i.test(metric), minute = /per.?minute|PerMinute/i.test(metric);
+    const name = PROVIDERS[p].name, model = v.quotaDimensions?.model ? ` (${v.quotaDimensions.model})` : "";
+    let text;
+    if (free && p !== "google_free") text = `O Google tratou a sua chave como COTA GRÁTIS${model}: o projeto dessa chave está sem faturamento ativo ou a cota grátis do dia acabou. Confira em aistudio.google.com se o projeto da chave tem faturamento e veja os limites em aistudio.google.com/rate-limit.`;
+    else if (daily) text = `Acabou a cota DIÁRIA de ${name}${model}. Ela renova à meia-noite do horário do Pacífico (5h no horário de Brasília). Dá pra trocar o modelo de imagem na Administração, usar o Gemini grátis ou enviar a imagem.`;
+    else if (minute || retry) text = `Limite POR MINUTO de ${name}${model}. O Onion espera ${Math.round(retry || 30)} s e tenta de novo sozinho.`;
+    else text = `Limite de uso atingido em ${name}${model}. ${msg ? "Mensagem do Google: " + msg.slice(0, 220) : "Espere um pouco."}`;
+    return fail("rate_limited", text, { retryAfter: retry || (daily ? 0 : 30), daily, free });
   }
   async function listModels(provider, stage) {
     const k = cfg.keys[provider];
@@ -211,8 +225,19 @@ const AI = (() => {
     }
   }
   let usedPaid = 0;
-  async function imageWith(p, prompt, { aspect = "16:9", signal } = {}) {
-    const st = cfg.image, k = cfg.keys[p];
+  async function imageWith(p, prompt, opts = {}) {
+    try { return await imageModel(p, cfg.image.model, prompt, opts); }
+    catch (e) {
+      if (!(e.code === "rate_limited" && e.daily) || !(p === "google" || p === "google_free")) throw e;
+      for (const m of cachedModels(p, "image").filter(m => m !== cfg.image.model)) {
+        try { const b = await imageModel(p, m, prompt, opts); modelSwaps++; return b; } catch (e2) { if (!(e2.code === "rate_limited")) throw e2; }
+      }
+      throw e;
+    }
+  }
+  let modelSwaps = 0;
+  async function imageModel(p, model, prompt, { aspect = "16:9", signal } = {}) {
+    const st = { ...cfg.image, model }, k = cfg.keys[p];
     if (!k) throw fail("no_key", "Cole a chave de " + PROVIDERS[p].name + " no cartão Imagens e capas da Administração.");
     if (!st.model) throw fail("model", "Escolha o modelo de imagem na Administração.");
     try {
