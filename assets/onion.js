@@ -607,43 +607,66 @@ async function drawScenes(idx){
 }
 
 /* ---- Imagens no estilo colagem ---- */
-function boardStats(P){ const a=(P.board&&P.board.assets)||[]; return {n:a.length,ok:a.filter(x=>x.img==="ok").length,real:a.filter(x=>x.img==="ok"&&x.real).length,bad:a.filter(x=>x.img&&x.img!=="ok"&&x.img!=="wait").length,beats:((P.board&&P.board.beats)||[]).length}; }
+function boardStats(P){ const a=(P.board&&P.board.assets)||[]; return {n:a.length,ok:a.filter(x=>x.img==="ok").length,real:a.filter(x=>x.img==="ok"&&x.real&&!x.own).length,own:a.filter(x=>x.img==="ok"&&x.own).length,ai:a.filter(x=>x.img==="ok"&&!x.real&&!x.own).length,bad:a.filter(x=>x.img&&!["ok","wait","nofound"].includes(x.img)).length,nofound:a.filter(x=>x.img==="nofound").length,pend:a.filter(x=>x.img!=="ok").length,beats:((P.board&&P.board.beats)||[]).length}; }
+const gImg=q=>`https://www.google.com/search?tbm=isch&tbs=sur:fmc&q=${encodeURIComponent(q)}`;
 function colagemView(){
-  const P=S.project, working=busy&&busy.k==="imagens", st=boardStats(P), tp=isDoc(P)?{bg:"#15181d",ink:"#eee"}:(Collage.TPL[P.template]||Collage.TPL["Azul explicador"]);
+  const P=S.project, working=busy&&busy.k==="imagens", st=boardStats(P), doc=isDoc(P), tp=doc?{bg:"#15181d",ink:"#eee"}:(Collage.TPL[P.template]||Collage.TPL["Azul explicador"]);
   const sel=P.board&&P.selAsset?P.board.assets.find(a=>a.id===P.selAsset):null;
   return `
-  <p class="lead">${isDoc(P)?"Estilo documentário: a equipe lê o roteiro, monta o storyboard cena a cena (fotos, filmes antigos, nomes, títulos, capítulos, citações, retratos e diagramas) e busca fotos históricas reais no Wikimedia Commons (grátis). Só o que não tem foto vira reconstrução por IA.":"Estilo colagem: a equipe lê o roteiro, monta o storyboard e cria o elenco de personagens, objetos e lugares que vão entrando na tela no ritmo da fala. Retratos, mapas e monumentos históricos vêm do Wikimedia Commons (domínio público, grátis)."}</p>
-  ${aiNote()}${imgNote()}
-  <div class="btns"><button class="btn" id="cgo2" ${busy||!AI.ready()?"disabled":""}>✦ ${P.board?"Refazer o storyboard do zero":(isDoc(P)?"Criar o storyboard e buscar as imagens":"Criar o storyboard e o elenco")}</button>
-    ${P.board&&st.ok<st.n&&!working?`<button class="btn ghost small" id="cmiss">Gerar os ${st.n-st.ok} que faltam</button>`:""}
-    ${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
+  <p class="lead">${doc?"Estilo documentário.":"Estilo colagem."} Em duas etapas pra você gastar o mínimo: <b>1)</b> a equipe lê o roteiro e lista as imagens que o vídeo precisa, ainda sem gerar nada. <b>2)</b> Pra cada uma você escolhe: buscar grátis na internet, enviar a sua ou gerar com IA.</p>
+  ${aiNote()}
+  <div class="btns"><button class="btn${P.board?" ghost small":""}" id="cgo2" ${busy||!AI.ready()?"disabled":""}>📋 ${P.board?"Refazer a lista do zero":"Criar a lista de imagens (sem gerar nada)"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
   ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>`:""}
   ${ui.imgErr?`<div class="err">${esc(ui.imgErr)}</div>`:""}
-  ${P.board?`<p class="m" style="font-size:12.5px;color:var(--muted)">${st.beats} batidas · ${isDoc(P)?"imagens":"elenco"}: ${st.n} (${st.ok} prontos${st.real?`, ${st.real} imagens reais grátis`:""}${st.bad?`, ${st.bad} com erro`:""}) · toque num elemento pra ver e refazer</p>
-  <div class="scenes">${P.board.assets.map(a=>`<button type="button" class="scene ${P.selAsset===a.id?"cur":""}" data-as="${esc(a.id)}" ${a.img==="ok"?`data-img="${mkey(P.id,"asset",a.id)}"`:""} style="background-color:${tp.bg};background-size:${isDoc(P)?"cover":"contain"}!important;background-repeat:no-repeat;color:${tp.ink}" title="${esc(a.nome)}">
-    <span>${a.own?"📁":(a.real||a.tipo==="real")?"📷":(isDoc(P)?"🎨":"✏️")}</span>${a.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(a.img&&a.img!=="ok"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}<small style="position:absolute;left:4px;right:4px;bottom:2px;font-size:10px;text-shadow:0 0 3px ${tp.bg};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.nome)}</small></button>`).join("")}</div>
-  ${sel?`<div class="card" style="margin-top:10px"><div class="t">${esc(sel.nome)} <span class="tag">${sel.tipo==="real"?"imagem real":"desenho"}</span></div>
-    ${sel.img==="ok"?`<div class="big" data-img="${mkey(P.id,"asset",sel.id)}" style="background-color:${tp.bg};background-size:contain!important;background-repeat:no-repeat"></div>`:""}
+  ${P.board?`
+  <div class="card" style="padding:10px 12px">
+    <div class="t">${st.ok} de ${st.n} imagens prontas <span class="m" style="font-weight:400">· ${st.beats} cenas</span></div>
+    <div class="m" style="font-size:12.5px">${[st.real?`📷 ${st.real} grátis da internet`:"",st.own?`📁 ${st.own} suas`:"",st.ai?`🎨 ${st.ai} geradas com IA`:"",st.nofound?`🔎 ${st.nofound} sem foto livre`:""].filter(Boolean).join(" · ")||"nenhuma ainda"}</div>
+    ${st.pend?`<div class="btns" style="margin-top:8px">
+      <button class="btn small" id="bsearch" ${busy?"disabled":""}>🔎 Buscar ${st.pend} grátis na internet</button>
+      <label class="btn ghost small" style="cursor:pointer">📁 Enviar várias<input type="file" id="bup" accept="image/*" multiple style="display:none"></label>
+      <button class="btn ghost small" id="bai" ${busy||!AI.stageReady("image")?"disabled":""} title="${AI.stageReady("image")?"":"Configure Imagens e capas na Administração"}">🎨 Gerar ${st.pend} com IA</button>
+      <button class="btn ghost small" id="bcopy">📋 Copiar a lista</button></div>
+      <p class="m" style="font-size:12px;margin:6px 0 0">Dica: busque grátis primeiro; só gere com IA o que sobrar. "Enviar várias" preenche os quadrados vazios na ordem.</p>`:""}
+  </div>
+  <div class="scenes">${P.board.assets.map(a=>{ const ok=a.img==="ok"; return `<button type="button" class="scene ${P.selAsset===a.id?"cur":""} ${ok?"":"pend"}" data-as="${esc(a.id)}" ${ok?`data-img="${mkey(P.id,"asset",a.id)}"`:""} style="background-color:${ok?tp.bg:"transparent"};background-size:${doc?"cover":"contain"}!important;background-repeat:no-repeat;color:${ok?tp.ink:"var(--text)"}" title="${esc(a.nome)}">
+    <span>${a.own?"📁":ok?(a.real?"📷":"🎨"):a.img==="nofound"?"🔎":"·"}</span>${a.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(!ok&&a.img&&a.img!=="nofound"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}<small style="position:absolute;left:4px;right:4px;bottom:3px;font-size:10.5px;line-height:1.15;${ok?`text-shadow:0 0 3px #000;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`:"white-space:normal"}">${esc(a.nome)}</small></button>`; }).join("")}</div>
+  ${sel?`<div class="card" style="margin-top:10px"><div class="t">${esc(sel.nome)} ${sel.img==="ok"?`<span class="tag">${sel.own?"sua":sel.real?"grátis da internet":"IA"}</span>`:`<span class="tag">falta</span>`}</div>
+    ${sel.img==="ok"?`<div class="big" data-img="${mkey(P.id,"asset",sel.id)}" style="background-color:${tp.bg};background-size:${doc?"cover":"contain"}!important;background-repeat:no-repeat"></div>`:""}
     ${sel.credit?`<div class="m" style="font-size:12px">${esc(sel.credit)}</div>`:""}
-    ${sel.img&&sel.img!=="ok"&&sel.img!=="wait"?`<div class="err">${esc(sel.img)}</div>`:""}
-    <div class="field" style="margin-top:8px"><label for="adesc">${sel.tipo==="real"?"Busca no Wikimedia Commons":(isDoc(P)?"Descrição da imagem gerada (inglês)":"Descrição do desenho (inglês)")}</label><textarea id="adesc" rows="2">${esc(sel.tipo==="real"?sel.busca:sel.descricao)}</textarea></div>
-    <div class="btns"><button class="btn small" id="aredo" ${busy?"disabled":""}>↻ Refazer</button><label class="btn ghost small" style="cursor:pointer">📁 Enviar imagem minha<input type="file" id="aup" accept="image/*" style="display:none"></label><button class="btn ghost small" id="aswap" ${busy?"disabled":""}>${sel.tipo==="real"?(isDoc(P)?"Gerar com IA":"Trocar por desenho"):"Tentar imagem real"}</button></div></div>`:""}
-  ${P.credits&&P.credits.length?"":""}`:""}
-  <div class="btns"><button class="btn" id="iok" ${!P.board||!st.ok||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Elenco aprovado ✓":"Aprovar e mandar pro Estúdio"}</button></div>`;
+    ${sel.img==="nofound"?`<div class="m" style="font-size:12.5px">Não achei foto livre com essa busca. Mude a busca, envie a sua ou gere com IA.</div>`:(sel.img&&!["ok","wait"].includes(sel.img)?`<div class="err">${esc(sel.img)}</div>`:"")}
+    <div class="field" style="margin-top:8px"><label for="abusca">Busca (em inglês costuma achar mais)</label><input id="abusca" value="${esc(sel.busca||sel.nome)}"></div>
+    <div class="field"><label for="adesc">Se for gerar com IA, descreva a imagem (inglês)</label><textarea id="adesc" rows="2">${esc(sel.descricao||sel.nome)}</textarea></div>
+    <div class="btns"><button class="btn small" id="asearch" ${busy?"disabled":""}>🔎 Buscar grátis</button>
+      <label class="btn ghost small" style="cursor:pointer">📁 Enviar a minha<input type="file" id="aup" accept="image/*" style="display:none"></label>
+      <button class="btn ghost small" id="aai" ${busy||!AI.stageReady("image")?"disabled":""}>🎨 Gerar com IA</button>
+      <a class="btn ghost small" href="${gImg(sel.busca||sel.nome)}" target="_blank" rel="noopener" style="text-decoration:none">🌐 Procurar no Google</a></div>
+    <p class="m" style="font-size:11.5px;margin:6px 0 0">O link do Google já abre filtrado por imagens com licença Creative Commons. Achou? Salve e use "Enviar a minha".</p></div>`:""}
+  `:""}
+  <div class="btns"><button class="btn" id="iok" ${!P.board||!st.ok||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Imagens aprovadas ✓":"Aprovar e mandar pro Estúdio"}</button>${P.board&&st.ok&&st.pend&&!P.done.imagens?`<span class="m" style="font-size:12px">As cenas sem imagem usam a imagem anterior.</span>`:""}</div>`;
+}
+async function saveOwn(P,a,f){
+  let b=await toJpeg(f,0,0,.9); if(!isDoc(P)&&a.tipo!=="real") b=await Collage.cutout(f);
+  await Store.put(mkey(P.id,"asset",a.id),b); Object.assign(a,{img:"ok",real:isDoc(P)||a.tipo==="real",own:true,credit:""}); Cut._R=null;
 }
 function bindColagem(el){
   const P=S.project;
-  el.querySelector("#cgo2").onclick=()=>{ if(P.board&&!confirm("Refazer o storyboard apaga o elenco atual. Continuar?")) return; runColagem(); };
-  const mi=el.querySelector("#cmiss"); if(mi) mi.onclick=()=>drawAssets(P.board.assets.filter(a=>a.img!=="ok").map(a=>a.id));
+  el.querySelector("#cgo2").onclick=()=>{ if(P.board&&!confirm("Refazer a lista apaga as imagens atuais. Continuar?")) return; runColagem(); };
+  const pend=()=>P.board.assets.filter(a=>a.img!=="ok").map(a=>a.id);
+  const bs=el.querySelector("#bsearch"); if(bs) bs.onclick=()=>drawAssets(pend(),"search");
+  const ba=el.querySelector("#bai"); if(ba) ba.onclick=()=>{ const n=pend().length; if(confirm(`Gerar ${n} imagem${n>1?"ns":""} com IA? Cada uma é uma chamada paga (ou da cota grátis).`)) drawAssets(pend(),"ai"); };
+  const bc=el.querySelector("#bcopy"); if(bc) bc.onclick=()=>navigator.clipboard?.writeText(P.board.assets.filter(a=>a.img!=="ok").map((a,i)=>`${i+1}. ${a.nome} — busca: ${a.busca||a.nome}`).join("\n")).then(()=>toast("Lista copiada"),()=>toast("Não deu pra copiar"));
+  const bu=el.querySelector("#bup"); if(bu) bu.onchange=async e=>{ const fs=[...e.target.files], ids=pend(); let n=0; for(const f of fs){ const id=ids[n]; if(!id) break; await saveOwn(P,P.board.assets.find(a=>a.id===id),f); n++; } save(); toast(`${n} imagem${n>1?"ns":""} sua${n>1?"s":""} colocada${n>1?"s":""}`); renderPanel(); };
   el.querySelectorAll("[data-as]").forEach(b=>b.onclick=()=>{ P.selAsset=P.selAsset===b.dataset.as?null:b.dataset.as; save(); renderPanel(); });
   const sel=P.board&&P.board.assets.find(a=>a.id===P.selAsset);
-  const ad=el.querySelector("#adesc"); if(ad&&sel) ad.oninput=()=>{ if(sel.tipo==="real") sel.busca=ad.value; else sel.descricao=ad.value; save(); };
-  const rd=el.querySelector("#aredo"); if(rd) rd.onclick=()=>{ P.done.imagens=false; drawAssets([sel.id]); };
-  const up=el.querySelector("#aup"); if(up) up.onchange=async e=>{ const f=e.target.files[0]; if(!f) return;
-    let b=await toJpeg(f,0,0,.9); if(!isDoc(P)&&!sel.real) b=await Collage.cutout(f);
-    await Store.put(mkey(P.id,"asset",sel.id),b); Object.assign(sel,{img:"ok",real:isDoc(P),own:true,credit:""}); Cut._R=null; save(); toast("Imagem trocada pela sua"); renderPanel(); };
-  const sw=el.querySelector("#aswap"); if(sw) sw.onclick=()=>{ sel.tipo=sel.tipo==="real"?(isDoc(P)?"ia":"desenho"):"real"; if(isDoc(P)&&sel.tipo==="ia"&&!sel.descricao) sel.descricao=sel.nome; if(sel.tipo==="real"&&!sel.busca) sel.busca=sel.nome; if(sel.tipo==="desenho"&&!sel.descricao) sel.descricao=sel.nome; P.done.imagens=false; drawAssets([sel.id]); };
-  el.querySelector("#iok").onclick=()=>{ P.done.imagens=true; save(); courier("imagens","narracao"); toast("Elenco aprovado"); renderProd(); openPanel("narracao"); };
+  if(sel){
+    const ab=el.querySelector("#abusca"); ab.oninput=()=>{ sel.busca=ab.value; save(); const g=el.querySelector('a[href*="google.com/search"]'); if(g) g.href=gImg(ab.value); };
+    const ad=el.querySelector("#adesc"); ad.oninput=()=>{ sel.descricao=ad.value; save(); };
+    el.querySelector("#asearch").onclick=()=>{ P.done.imagens=false; drawAssets([sel.id],"search"); };
+    el.querySelector("#aai").onclick=()=>{ P.done.imagens=false; drawAssets([sel.id],"ai"); };
+    el.querySelector("#aup").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await saveOwn(P,sel,f); save(); toast("Imagem colocada"); renderPanel(); };
+  }
+  el.querySelector("#iok").onclick=()=>{ P.done.imagens=true; save(); courier("imagens","narracao"); toast("Imagens aprovadas"); renderProd(); openPanel("narracao"); };
   paintImgs(el);
 }
 async function runColagem(){
@@ -667,7 +690,7 @@ async function runColagem(){
       P.board={kind:"doc",assets,beats}; P.scenes=beats.map(b=>({trecho:b.trecho,prompt:b.tipo,img:"ok"})); save();
     }catch(e){ ui.imgErr=errMsg(e)||e.message; clearBusy(); return renderPanel(); }
     clearBusy();
-    return drawAssets(P.board.assets.filter(a=>a.img!=="ok").map(a=>a.id));
+    return renderPanel();
   }
   try{
     const r=await ask(Collage.storyboardPrompt(P,{maxAssets:isShort?10:Math.min(45,Math.round(dur*3.2)),beats:isShort?18:Math.round(dur*14),isShort,battle:isBattle(P),
@@ -681,11 +704,13 @@ async function runColagem(){
     P.board={assets,beats}; P.scenes=beats.map(b=>({trecho:b.trecho,prompt:b.elementos.join(","),img:"ok"})); save();
   }catch(e){ ui.imgErr=errMsg(e)||e.message; clearBusy(); return renderPanel(); }
   clearBusy();
-  await drawAssets(P.board.assets.filter(a=>a.img!=="ok").map(a=>a.id));
+  renderPanel();
 }
-async function drawAssets(ids){
+// mode: "search" (só internet, grátis) · "ai" (só IA) · "auto" (internet e, se não achar, IA — usado pelo piloto)
+async function drawAssets(ids,mode="auto"){
   const P=S.project; if(!ids.length) return renderPanel(); ui.imgErr=null;
-  setBusy("imagens",`criando o elenco: 0 de ${ids.length}`);
+  const doc=P.board.kind==="doc", verb=mode==="search"?"buscando na internet":mode==="ai"?"gerando com IA":"buscando e criando";
+  setBusy("imagens",`${verb}: 0 de ${ids.length}`);
   const A=id=>P.board.assets.find(a=>a.id===id);
   ids.forEach(id=>{ A(id).img="wait"; }); renderPanel();
   let done=0;
@@ -693,33 +718,34 @@ async function drawAssets(ids){
     const a=A(id);
     try{
       let blob=null;
-      if(P.board.kind==="doc"){
-        if(a.tipo==="real"){
-          const r=await Collage.findReal(a.busca||a.nome,a.nome,1920);
-          if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; }
-          else { a.tipo="ia"; a.auto=true; a.estilo=a.estilo||"reconstrucao"; a.descricao=a.descricao||`${a.busca||a.nome}. If a person appears, show an anonymous figure (from behind, silhouette or in shadow) with no recognizable face.`; }
-        }
+      const canSearch=doc||a.tipo==="real";
+      if(mode!=="ai"&&canSearch){
+        const r=await Collage.findReal(a.busca||a.nome,a.nome,doc?1920:1280);
+        if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; a.own=false; }
+      }
+      if(!blob&&mode==="search"){ a.img="nofound"; }
+      else {
         if(!blob){
-          if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas na Administração pra gerar as reconstruções."};
-          const raw=await AI.image(`${Doc.STYLE[a.estilo]||Doc.STYLE.reconstrucao} Scene: ${a.descricao||a.nome}.`,{aspect:"16:9",signal:busy.ctl.signal});
-          blob=await toJpeg(raw,0,0,.9); a.real=false; a.credit="";
+          if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas na Administração pra gerar com IA."};
+          if(doc){
+            const desc=a.descricao&&a.descricao!==a.nome?a.descricao:`${a.busca||a.nome}. If a person appears, show an anonymous figure (from behind, silhouette or in shadow) with no recognizable face.`;
+            const raw=await AI.image(`${Doc.STYLE[a.estilo]||Doc.STYLE.reconstrucao} Scene: ${desc}.`,{aspect:"16:9",signal:busy.ctl.signal});
+            blob=await toJpeg(raw,0,0,.9);
+          } else {
+            const raw=await AI.image(`${Collage.DRAW_STYLE} Subject: ${a.descricao||a.nome}.`,{aspect:"3:4",signal:busy.ctl.signal});
+            blob=await Collage.cutout(raw);
+          }
+          a.real=false; a.own=false; a.credit="";
         }
-        await Store.put(mkey(P.id,"asset",a.id),blob); a.img="ok";
-        done++; setAction(`buscando e criando as imagens: ${done} de ${ids.length}`); save(); renderPanel(); return;
+        await Store.put(mkey(P.id,"asset",a.id),blob); a.img="ok"; Cut._R=null;
       }
-      if(a.tipo==="real"){ const r=await Collage.findReal(a.busca||a.nome,a.nome); if(r){ blob=await toJpeg(r.blob,0,0,.9); a.credit=r.credit; a.real=true; } else { a.tipo="desenho"; a.descricao=a.descricao||a.nome; } }
-      if(!blob){
-        if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas na Administração pra desenhar os elementos."};
-        const raw=await AI.image(`${Collage.DRAW_STYLE} Subject: ${a.descricao||a.nome}.`,{aspect:"3:4",signal:busy.ctl.signal});
-        blob=await Collage.cutout(raw); a.real=false; a.credit="";
-      }
-      await Store.put(mkey(P.id,"asset",a.id),blob); a.img="ok";
     }catch(e){ if(e.code==="cancelled"){ a.img=null; throw e; } a.img=e.message||"Falhou"; if(e.code==="rate_limited"||e.code==="overloaded") throw e; }
-    done++; setAction(`criando o elenco: ${done} de ${ids.length}`); save(); renderPanel();
+    done++; setAction(`${verb}: ${done} de ${ids.length}`); save(); renderPanel();
   });
-  await imagePool(jobs,2);
+  await imagePool(jobs,mode==="search"?3:2);
   P.board.assets.forEach(a=>{ if(a.img==="wait") a.img=null; });
-  const bad=P.board.assets.find(a=>a.img&&a.img!=="ok"); if(bad) ui.imgErr=bad.img;
+  const bad=P.board.assets.find(a=>a.img&&!["ok","nofound"].includes(a.img)); if(bad) ui.imgErr=bad.img;
+  if(mode==="search"){ const nf=ids.filter(id=>A(id).img==="nofound").length; toast(nf?`Achei ${ids.length-nf} de ${ids.length}. ${nf} sem foto livre: envie a sua ou gere com IA.`:`Achei as ${ids.length} grátis!`); }
   save(); clearBusy(); renderPanel();
 }
 function creditsText(P){ const A=(P.board&&P.board.assets)||[], c=A.filter(a=>a.real&&a.credit).map(a=>"• "+a.credit); const ia=P.board&&P.board.kind==="doc"&&A.some(a=>a.img==="ok"&&!a.real);

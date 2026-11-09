@@ -106,7 +106,7 @@ async function apImagens() {
   await walk("imagens", "indo pro Prédio das Imagens");
   if (isColagem(P)) {
     if (!P.board) { await attempt("Storyboard", () => runColagem(), () => !!P.board); apLog("Imagens", `storyboard com ${P.board.beats.length} batidas e elenco de ${P.board.assets.length}`, "ok"); }
-    for (let t = 0; t < 2 && P.board.assets.some(a => a.img !== "ok"); t++) { apCheck(); await drawAssets(P.board.assets.filter(a => a.img !== "ok").map(a => a.id)); }
+    for (let t = 0; t < 2 && P.board.assets.some(a => a.img !== "ok"); t++) { apCheck(); await drawAssets(P.board.assets.filter(a => a.img !== "ok").map(a => a.id), "auto"); }
     const st = boardStats(P);
     if (!st.ok) throw { code: "stage", message: "Imagens: nenhum elemento do elenco foi criado. " + (ui.imgErr || "") };
     P.done.imagens = true; save(); renderProd();
