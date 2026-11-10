@@ -1035,7 +1035,7 @@ async function runNarracao(onlyFailed){
 const RES=["1080p","720p"];
 let cutPrev=null;
 function fmtT(s){ s=Math.max(0,s); return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`; }
-function cutOpts(P){ const m=P.kind!=="short"&&P.idea&&P.idea.mural&&P.idea.mural.on?P.idea.mural:null; return {template:P.template,captions:P.captions,res:P.res||"1080p",mural:m,ink:isDoc(P)?"doc":"plain"}; }
+function cutOpts(P){ const m=P.idea&&P.idea.mural&&P.idea.mural.on?P.idea.mural:null; return {template:P.template,captions:P.captions,res:P.res||"1080p",mural:m,ink:isDoc(P)?"doc":"plain"}; }
 // o plano do criador (ideia central + começo, meio e fim) entra em cada bloco do roteiro
 function planoCriador(P,i,n){
   const I=P.idea||{}, last=i===n-1, first=i===0, mid=!first&&!last;
@@ -1056,8 +1056,8 @@ VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem";
   <h3>Trilha</h3>${pills("mood",[...Object.keys(Sound.MOODS),"Sem trilha"],(P.sound||{}).custom?"":((P.sound||{}).mood||"Sem trilha"))}
   <div class="btns" style="margin-top:6px"><label class="btn ghost small" style="cursor:pointer">🎵 ${(P.sound||{}).custom?"Trocar a minha música":"Usar uma música minha (mp3)"}<input type="file" id="mfile" accept="audio/*" style="display:none"></label>${(P.sound||{}).custom?`<span class="tag gold">usando a sua música</span><button class="btn ghost small" id="mfilex">tirar</button>`:""}</div>
   <p class="m" style="font-size:12px;color:var(--muted)">As trilhas prontas são criadas aqui mesmo, sem direitos autorais. Se usar uma música sua, prefira a Biblioteca de Áudio do YouTube.</p>
-  ${P.kind!=="short"?`<h3>Mural de inscritos (final do vídeo)</h3>
-  <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="mmural" ${P.idea&&P.idea.mural&&P.idea.mural.on?"checked":""}> Terminar com uma tela preta com os nomes dos inscritos (6 s)</label>
+  ${true?`<h3>Mural de inscritos (depois do fim do vídeo)</h3>
+  <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="mmural" ${P.idea&&P.idea.mural&&P.idea.mural.on?"checked":""}> Depois que o conteúdo termina, mostrar 6 s de tela preta com os nomes dos inscritos${P.kind==="short"?" (o Short fica com ~1 min de conteúdo + 6 s de mural)":""}</label>
   ${P.idea&&P.idea.mural&&P.idea.mural.on?`<div class="field"><textarea id="mnomes" rows="3" placeholder="Um nome por linha (sem nomes aparece “Seu nome pode aparecer aqui”)">${esc((P.idea.mural.nomes||[]).join("\n"))}</textarea></div>`:""}`:""}
   <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:6px 0"><input type="checkbox" id="msfx" ${(P.sound||{}).sfx!==false?"checked":""}> Efeitos sonoros nas transições (whoosh, impacto, clique)</label>
   <h3>Legendas</h3>${pills("cap",CAPTIONS,P.captions)}

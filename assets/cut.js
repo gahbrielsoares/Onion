@@ -157,7 +157,7 @@ const Cut = (() => {
     const env = envelope(audio, Math.max(480, Math.floor(audio.length / 240))); const mx = Math.max(...env) || 1;
     const wave = Array.from(env).map(v => v / mx);
     // trilha e efeitos sonoros
-    const END = (P.kind !== "short" && P.idea && P.idea.mural && P.idea.mural.on) ? 6 : 0;
+    const END = (P.idea && P.idea.mural && P.idea.mural.on) ? 6 : 0;
     const voiceEnd = END ? Voice.concat([audio, new Float32Array(Math.floor(END * SR))]) : audio;
     let mixed = voiceEnd; const snd = P.sound || {};
     if (snd.mood !== "Sem trilha" || snd.sfx) {
@@ -204,13 +204,15 @@ const Cut = (() => {
     g.save(); g.globalAlpha = card ? 1 : q * .82; g.fillStyle = "#000000"; g.fillRect(0, 0, W, H); g.globalAlpha = q;
     g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = doc ? "#E3A93C" : "#ffffff";
     g.font = `${doc ? "700" : "800"} ${Math.round(52 * S2)}px ${doc ? "Cinzel, Georgia, serif" : "Figtree, Arial, sans-serif"}`;
-    g.fillText(nomes.length ? "OBRIGADO AOS NOVOS INSCRITOS" : "SEU NOME PODE APARECER AQUI", W / 2, H * .2);
+    const portrait = H > W;
+    if (portrait) { g.font = `${doc ? "700" : "800"} ${Math.round(64 * S2)}px ${doc ? "Cinzel, Georgia, serif" : "Figtree, Arial, sans-serif"}`; g.fillText(nomes.length ? "OBRIGADO AOS" : "SEU NOME PODE", W / 2, H * .24); g.fillText(nomes.length ? "NOVOS INSCRITOS" : "APARECER AQUI", W / 2, H * .24 + 78 * S2); }
+    else g.fillText(nomes.length ? "OBRIGADO AOS NOVOS INSCRITOS" : "SEU NOME PODE APARECER AQUI", W / 2, H * .2);
     g.font = `600 ${Math.round(30 * S2)}px Figtree, Arial, sans-serif`; g.fillStyle = "#d8d3c8";
-    if (!nomes.length) g.fillText("Inscreva-se e apareça no mural do próximo vídeo", W / 2, H * .3);
-    const cols = W > H ? 3 : 2, rows = Math.ceil(nomes.length / cols), lh = 54 * S2;
+    if (!nomes.length) g.fillText("Inscreva-se e apareça no mural do próximo vídeo", W / 2, H * (portrait ? .36 : .3));
+    const cols = W > H ? 3 : (nomes.length > 9 ? 2 : 1), rows = Math.ceil(nomes.length / cols), lh = (portrait ? 72 : 54) * S2;
     nomes.forEach((n, k) => {
       const c = k % cols, r = Math.floor(k / cols), d = Math.min(1, Math.max(0, (t - start - .5 - k * .12) / .4));
-      g.globalAlpha = q * d; g.font = `700 ${Math.round(36 * S2)}px Figtree, Arial, sans-serif`; g.fillStyle = "#ffffff";
+      g.globalAlpha = q * d; g.font = `700 ${Math.round((portrait ? 46 : 36) * S2)}px Figtree, Arial, sans-serif`; g.fillStyle = "#ffffff";
       g.fillText(n, W * (c + .5) / cols, H * .52 + (r - (rows - 1) / 2) * lh + (1 - d) * 14 * S2);
     });
     g.restore(); g.textAlign = "start"; g.textBaseline = "alphabetic";
