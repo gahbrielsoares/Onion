@@ -195,7 +195,26 @@ const Cut = (() => {
     const fx = (W - dw) / 2 + x * (dw - W) * .9, fy = (H - dh) / 2 + y * (dh - H) * .9;
     g.drawImage(bmp, fx, fy, dw, dh);
   }
-  function frame(g, t, R, o) {
+  // mural de inscritos nos últimos segundos
+  function mural(g, t, R, o) {
+    const { W, H } = o, start = R.dur - 7; if (t < start) return;
+    const q = Math.min(1, (t - start) / .8), nomes = (o.mural.nomes || []).slice(0, 18), S2 = Math.min(W, H) / 1080, doc = o.ink === "doc";
+    g.save(); g.globalAlpha = q * .82; g.fillStyle = "#0b0d12"; g.fillRect(0, 0, W, H); g.globalAlpha = q;
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = doc ? "#E3A93C" : "#ffffff";
+    g.font = `${doc ? "700" : "800"} ${Math.round(52 * S2)}px ${doc ? "Cinzel, Georgia, serif" : "Figtree, Arial, sans-serif"}`;
+    g.fillText(nomes.length ? "OBRIGADO AOS NOVOS INSCRITOS" : "SEU NOME PODE APARECER AQUI", W / 2, H * .2);
+    g.font = `600 ${Math.round(30 * S2)}px Figtree, Arial, sans-serif`; g.fillStyle = "#d8d3c8";
+    if (!nomes.length) g.fillText("Inscreva-se e apareça no mural do próximo vídeo", W / 2, H * .3);
+    const cols = W > H ? 3 : 2, rows = Math.ceil(nomes.length / cols), lh = 54 * S2;
+    nomes.forEach((n, k) => {
+      const c = k % cols, r = Math.floor(k / cols), d = Math.min(1, Math.max(0, (t - start - .5 - k * .12) / .4));
+      g.globalAlpha = q * d; g.font = `700 ${Math.round(36 * S2)}px Figtree, Arial, sans-serif`; g.fillStyle = "#ffffff";
+      g.fillText(n, W * (c + .5) / cols, H * .42 + (r - (rows - 1) / 2) * lh + (1 - d) * 14 * S2);
+    });
+    g.restore(); g.textAlign = "start"; g.textBaseline = "alphabetic";
+  }
+  function frame(g, t, R, o) { frame0(g, t, R, o); if (o.mural) mural(g, t, R, o); }
+  function frame0(g, t, R, o) {
     if (R.mode === "doc") { Doc.frame(g, t, R, o); if (o.captions !== "Sem legenda") drawCaption(g, t, R, o); return; }
     if (R.mode === "colagem") { Collage.frame(g, t, R, o); if (o.captions !== "Sem legenda") drawCaption(g, t, R, o); return; }
     const { W, H } = o, tp = TEMPLATES[o.template] || TEMPLATES["Clean"];

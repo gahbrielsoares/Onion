@@ -302,7 +302,9 @@ Responda só com JSON: {"ideias":[...]}`;
 }
 
 /* ---- Ideias ---- */
+function draft(){ if(!S.draft) S.draft={tema:"",ideia:"",comeco:"",meio:"",fim:"",mural:false,nomes:""}; return S.draft; }
 VIEWS.ideias=()=>{
+  const D=draft();
   const c=S.config||{nicho:"Orações",publico:"Americanos 50+",formato:"Motivacional / Discurso",gancho:"História pessoal",voz:"Masculina",duracao:15,idioma:"Inglês"};
   const blocks=Math.max(2,Math.round(c.duracao/5));
   return `
@@ -324,16 +326,26 @@ VIEWS.ideias=()=>{
   <div class="btns"><button class="btn" id="csave">${S.config?"Salvar alterações":"Salvar canal"}</button></div>
   </div></details>
 
-  <h3>Fila de ideias</h3>
-  <div class="field"><label for="ni">Adicionar uma ideia ou título de referência</label><input id="ni" placeholder="Ex.: oração da manhã pra ter um dia abençoado"></div>
-  <div class="btns" style="margin-top:-4px"><button class="btn ghost small" id="nadd">+ Adicionar à fila</button></div>
-  <div style="margin-top:12px">
-  ${S.ideias.length?S.ideias.map(i=>`<div class="card click ${S.selIdea===i.id?"sel":""}" data-pick="${i.id}"><div class="t">${esc(i.tema)}</div>${i.angulo?`<div class="m">${esc(i.angulo)}</div>`:""}<div class="tags"><span class="tag">${esc(i.origem)}</span><button class="tag" style="border:0;cursor:pointer" data-del="${i.id}" aria-label="Remover ideia">remover</button></div></div>`).join(""):`<div class="empty">A fila está vazia. Adicione uma ideia acima ou mande temas do Laboratório de Virais.</div>`}
-  </div>
+  <h3 style="margin-top:18px">Novo vídeo</h3>
   ${S.project?`<div class="note">Já tem um vídeo em produção: “${esc(S.project.title||S.project.idea.tema)}”. Termine ou descarte antes de começar outro. <button class="btn ghost small" id="discard" style="margin-top:6px">Descartar produção atual</button></div>`:""}
-  <div class="field" style="margin-top:12px"><label>Tipo de vídeo</label>${pills("kind",["Casada: longo + Short","Vídeo longo","Short (vertical, ~1 min)"],ui.kind==="short"?"Short (vertical, ~1 min)":ui.kind==="long"?"Vídeo longo":"Casada: longo + Short")}
-  <p class="m" style="font-size:12px;margin:5px 0 0">Casada: cada etapa do vídeo longo já faz a do Short junto. O Short reaproveita as imagens e termina chamando pro vídeo completo.</p></div>
-  <div class="btns"><button class="btn" id="start" ${!S.config||!S.selIdea||S.project?"disabled":""}>Começar produção</button>${!S.config?`<span class="m" style="font-size:12.5px;color:var(--muted)">Salve o canal primeiro</span>`:(!S.selIdea?`<span style="font-size:12.5px;color:var(--muted)">Toque numa ideia pra escolher</span>`:"")}</div>`;
+  <div class="card" style="padding:12px 14px">
+    <div class="field"><label for="dtema">Tema do vídeo</label><input id="dtema" value="${esc(D.tema)}" placeholder="Ex.: como morreram os cangaceiros de Lampião"></div>
+    <div class="field"><label for="dideia">O que você quer passar com esse vídeo</label><textarea id="dideia" rows="2" placeholder="Ex.: mostrar que o fim do cangaço foi mais brutal do que se conta, sem romantizar">${esc(D.ideia)}</textarea></div>
+    <details ${D.comeco||D.meio||D.fim?"open":""} style="margin-top:4px"><summary style="cursor:pointer;font-weight:600;font-size:13.5px">Começo, meio e fim (opcional, a IA segue à risca)</summary>
+      <div class="field" style="margin-top:10px"><label for="dcom">Começo</label><textarea id="dcom" rows="2" placeholder="Ex.: abrir com a cena das cabeças expostas na escadaria, sem explicar ainda">${esc(D.comeco)}</textarea></div>
+      <div class="field"><label for="dmeio">Meio</label><textarea id="dmeio" rows="2" placeholder="Ex.: contar quem traiu o bando e como a volante chegou até a grota">${esc(D.meio)}</textarea></div>
+      <div class="field"><label for="dfim">Fim</label><textarea id="dfim" rows="2" placeholder="Ex.: pedir pra se inscrever e dizer que o nome dos inscritos aparece no final dos próximos vídeos">${esc(D.fim)}</textarea></div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:4px 0"><input type="checkbox" id="dmural" ${D.mural?"checked":""} style="margin-top:3px"> <span>Mostrar o <b>mural de inscritos</b> nos últimos segundos do vídeo</span></label>
+      ${D.mural?`<div class="field"><label for="dnomes">Nomes no mural (um por linha; copie dos inscritos recentes do YouTube Studio)</label><textarea id="dnomes" rows="3" placeholder="Maria S.&#10;João Pedro&#10;Ana Lima">${esc(D.nomes)}</textarea>
+      <div class="m" style="font-size:12px;margin-top:4px">Sem nomes, o mural mostra “Seu nome pode aparecer aqui no próximo vídeo”. Use nomes reais: inventar inscritos engana quem assiste e pode virar denúncia.</div></div>`:""}
+    </details>
+    <div class="field" style="margin-top:10px"><label>Tipo</label>${pills("kind",["Casada: longo + Short","Vídeo longo","Short (vertical, ~1 min)"],ui.kind==="short"?"Short (vertical, ~1 min)":ui.kind==="long"?"Vídeo longo":"Casada: longo + Short")}</div>
+    <div class="btns"><button class="btn" id="start" ${!S.config||!D.tema.trim()||S.project?"disabled":""}>🚀 Começar produção</button><button class="btn ghost small" id="dqueue" ${!D.tema.trim()?"disabled":""}>Guardar na fila pra depois</button>${!S.config?`<span class="m" style="font-size:12.5px;color:var(--muted)">Salve o canal primeiro</span>`:""}</div>
+  </div>
+  ${S.ideias.length?`<details class="card" style="padding:0;margin-top:10px" ${S.ideias.length<6?"open":""}><summary style="padding:12px;cursor:pointer;font-weight:700">Fila de ideias <span class="tag">${S.ideias.length}</span></summary><div style="padding:0 12px 10px">
+    <p class="m" style="font-size:12.5px;margin:0 0 8px">Toque numa ideia pra trazer pro formulário acima.</p>
+    ${S.ideias.map(i=>`<div class="card click" data-pick="${i.id}" style="margin-bottom:6px"><div class="t">${esc(i.tema)}</div>${i.angulo?`<div class="m">${esc(i.angulo)}</div>`:""}<div class="tags"><span class="tag">${esc(i.origem||"Sua ideia")}</span><button class="tag" style="border:0;cursor:pointer" data-del="${i.id}" aria-label="Remover ideia">remover</button></div></div>`).join("")}
+  </div></details>`:""}`;
 };
 BIND.ideias=el=>{
   let lang=(S.config&&S.config.idioma)||"Inglês";
@@ -348,17 +360,25 @@ BIND.ideias=el=>{
   cd.oninput=()=>{ const v=Math.max(10,Math.min(60,+cd.value||15)); el.querySelector("#cdb").textContent=Math.max(2,Math.round(v/5))+" blocos de roteiro"; };
   cd.onchange=autosave;
   el.querySelector("#csave").onclick=()=>{ S.config=readCfg(); save(); toast("Canal salvo · vídeos em "+S.config.idioma); renderPanel(); };
-  const ni=el.querySelector("#ni");
-  const add=()=>{ const v=ni.value.trim(); if(!v) return; const id=Date.now()+Math.random(); S.ideias.unshift({id,tema:v,origem:"Sua ideia"}); S.selIdea=id; save(); renderPanel(); };
-  el.querySelector("#nadd").onclick=add; ni.onkeydown=e=>{ if(e.key==="Enter") add(); };
-  el.querySelectorAll("[data-pick]").forEach(c=>c.onclick=e=>{ if(e.target.dataset.del) return; S.selIdea=+c.dataset.pick; save(); renderPanel(); });
-  el.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ S.ideias=S.ideias.filter(i=>i.id!==+b.dataset.del); if(S.selIdea===+b.dataset.del) S.selIdea=null; save(); renderPanel(); });
+  // formulário do novo vídeo (rascunho salvo a cada tecla)
+  const D=draft();
+  const sync=()=>{ D.tema=el.querySelector("#dtema").value; D.ideia=el.querySelector("#dideia").value; D.comeco=el.querySelector("#dcom").value; D.meio=el.querySelector("#dmeio").value; D.fim=el.querySelector("#dfim").value; const n=el.querySelector("#dnomes"); if(n) D.nomes=n.value; save();
+    const st=el.querySelector("#start"), q=el.querySelector("#dqueue"); if(st) st.disabled=!S.config||!D.tema.trim()||!!S.project; if(q) q.disabled=!D.tema.trim(); };
+  ["#dtema","#dideia","#dcom","#dmeio","#dfim","#dnomes"].forEach(q=>{ const i=el.querySelector(q); if(i) i.oninput=sync; });
+  el.querySelector("#dmural").onchange=e=>{ sync(); D.mural=e.target.checked; save(); renderPanel(); };
+  const toIdea=()=>({id:Date.now()+Math.random(),tema:D.tema.trim(),angulo:D.angulo||"",origem:D.origem||"Sua ideia",intencao:D.ideia.trim(),comeco:D.comeco.trim(),meio:D.meio.trim(),fim:D.fim.trim(),mural:D.mural?{on:true,nomes:D.nomes.split("\n").map(x=>x.trim()).filter(Boolean)}:null});
+  const clearDraft=()=>{ S.draft=null; };
+  el.querySelector("#dqueue").onclick=()=>{ sync(); S.ideias.unshift(toIdea()); clearDraft(); save(); toast("Guardada na fila"); renderPanel(); };
+  el.querySelectorAll("[data-pick]").forEach(c=>c.onclick=e=>{ if(e.target.dataset.del) return; const i=S.ideias.find(x=>x.id===+c.dataset.pick); if(!i) return;
+    S.draft={tema:i.tema||"",ideia:i.intencao||"",comeco:i.comeco||"",meio:i.meio||"",fim:i.fim||"",mural:!!(i.mural&&i.mural.on),nomes:((i.mural&&i.mural.nomes)||[]).join("\n"),angulo:i.angulo||"",origem:i.origem||"",fromId:i.id}; save(); renderPanel(); el.scrollTop=0; });
+  el.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ S.ideias=S.ideias.filter(i=>i.id!==+b.dataset.del); save(); renderPanel(); });
   bindPills(el,"kind",v=>{ ui.kind=/Casada/.test(v)?"combo":/^Short/.test(v)?"short":"long"; });
   const d=el.querySelector("#discard"); if(d) d.onclick=()=>{ if(busy) interrupt(); Store.delPrefix(`p${S.project.id}:`); S.project=null; save(); toast("Produção descartada"); renderPanel(); renderProd(); };
   el.querySelector("#start").onclick=()=>{
-    const idea=S.ideias.find(i=>i.id===S.selIdea); if(!idea) return;
+    sync(); if(!D.tema.trim()) return;
+    const idea=toIdea(); if(D.fromId) S.ideias=S.ideias.filter(i=>i.id!==D.fromId);
     S.project=newProject(idea,ui.kind==="combo"?"long":ui.kind); if((ui.kind||"combo")==="combo") S.project.combo=true;
-    S.ideias=S.ideias.filter(i=>i.id!==idea.id); S.selIdea=null; save();
+    clearDraft(); save();
     courier("ideias","titulos"); toast("Ideia enviada pra Torre dos Títulos"); renderProd(); openPanel("titulos");
   };
 };
@@ -384,7 +404,7 @@ async function runTitulos(){
   const P=S.project; ui.titErr=null; setBusy("titulos","testando ângulos"); renderPanel();
   const prompt=`Você é copywriter sênior de YouTube especializado em canais faceless de alto CTR.
 Canal: ${cfgText()}
-Ideia do vídeo: "${P.idea.tema}"${P.idea.angulo?` (ângulo sugerido: ${P.idea.angulo})`:""}.
+Ideia do vídeo: "${P.idea.tema}"${P.idea.angulo?` (ângulo sugerido: ${P.idea.angulo})`:""}.${P.idea.intencao?` O que o criador quer passar com o vídeo: ${P.idea.intencao}.`:""}
 Crie 10 títulos no idioma ${P.config.idioma}, cada um com ângulo e gatilho emocional diferentes (curiosidade, medo de perder, esperança, alívio, urgência, prova, contraste…). Máximo 80 caracteres. Sem clickbait mentiroso, sem CAPS exagerado, sem emojis. Pense no que faria esse público específico clicar.
 Para cada: "titulo", "angulo" (em português, até 6 palavras), "gatilho" (em português, 1-2 palavras).
 Responda só com JSON: {"titulos":[...]}`;
@@ -481,7 +501,7 @@ async function runRoteiro(){
 Canal: ${cfgText()}
 Título do vídeo: "${P.title}".
 ${P.kind==="short"?`Escreva o roteiro do short, com cerca de ${words} palavras`:`Escreva o bloco ${i+1} de ${n} do roteiro, com cerca de ${words} palavras`}, no idioma ${P.config.idioma}.
-${role}
+${role}${planoCriador(P,i,n)}
 Regras: escreva SÓ o texto que o narrador vai ler, em parágrafos, sem títulos, marcações, colchetes, emojis ou indicações de cena. Tom humano e específico ao público (${P.config.publico}). Proibido abertura genérica tipo "Olá pessoal" ou "neste vídeo vamos". Frases de tamanhos variados, boas pra ouvir em voz alta.
 ${P.seedScript&&P.kind!=="short"?`\nEste vídeo longo aprofunda um Short já publicado do canal sobre o mesmo assunto. Mantenha os fatos e o tom dele e vá muito além (contexto, detalhes, personagens, consequências):\n"""${P.seedScript.slice(0,3000)}"""`:""}
 ${prev?`\nRoteiro até aqui (continue a partir dele sem repetir):\n"""${prev.slice(-6000)}"""`:""}`;
@@ -731,31 +751,50 @@ function colagemView0(){
     <div class="t">${st.ok} de ${st.n} imagens prontas <span class="m" style="font-weight:400">· ${st.beats} cenas</span></div>
     <div class="m" style="font-size:12.5px">${[st.real?`📷 ${st.real} grátis da internet`:"",st.own?`📁 ${st.own} suas`:"",st.ai?`🎨 ${st.ai} geradas com IA`:"",st.nofound?`🔎 ${st.nofound} sem foto livre`:""].filter(Boolean).join(" · ")||"nenhuma ainda"}</div>
     ${st.pend?`<div class="btns" style="margin-top:8px">
-      <button class="btn small" id="bsearch" ${busy?"disabled":""}>🔎 Buscar ${st.pend} grátis na internet</button>
-      <label class="btn ghost small" style="cursor:pointer">📁 Enviar várias<input type="file" id="bup" accept="image/*" multiple style="display:none"></label>
-      <button class="btn ghost small" id="bai" ${busy||!AI.stageReady("image")?"disabled":""} title="${AI.stageReady("image")?"":"Configure Imagens e capas na Administração"}">🎨 Gerar ${st.pend} com IA</button>
-      <button class="btn ghost small" id="bcopy">📋 Copiar a lista</button></div>
-      <p class="m" style="font-size:12px;margin:6px 0 0">Dica: busque grátis primeiro; só gere com IA o que sobrar. Pelo Google é rápido: toque num quadrado, clique em 🌐 Procurar no Google, copie a imagem (botão direito › Copiar imagem) e aperte <b>Ctrl+V</b> aqui.</p>`:""}
+      <button class="btn small" id="bsearch" ${busy?"disabled":""}>🔎 Buscar ${st.pend} grátis</button>
+      <button class="btn ghost small" id="bai" ${busy||!AI.stageReady("image")?"disabled":""} title="${AI.stageReady("image")?"":"Configure Imagens e capas na Administração"}">🎨 Gerar ${st.pend} pela API (pago)</button></div>
+      <p class="m" style="font-size:12px;margin:6px 0 0">Pra trocar ou preencher uma imagem: toque no quadrado e use 🌐 Google ou ✨ Gemini, depois Ctrl+V. · <label style="cursor:pointer;color:var(--accent)">enviar várias do computador<input type="file" id="bup" accept="image/*" multiple style="display:none"></label> · <a href="#" id="bcopy" style="color:var(--accent)">copiar a lista</a></p>`:""}
   </div>
   <div class="scenes">${P.board.assets.map(a=>{ const ok=a.img==="ok"; return `<button type="button" class="scene ${P.selAsset===a.id?"cur":""} ${ok?"":"pend"}" data-as="${esc(a.id)}" ${ok?`data-img="${mkey(P.id,"asset",a.id)}"`:""} style="background-color:${ok?tp.bg:"transparent"};background-size:${doc?"cover":"contain"}!important;background-repeat:no-repeat;color:${ok?tp.ink:"var(--text)"}" title="${esc(a.nome)}">
     <span>${a.own?"📁":ok?(a.real?"📷":"🎨"):a.img==="nofound"?"🔎":"·"}</span>${a.img==="wait"?`<i class="spin" style="margin:auto"></i>`:(!ok&&a.img&&a.img!=="nofound"?`<b style="margin:auto;color:var(--danger)">!</b>`:"")}<small style="position:absolute;left:4px;right:4px;bottom:3px;font-size:10.5px;line-height:1.15;${ok?`text-shadow:0 0 3px #000;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`:"white-space:normal"}">${esc(a.nome)}</small></button>`; }).join("")}</div>
   ${sel?`<div class="card" style="margin-top:10px"><div class="t">${esc(sel.nome)} ${sel.img==="ok"?`<span class="tag">${sel.own?"sua":sel.real?"grátis da internet":"IA"}</span>`:`<span class="tag">falta</span>`}</div>
     ${sel.img==="ok"?`<div class="big" data-img="${mkey(P.id,"asset",sel.id)}" style="background-color:${tp.bg};background-size:${doc?"cover":"contain"}!important;background-repeat:no-repeat"></div>`:""}
     ${sel.credit?`<div class="m" style="font-size:12px">${esc(sel.credit)}</div>`:""}
-    ${sel.img==="nofound"?`<div class="m" style="font-size:12.5px">Não achei foto livre com essa busca. Mude a busca, envie a sua ou gere com IA.</div>`:(sel.img&&!["ok","wait"].includes(sel.img)?`<div class="err">${esc(sel.img)}</div>`:"")}
-    <div class="field" style="margin-top:8px"><label for="abusca">Busca (em inglês costuma achar mais)</label><input id="abusca" value="${esc(sel.busca||sel.nome)}"></div>
-    <div class="field"><label for="adesc">Se for gerar com IA, descreva a imagem (inglês)</label><textarea id="adesc" rows="2">${esc(sel.descricao||sel.nome)}</textarea></div>
-    <div class="btns"><button class="btn small" id="asearch" ${busy?"disabled":""}>🔎 Buscar grátis</button>
-      <label class="btn ghost small" style="cursor:pointer">📁 Enviar a minha<input type="file" id="aup" accept="image/*" style="display:none"></label>
-      <button class="btn ghost small" id="aai" ${busy||!AI.stageReady("image")?"disabled":""}>🎨 Gerar com IA</button>
-      <a class="btn ghost small" href="${gImg(sel.busca||sel.nome)}" target="_blank" rel="noopener" style="text-decoration:none">🌐 Procurar no Google</a></div>
-    <p class="m" style="font-size:11.5px;margin:6px 0 0">No Google: botão direito na imagem › <b>Copiar imagem</b>. Volte aqui e aperte <b>Ctrl+V</b>: ela entra neste quadrado e o próximo já fica selecionado. Também dá pra arrastar um arquivo pro quadrado.</p></div>`:""}
+    ${sel.img==="nofound"?`<div class="m" style="font-size:12.5px">Não achei foto livre. Pesquise no Google ou crie no Gemini e cole aqui.</div>`:(sel.img&&!["ok","wait"].includes(sel.img)?`<div class="err">${esc(sel.img)}</div>`:"")}
+    <div id="pastezone" tabindex="0" style="margin-top:8px;border:2px dashed var(--line);border-radius:12px;padding:14px;text-align:center;cursor:text"><b>📋 Cole a imagem aqui: Ctrl+V</b><div class="m" style="font-size:12px">ou arraste um arquivo · vale imagem copiada do Google ou do Gemini</div></div>
+    <div class="btns" style="margin-top:8px"><a class="btn small" href="${gImg(sel.busca||sel.nome)}" target="_blank" rel="noopener" style="text-decoration:none" id="agoogle">🌐 Pesquisar no Google</a>
+      <button class="btn small" id="agemini">✨ Criar no Gemini</button></div>
+    <div class="field" style="margin-top:10px"><label for="aurl">Endereço da imagem (no Google: botão direito › Copiar endereço da imagem)</label>
+      <div style="display:flex;gap:6px"><input id="aurl" placeholder="https://… ou data:image/…"><button class="btn ghost small" id="aurlgo">Trazer</button></div></div>
+    <details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;font-weight:600">Mais opções</summary>
+      <div class="field" style="margin-top:8px"><label for="abusca">Busca (curta funciona melhor)</label><input id="abusca" value="${esc(sel.busca||sel.nome)}"></div>
+      <div class="field"><label for="adesc">Descrição pra gerar com IA</label><textarea id="adesc" rows="2">${esc(sel.descricao||sel.nome)}</textarea></div>
+      <div class="btns"><button class="btn ghost small" id="asearch" ${busy?"disabled":""}>🔎 Buscar grátis nos bancos</button>
+        <button class="btn ghost small" id="aai" ${busy||!AI.stageReady("image")?"disabled":""}>🎨 Gerar pela API (pago)</button>
+        <label class="btn ghost small" style="cursor:pointer">📁 Arquivo<input type="file" id="aup" accept="image/*" style="display:none"></label></div>
+    </details></div>`:""}
   `:""}
   <div class="btns"><button class="btn" id="iok" ${!P.board||!st.ok||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Imagens aprovadas ✓":"Aprovar e mandar pro Estúdio"}</button>${P.board&&st.ok&&st.pend&&!P.done.imagens?`<span class="m" style="font-size:12px">As cenas sem imagem usam a imagem anterior.</span>`:""}</div>`;
 }
 async function saveOwn(P,a,f){
   let b=await toJpeg(f,0,0,.9); if(!isDoc(P)&&a.tipo!=="real") b=await Collage.cutout(f);
   await Store.put(mkey(P.id,"asset",a.id),b); Object.assign(a,{img:"ok",real:isDoc(P)||a.tipo==="real",own:true,credit:""}); Cut._R=null;
+}
+// traz uma imagem a partir do endereço: direto, ou por um repassador de imagens quando o site bloqueia
+async function fetchImageURL(u){
+  if(/^data:image\//.test(u)){ const r=await fetch(u); return await r.blob(); }
+  if(!/^https?:\/\//.test(u)) throw {message:"Isso não parece um endereço de imagem. No Google: botão direito na imagem › Copiar endereço da imagem."};
+  const tryGet=async url=>{ const r=await fetch(url); if(!r.ok) throw 0; const b=await r.blob(); if(!/^image\//.test(b.type)||b.size<2000) throw 0; return b; };
+  try{ return await tryGet(u); }catch(e){}
+  try{ return await tryGet("https://wsrv.nl/?url="+encodeURIComponent(u)+"&w=1920&output=jpg&q=90"); }catch(e){}
+  throw {message:"Esse site não deixa baixar a imagem. Use botão direito › Copiar imagem e cole aqui com Ctrl+V."};
+}
+// pedido pronto pra colar no Gemini (app grátis), no estilo do vídeo
+function geminiPrompt(P,a){
+  const doc=isDoc(P), d=(a.descricao&&a.descricao!==a.nome?a.descricao:"")||a.busca||"";
+  const estilo=doc?(a.estilo==="diagrama"?"diagrama 3D isométrico em corte, render branco tipo argila sobre fundo cinza claro, estilo ilustração técnica":a.estilo==="objeto"?"foto de estúdio de um único objeto histórico sobre fundo escuro neutro, luz lateral dramática":"reconstrução histórica cinematográfica, luz dramática, cores dessaturadas, aparência fotográfica de documentário")
+    :"ilustração editorial 2D plana, contornos escuros, cores suaves com sombreado leve, um único elemento inteiro e centralizado, fundo branco liso, sem sombra";
+  return `Crie uma imagem de: ${a.nome}.${d?" Detalhes: "+d+".":""} Estilo: ${estilo}. Formato ${doc?"horizontal 16:9":"vertical 3:4"}. Sem texto, sem legendas e sem marca d'água.${doc?" Se aparecer uma pessoa real, não reproduza o rosto dela.":""}`;
 }
 // colar (Ctrl+V) uma imagem copiada do Google: entra no quadrado selecionado (ou no primeiro vazio) e já seleciona o próximo
 async function pasteToBoard(file){
@@ -779,7 +818,7 @@ function bindColagem(el){
   const pend=()=>P.board.assets.filter(a=>a.img!=="ok").map(a=>a.id);
   const bs=el.querySelector("#bsearch"); if(bs) bs.onclick=()=>drawAssets(pend(),"search");
   const ba=el.querySelector("#bai"); if(ba) ba.onclick=()=>{ const n=pend().length; if(confirm(`Gerar ${n} imagem${n>1?"ns":""} com IA? Cada uma é uma chamada paga (ou da cota grátis).`)) drawAssets(pend(),"ai"); };
-  const bc=el.querySelector("#bcopy"); if(bc) bc.onclick=()=>navigator.clipboard?.writeText(P.board.assets.filter(a=>a.img!=="ok").map((a,i)=>`${i+1}. ${a.nome} — busca: ${a.busca||a.nome}`).join("\n")).then(()=>toast("Lista copiada"),()=>toast("Não deu pra copiar"));
+  const bc=el.querySelector("#bcopy"); if(bc) bc.onclick=e=>{ e.preventDefault(); navigator.clipboard?.writeText(P.board.assets.filter(a=>a.img!=="ok").map((a,i)=>`${i+1}. ${a.nome} — busca: ${a.busca||a.nome}`).join("\n")).then(()=>toast("Lista copiada"),()=>toast("Não deu pra copiar")); };
   const bu=el.querySelector("#bup"); if(bu) bu.onchange=async e=>{ const fs=[...e.target.files], ids=pend(); let n=0; for(const f of fs){ const id=ids[n]; if(!id) break; await saveOwn(P,P.board.assets.find(a=>a.id===id),f); n++; } save(); toast(`${n} imagem${n>1?"ns":""} sua${n>1?"s":""} colocada${n>1?"s":""}`); renderPanel(); };
   el.querySelectorAll("[data-as]").forEach(b=>b.onclick=()=>{ P.selAsset=P.selAsset===b.dataset.as?null:b.dataset.as; save(); renderPanel(); });
   const sel=P.board&&P.board.assets.find(a=>a.id===P.selAsset);
@@ -789,6 +828,16 @@ function bindColagem(el){
     el.querySelector("#asearch").onclick=()=>{ P.done.imagens=false; drawAssets([sel.id],"search"); };
     el.querySelector("#aai").onclick=()=>{ P.done.imagens=false; drawAssets([sel.id],"ai"); };
     el.querySelector("#aup").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await saveOwn(P,sel,f); save(); toast("Imagem colocada"); renderPanel(); };
+    el.querySelector("#agemini").onclick=async()=>{ const txt=geminiPrompt(P,sel); let ok=true; try{ await navigator.clipboard.writeText(txt); }catch(e){ ok=false; }
+      window.open("https://gemini.google.com/app","_blank","noopener");
+      toast(ok?"Pedido copiado! No Gemini: Ctrl+V e Enter. Depois copie a imagem e cole aqui com Ctrl+V.":"Abri o Gemini. Copie o pedido em Mais opções › Descrição."); };
+    const go=async()=>{ const u=el.querySelector("#aurl").value.trim(); if(!u) return; const b=el.querySelector("#aurlgo"); b.disabled=true; b.innerHTML=`<span class="spin"></span>`;
+      try{ const f=await fetchImageURL(u); P.selAsset=sel.id; await pasteToBoard(f); }catch(e){ toast(e.message||"Não consegui trazer essa imagem"); b.disabled=false; b.textContent="Trazer"; } };
+    el.querySelector("#aurlgo").onclick=go; el.querySelector("#aurl").onkeydown=e=>{ if(e.key==="Enter") go(); };
+    el.querySelector("#aurl").onpaste=e=>{ const t=(e.clipboardData||{}).getData&&e.clipboardData.getData("text"); if(t&&/^(https?:|data:image)/.test(t.trim())) setTimeout(go,50); };
+    const pz=el.querySelector("#pastezone"); pz.ondragover=e=>{ e.preventDefault(); pz.style.borderColor="var(--accent)"; }; pz.ondragleave=()=>{ pz.style.borderColor=""; };
+    pz.ondrop=async e=>{ e.preventDefault(); pz.style.borderColor=""; const f=[...(e.dataTransfer.files||[])].find(x=>x.type.startsWith("image/")); if(f){ P.selAsset=sel.id; await pasteToBoard(f); return; }
+      const u=(e.dataTransfer.getData("text/uri-list")||e.dataTransfer.getData("text")||"").trim(); if(u){ try{ const f2=await fetchImageURL(u); P.selAsset=sel.id; await pasteToBoard(f2); }catch(err){ toast(err.message); } } };
   }
   el.querySelector("#iok").onclick=()=>{ P.done.imagens=true; save(); courier("imagens","narracao"); toast("Imagens aprovadas"); renderProd(); openPanel("narracao"); comboAfter("imagens"); };
   paintImgs(el);
@@ -986,7 +1035,20 @@ async function runNarracao(onlyFailed){
 const RES=["1080p","720p"];
 let cutPrev=null;
 function fmtT(s){ s=Math.max(0,s); return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`; }
-function cutOpts(P){ return {template:P.template,captions:P.captions,res:P.res||"1080p"}; }
+function cutOpts(P){ const m=P.kind!=="short"&&P.idea&&P.idea.mural&&P.idea.mural.on?P.idea.mural:null; return {template:P.template,captions:P.captions,res:P.res||"1080p",mural:m,ink:isDoc(P)?"doc":"plain"}; }
+// o plano do criador (ideia central + começo, meio e fim) entra em cada bloco do roteiro
+function planoCriador(P,i,n){
+  const I=P.idea||{}, last=i===n-1, first=i===0, mid=!first&&!last;
+  const linha=[];
+  if(I.intencao) linha.push(`Ideia central que o vídeo inteiro precisa passar: ${I.intencao}`);
+  if(!P.linkToLong){
+    if(I.comeco&&(first||n===1)) linha.push(`COMEÇO, aplique neste bloco: ${I.comeco}`);
+    if(I.meio&&(mid||n<=2)) linha.push(`MEIO, aplique neste bloco: ${I.meio}`);
+    if(I.fim&&(last||n===1)) linha.push(`FIM, aplique no final deste bloco: ${I.fim}`);
+    if(I.mural&&I.mural.on&&(last||n===1)) linha.push((I.mural.nomes||[]).length?`Nos últimos segundos aparece na tela um mural com os nomes de inscritos: agradeça a eles em uma frase curta e convide a se inscrever pra aparecer no próximo.`:`Nos últimos segundos aparece na tela um mural de inscritos: convide a pessoa a se inscrever pra ter o nome no mural dos próximos vídeos.`);
+  }
+  return linha.length?`\nPLANO DO CRIADOR (siga com prioridade, sem perder o estilo):\n- ${linha.join("\n- ")}`:"";
+}
 VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem"; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null; const sup=Cut.supported(); return staleNote(P,"montagem")+`
   <p class="lead">O OnionCut junta cenas, voz e legendas, troca as imagens nas pausas da narração e exporta o vídeo em MP4.</p>
   ${sup?"":`<div class="err">Este navegador não consegue gerar vídeo. Abra o Onion no Chrome ou no Edge, no computador.</div>`}
