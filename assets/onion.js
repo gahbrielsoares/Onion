@@ -1261,7 +1261,7 @@ VIEWS.arquivo=()=>`<div class="lib">
     <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
     ${P.sub?`<div class="m" style="font-size:12.5px;margin:6px 0">📱 Short junto: <b>${esc(P.sub.title||"")}</b>${P.sub.render&&P.sub.render.stored?` · <a href="#" data-splay="${i}" style="color:var(--accent)">assistir</a> · <a href="#" data-svid="${i}" style="color:var(--accent)">baixar .mp4</a>`:" · ainda sem vídeo renderizado"}</div><div data-sbox="${i}"></div>`:""}
-    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}${!P.sub&&!AP.on?`<button class="btn small" data-pair="${i}">${P.kind==="short"?"🎬 Gerar o vídeo longo deste Short":"📱 Gerar o Short deste vídeo"}</button>`:""}<button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}${!P.sub&&!AP.on?`<button class="btn small" data-pair="${i}">${P.kind==="short"?"🎬 Gerar o vídeo longo deste Short":"📱 Gerar o Short deste vídeo"}</button>`:""}<button class="btn ghost small" data-recut="${i}" title="Volta pro OnionCut pra mudar template, trilha ou mural e renderizar de novo, sem gastar nada">🎬 Reabrir no OnionCut</button><button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
   <p class="m" id="usage" style="font-size:12px;color:var(--muted)"></p>
 </div>`;
 BIND.arquivo=el=>{
@@ -1279,6 +1279,12 @@ BIND.arquivo=el=>{
       toast(out.cut?`Instrução removida em ${out.cut} de ${out.total} trechos. Agora é só renderizar.`:"Não achei instrução lida nos trechos. Nada foi cortado.");
       courier("arquivo","montagem"); openPanel("montagem");
     }catch(e){ toast(e.message||"Não deu pra consertar"); renderPanel(); }
+  });
+  el.querySelectorAll("[data-recut]").forEach(b=>b.onclick=()=>{
+    if(S.main()) return toast("Termine ou descarte o vídeo em produção antes");
+    const P=S.library[+b.dataset.recut]; if(!P.narr) return toast("Este vídeo não tem a narração guardada neste navegador.");
+    S.library.splice(+b.dataset.recut,1); P.done.montagem=false; delete P.savedAt; if(P.sub) P.combo=true;
+    S.project=P; Cut._R=null; save(); renderProd(); courier("arquivo","montagem"); toast("De volta ao OnionCut: ajuste e clique em Montar de novo"); openPanel("montagem");
   });
   el.querySelectorAll("[data-reopen]").forEach(b=>b.onclick=async()=>{
     if(S.project) return toast("Termine ou descarte o vídeo em produção antes");
