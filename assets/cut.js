@@ -157,16 +157,18 @@ const Cut = (() => {
     const env = envelope(audio, Math.max(480, Math.floor(audio.length / 240))); const mx = Math.max(...env) || 1;
     const wave = Array.from(env).map(v => v / mx);
     // trilha e efeitos sonoros
-    let mixed = audio; const snd = P.sound || {};
+    const END = (P.kind !== "short" && P.idea && P.idea.mural && P.idea.mural.on) ? 6 : 0;
+    const voiceEnd = END ? Voice.concat([audio, new Float32Array(Math.floor(END * SR))]) : audio;
+    let mixed = voiceEnd; const snd = P.sound || {};
     if (snd.mood !== "Sem trilha" || snd.sfx) {
       onStatus && onStatus("mixando trilha e efeitos");
       let music = null;
       if (snd.custom) { const mb = await Store.get(`p${P.id}:music:0`); if (mb) try { music = await Sound.custom(mb); } catch (e) {} }
       if (!music && snd.mood && snd.mood !== "Sem trilha") music = await Sound.loop(snd.mood);
       const ev = snd.sfx === false ? [] : doc ? Doc.events(scenes) : col ? scenes.filter((s, i) => i > 0 && i % 2 === 0).map(s => ({ t: s.s - .25, kind: "whoosh", gain: .35 })) : [];
-      mixed = await Sound.mix(audio, { music, events: ev, musicGain: snd.custom ? .14 : .11 });
+      mixed = await Sound.mix(voiceEnd, { music, events: ev, musicGain: snd.custom ? .14 : .11 });
     }
-    return { audio: mixed, voice: audio, dur, words, scenes, caps, bitmaps, assets, mode: doc ? "doc" : col ? "colagem" : "cinema", pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: col ? Object.keys(assets).length : sc };
+    return { audio: mixed, voice: audio, endCard: END, dur, words, scenes, caps, bitmaps, assets, mode: doc ? "doc" : col ? "colagem" : "cinema", pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: col ? Object.keys(assets).length : sc };
   }
 
   /* ---------- desenhar um quadro ---------- */
@@ -197,9 +199,9 @@ const Cut = (() => {
   }
   // mural de inscritos nos últimos segundos
   function mural(g, t, R, o) {
-    const { W, H } = o, start = R.dur - 7; if (t < start) return;
+    const { W, H } = o, card = R.endCard > 0, start = card ? R.dur + .15 : R.dur - 7; if (t < start) return;
     const q = Math.min(1, (t - start) / .8), nomes = (o.mural.nomes || []).slice(0, 18), S2 = Math.min(W, H) / 1080, doc = o.ink === "doc";
-    g.save(); g.globalAlpha = q * .82; g.fillStyle = "#0b0d12"; g.fillRect(0, 0, W, H); g.globalAlpha = q;
+    g.save(); g.globalAlpha = card ? 1 : q * .82; g.fillStyle = "#000000"; g.fillRect(0, 0, W, H); g.globalAlpha = q;
     g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = doc ? "#E3A93C" : "#ffffff";
     g.font = `${doc ? "700" : "800"} ${Math.round(52 * S2)}px ${doc ? "Cinzel, Georgia, serif" : "Figtree, Arial, sans-serif"}`;
     g.fillText(nomes.length ? "OBRIGADO AOS NOVOS INSCRITOS" : "SEU NOME PODE APARECER AQUI", W / 2, H * .2);
@@ -209,11 +211,14 @@ const Cut = (() => {
     nomes.forEach((n, k) => {
       const c = k % cols, r = Math.floor(k / cols), d = Math.min(1, Math.max(0, (t - start - .5 - k * .12) / .4));
       g.globalAlpha = q * d; g.font = `700 ${Math.round(36 * S2)}px Figtree, Arial, sans-serif`; g.fillStyle = "#ffffff";
-      g.fillText(n, W * (c + .5) / cols, H * .42 + (r - (rows - 1) / 2) * lh + (1 - d) * 14 * S2);
+      g.fillText(n, W * (c + .5) / cols, H * .52 + (r - (rows - 1) / 2) * lh + (1 - d) * 14 * S2);
     });
     g.restore(); g.textAlign = "start"; g.textBaseline = "alphabetic";
   }
-  function frame(g, t, R, o) { frame0(g, t, R, o); if (o.mural) mural(g, t, R, o); }
+  function frame(g, t, R, o) {
+    if (o.mural && R.endCard > 0 && t > R.dur + .15) { mural(g, t, R, o); if (t > R.dur + R.endCard) { g.fillStyle = `rgba(0,0,0,${Math.min(1, (t - R.dur - R.endCard) / .6)})`; g.fillRect(0, 0, o.W, o.H); } return; }
+    frame0(g, t, R, o); if (o.mural) mural(g, t, R, o);
+  }
   function frame0(g, t, R, o) {
     if (R.mode === "doc") { Doc.frame(g, t, R, o); if (o.captions !== "Sem legenda") drawCaption(g, t, R, o); return; }
     if (R.mode === "colagem") { Collage.frame(g, t, R, o); if (o.captions !== "Sem legenda") drawCaption(g, t, R, o); return; }
@@ -276,7 +281,7 @@ const Cut = (() => {
     const t0 = ac.currentTime + .05; src.start(t0, Math.min(from, R.dur));
     const g = canvas.getContext("2d"); let raf, stopped = false;
     const opts = { ...o, W: canvas.width, H: canvas.height };
-    const loop = () => { if (stopped) return; const t = from + Math.max(0, ac.currentTime - t0); frame(g, t, R, opts); onTime && onTime(t); if (t >= R.dur + .5) { stop(); onEnd && onEnd(); return; } raf = requestAnimationFrame(loop); };
+    const loop = () => { if (stopped) return; const t = from + Math.max(0, ac.currentTime - t0); frame(g, t, R, opts); onTime && onTime(t); if (t >= R.dur + (R.endCard || 0) + .5) { stop(); onEnd && onEnd(); return; } raf = requestAnimationFrame(loop); };
     loop();
     function stop() { stopped = true; cancelAnimationFrame(raf); try { src.stop(); } catch (e) {} ac.close(); }
     return { stop };
@@ -310,7 +315,7 @@ const Cut = (() => {
     let err = null;
     const ve = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: e => err = e }); ve.configure(cfg.video);
     const ae = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: e => err = e }); ae.configure(cfg.audio);
-    const totalDur = R.dur + .6, audioAll = new Float32Array(Math.ceil(totalDur * SR)); audioAll.set(R.audio.subarray(0, audioAll.length));
+    const totalDur = R.dur + (R.endCard || 0) + .6, audioAll = new Float32Array(Math.ceil(totalDur * SR)); audioAll.set(R.audio.subarray(0, audioAll.length));
     for (let off = 0; off < audioAll.length; off += SR) {
       const n = Math.min(SR, audioAll.length - off);
       const ad = new AudioData({ format: "f32-planar", sampleRate: SR, numberOfFrames: n, numberOfChannels: 1, timestamp: Math.round(off / SR * 1e6), data: audioAll.slice(off, off + n) });

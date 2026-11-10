@@ -1056,6 +1056,9 @@ VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem";
   <h3>Trilha</h3>${pills("mood",[...Object.keys(Sound.MOODS),"Sem trilha"],(P.sound||{}).custom?"":((P.sound||{}).mood||"Sem trilha"))}
   <div class="btns" style="margin-top:6px"><label class="btn ghost small" style="cursor:pointer">🎵 ${(P.sound||{}).custom?"Trocar a minha música":"Usar uma música minha (mp3)"}<input type="file" id="mfile" accept="audio/*" style="display:none"></label>${(P.sound||{}).custom?`<span class="tag gold">usando a sua música</span><button class="btn ghost small" id="mfilex">tirar</button>`:""}</div>
   <p class="m" style="font-size:12px;color:var(--muted)">As trilhas prontas são criadas aqui mesmo, sem direitos autorais. Se usar uma música sua, prefira a Biblioteca de Áudio do YouTube.</p>
+  ${P.kind!=="short"?`<h3>Mural de inscritos (final do vídeo)</h3>
+  <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="mmural" ${P.idea&&P.idea.mural&&P.idea.mural.on?"checked":""}> Terminar com uma tela preta com os nomes dos inscritos (6 s)</label>
+  ${P.idea&&P.idea.mural&&P.idea.mural.on?`<div class="field"><textarea id="mnomes" rows="3" placeholder="Um nome por linha (sem nomes aparece “Seu nome pode aparecer aqui”)">${esc((P.idea.mural.nomes||[]).join("\n"))}</textarea></div>`:""}`:""}
   <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:6px 0"><input type="checkbox" id="msfx" ${(P.sound||{}).sfx!==false?"checked":""}> Efeitos sonoros nas transições (whoosh, impacto, clique)</label>
   <h3>Legendas</h3>${pills("cap",CAPTIONS,P.captions)}
   ${P.kind==="short"?`<p class="m" style="font-size:12.5px">Short vertical 1080×1920.</p>`:`<h3>Resolução</h3>${pills("res",RES,P.res||"1080p")}`}
@@ -1084,6 +1087,8 @@ BIND.montagem=el=>{
   P.sound=P.sound||{mood:"Tensão (documentário)",sfx:true,custom:false};
   const soundChanged=()=>{ if(Cut._R&&Cut._R.pid===P.id){ Cut._R=null; toast("Trilha alterada: clique em Montar de novo"); renderPanel(); } };
   bindPills(el,"mood",v=>{ P.sound.mood=v; P.sound.custom=false; save(); soundChanged(); });
+  const mm=el.querySelector("#mmural"); if(mm) mm.onchange=e=>{ P.idea=P.idea||{}; P.idea.mural={on:e.target.checked,nomes:(P.idea.mural&&P.idea.mural.nomes)||[]}; save(); Cut._R=null; toast(e.target.checked?"Mural ligado: clique em Montar de novo":"Mural desligado: clique em Montar de novo"); renderPanel(); };
+  const mn=el.querySelector("#mnomes"); if(mn) mn.onchange=()=>{ P.idea.mural.nomes=mn.value.split("\n").map(x=>x.trim()).filter(Boolean); save(); if(Cut._R&&Cut._R.pid===P.id){ redraw(); } toast("Nomes salvos"); };
   el.querySelector("#msfx").onchange=e=>{ P.sound.sfx=e.target.checked; save(); soundChanged(); };
   el.querySelector("#mfile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await Store.put(mkey(P.id,"music",0),f); P.sound.custom=true; save(); toast("Música carregada"); soundChanged(); renderPanel(); };
   const mx=el.querySelector("#mfilex"); if(mx) mx.onclick=async()=>{ await Store.delPrefix(`p${P.id}:music:`); P.sound.custom=false; save(); soundChanged(); renderPanel(); };
