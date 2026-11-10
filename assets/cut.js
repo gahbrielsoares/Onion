@@ -157,8 +157,14 @@ const Cut = (() => {
     const env = envelope(audio, Math.max(480, Math.floor(audio.length / 240))); const mx = Math.max(...env) || 1;
     const wave = Array.from(env).map(v => v / mx);
     // trilha e efeitos sonoros
-    const END = (P.idea && P.idea.mural && P.idea.mural.on) ? 6 : 0;
-    const voiceEnd = END ? Voice.concat([audio, new Float32Array(Math.floor(END * SR))]) : audio;
+    // mural: a duração segue a narração dos nomes (gravada à parte)
+    let END = 0, muralDur = 0, voiceEnd = audio;
+    if (P.idea && P.idea.mural && P.idea.mural.on) {
+      let mv = null; const mb = await Store.get(`p${P.id}:mural:0`);
+      if (mb && P.narr && P.narr.mural) { try { mv = await Voice.decode(mb); } catch (e) {} }
+      if (mv) { muralDur = mv.length / SR; END = .6 + muralDur + 1.2; voiceEnd = Voice.concat([audio, new Float32Array(Math.floor(.6 * SR)), mv, new Float32Array(Math.floor(1.2 * SR))]); }
+      else { END = 4; voiceEnd = Voice.concat([audio, new Float32Array(Math.floor(END * SR))]); }
+    }
     let mixed = voiceEnd; const snd = P.sound || {};
     if (snd.mood !== "Sem trilha" || snd.sfx) {
       onStatus && onStatus("mixando trilha e efeitos");
@@ -168,7 +174,7 @@ const Cut = (() => {
       const ev = snd.sfx === false ? [] : doc ? Doc.events(scenes) : col ? scenes.filter((s, i) => i > 0 && i % 2 === 0).map(s => ({ t: s.s - .25, kind: "whoosh", gain: .35 })) : [];
       mixed = await Sound.mix(voiceEnd, { music, events: ev, musicGain: snd.custom ? .14 : .11 });
     }
-    return { audio: mixed, voice: audio, endCard: END, dur, words, scenes, caps, bitmaps, assets, mode: doc ? "doc" : col ? "colagem" : "cinema", pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: col ? Object.keys(assets).length : sc };
+    return { audio: mixed, voice: audio, endCard: END, muralDur, dur, words, scenes, caps, bitmaps, assets, mode: doc ? "doc" : col ? "colagem" : "cinema", pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: col ? Object.keys(assets).length : sc };
   }
 
   /* ---------- desenhar um quadro ---------- */
@@ -211,7 +217,8 @@ const Cut = (() => {
     if (!nomes.length) g.fillText("Inscreva-se e apareça no mural do próximo vídeo", W / 2, H * (portrait ? .36 : .3));
     const cols = W > H ? 3 : (nomes.length > 9 ? 2 : 1), rows = Math.ceil(nomes.length / cols), lh = (portrait ? 72 : 54) * S2;
     nomes.forEach((n, k) => {
-      const c = k % cols, r = Math.floor(k / cols), d = Math.min(1, Math.max(0, (t - start - .5 - k * .12) / .4));
+      const step = R.muralDur ? (R.muralDur * .75) / Math.max(1, nomes.length) : .12, lead = R.muralDur ? .6 + R.muralDur * .12 : .5;
+      const c = k % cols, r = Math.floor(k / cols), d = Math.min(1, Math.max(0, (t - start - lead - k * step) / .35));
       g.globalAlpha = q * d; g.font = `700 ${Math.round((portrait ? 46 : 36) * S2)}px Figtree, Arial, sans-serif`; g.fillStyle = "#ffffff";
       g.fillText(n, W * (c + .5) / cols, H * .52 + (r - (rows - 1) / 2) * lh + (1 - d) * 14 * S2);
     });

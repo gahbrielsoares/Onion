@@ -1045,7 +1045,7 @@ function planoCriador(P,i,n){
     if(I.comeco&&(first||n===1)) linha.push(`COMEÇO, aplique neste bloco: ${I.comeco}`);
     if(I.meio&&(mid||n<=2)) linha.push(`MEIO, aplique neste bloco: ${I.meio}`);
     if(I.fim&&(last||n===1)) linha.push(`FIM, aplique no final deste bloco: ${I.fim}`);
-    if(I.mural&&I.mural.on&&(last||n===1)) linha.push((I.mural.nomes||[]).length?`Nos últimos segundos aparece na tela um mural com os nomes de inscritos: agradeça a eles em uma frase curta e convide a se inscrever pra aparecer no próximo.`:`Nos últimos segundos aparece na tela um mural de inscritos: convide a pessoa a se inscrever pra ter o nome no mural dos próximos vídeos.`);
+    if(I.mural&&I.mural.on&&(last||n===1)) linha.push(`Não cite nomes de inscritos no texto: depois do fim do vídeo entra um mural com narração própria que faz isso.`);
   }
   return linha.length?`\nPLANO DO CRIADOR (siga com prioridade, sem perder o estilo):\n- ${linha.join("\n- ")}`:"";
 }
@@ -1057,7 +1057,7 @@ VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem";
   <div class="btns" style="margin-top:6px"><label class="btn ghost small" style="cursor:pointer">🎵 ${(P.sound||{}).custom?"Trocar a minha música":"Usar uma música minha (mp3)"}<input type="file" id="mfile" accept="audio/*" style="display:none"></label>${(P.sound||{}).custom?`<span class="tag gold">usando a sua música</span><button class="btn ghost small" id="mfilex">tirar</button>`:""}</div>
   <p class="m" style="font-size:12px;color:var(--muted)">As trilhas prontas são criadas aqui mesmo, sem direitos autorais. Se usar uma música sua, prefira a Biblioteca de Áudio do YouTube.</p>
   ${true?`<h3>Mural de inscritos (depois do fim do vídeo)</h3>
-  <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="mmural" ${P.idea&&P.idea.mural&&P.idea.mural.on?"checked":""}> Depois que o conteúdo termina, mostrar 6 s de tela preta com os nomes dos inscritos${P.kind==="short"?" (o Short fica com ~1 min de conteúdo + 6 s de mural)":""}</label>
+  <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="mmural" ${P.idea&&P.idea.mural&&P.idea.mural.on?"checked":""}> Depois que o conteúdo termina, mostrar uma tela preta com os nomes dos inscritos, e o narrador lê os nomes (dura o tempo da fala)</label>
   ${P.idea&&P.idea.mural&&P.idea.mural.on?`<div class="field"><textarea id="mnomes" rows="3" placeholder="Um nome por linha (sem nomes aparece “Seu nome pode aparecer aqui”)">${esc((P.idea.mural.nomes||[]).join("\n"))}</textarea></div>`:""}`:""}
   <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:6px 0"><input type="checkbox" id="msfx" ${(P.sound||{}).sfx!==false?"checked":""}> Efeitos sonoros nas transições (whoosh, impacto, clique)</label>
   <h3>Legendas</h3>${pills("cap",CAPTIONS,P.captions)}
@@ -1088,7 +1088,7 @@ BIND.montagem=el=>{
   const soundChanged=()=>{ if(Cut._R&&Cut._R.pid===P.id){ Cut._R=null; toast("Trilha alterada: clique em Montar de novo"); renderPanel(); } };
   bindPills(el,"mood",v=>{ P.sound.mood=v; P.sound.custom=false; save(); soundChanged(); });
   const mm=el.querySelector("#mmural"); if(mm) mm.onchange=e=>{ P.idea=P.idea||{}; P.idea.mural={on:e.target.checked,nomes:(P.idea.mural&&P.idea.mural.nomes)||[]}; save(); Cut._R=null; toast(e.target.checked?"Mural ligado: clique em Montar de novo":"Mural desligado: clique em Montar de novo"); renderPanel(); };
-  const mn=el.querySelector("#mnomes"); if(mn) mn.onchange=()=>{ P.idea.mural.nomes=mn.value.split("\n").map(x=>x.trim()).filter(Boolean); save(); if(Cut._R&&Cut._R.pid===P.id){ redraw(); } toast("Nomes salvos"); };
+  const mn=el.querySelector("#mnomes"); if(mn) mn.onchange=()=>{ P.idea.mural.nomes=mn.value.split("\n").map(x=>x.trim()).filter(Boolean); save(); Cut._R=null; toast("Nomes salvos: clique em Montar de novo pra gravar a fala do mural"); renderPanel(); };
   el.querySelector("#msfx").onchange=e=>{ P.sound.sfx=e.target.checked; save(); soundChanged(); };
   el.querySelector("#mfile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await Store.put(mkey(P.id,"music",0),f); P.sound.custom=true; save(); toast("Música carregada"); soundChanged(); renderPanel(); };
   const mx=el.querySelector("#mfilex"); if(mx) mx.onclick=async()=>{ await Store.delPrefix(`p${P.id}:music:`); P.sound.custom=false; save(); soundChanged(); renderPanel(); };
@@ -1115,11 +1115,30 @@ BIND.montagem=el=>{
   }
 };
 function stopPreview(){ if(cutPrev){ cutPrev.stop(); cutPrev=null; } }
+// narração do mural de inscritos: lê os nomes e chama pra se inscrever (duração livre, conforme a fala)
+function muralText(P){
+  const m=P.idea&&P.idea.mural; if(!m||!m.on) return "";
+  const nomes=(m.nomes||[]).slice(0,18), L=(P.config&&P.config.idioma)||"Português";
+  const lista=(arr,e)=>{ const x=arr.map(n=>n.replace(/[.,;:!?\s]+$/,"")); return x.length>1?x.slice(0,-1).join(", ")+` ${e} `+x[x.length-1]:x[0]; };
+  if(L==="Inglês") return nomes.length?`Thanks to our new subscribers: ${lista(nomes,"and")}. Subscribe too, and your name could show up here in the next video.`:`Subscribe to the channel, and your name could show up here in the next video.`;
+  if(L==="Espanhol") return nomes.length?`Gracias a los nuevos suscriptores: ${lista(nomes,"y")}. Suscríbete tú también y tu nombre puede aparecer aquí en el próximo video.`:`Suscríbete al canal y tu nombre puede aparecer aquí en el próximo video.`;
+  return nomes.length?`Obrigado aos novos inscritos: ${lista(nomes,"e")}. Se inscreva também, e o seu nome pode aparecer aqui no próximo vídeo.`:`Se inscreva no canal, e o seu nome pode aparecer aqui no próximo vídeo.`;
+}
+async function ensureMuralAudio(P){
+  const txt=muralText(P); if(!txt||!P.narr) return;
+  if(P.narr.mural&&P.narr.mural.text===txt&&await Store.get(mkey(P.id,"mural",0))) return;
+  if(!AI.stageReady("voice")) return;
+  setAction("gravando a narração do mural");
+  const r=await Voice.synth(txt,{voiceId:P.narr.voiceId,speed:P.narr.speed||1,style:P.narr.style||"",lang:LANG_EN[P.config.idioma],idioma:P.config.idioma});
+  await Store.put(mkey(P.id,"mural",0),r.blob);
+  const f=await Voice.decode(r.blob); P.narr.mural={text:txt,dur:f.length/Voice.SR}; save();
+}
 async function runPrepare(){
   const P=S.project; ui.cutErr=null; stopPreview();
   if(!P.narr||!P.narration){ ui.cutErr="Gere a narração no Estúdio antes de montar."; return renderPanel(); }
   setBusy("montagem","abrindo o áudio"); P.renderProg=null; renderPanel();
-  try{ const R=await Cut.prepare(P,{onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal}); R.pid=P.id; Cut._R=R; ui.pt=0; P.cut=true; if(P.stale) delete P.stale.montagem; save(); }
+  try{ try{ await ensureMuralAudio(P); }catch(e){ if(e.code==="cancelled") throw e; toast("Não deu pra gravar a narração do mural: "+(e.message||"erro")); }
+    const R=await Cut.prepare(P,{onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal}); R.pid=P.id; Cut._R=R; ui.pt=0; P.cut=true; if(P.stale) delete P.stale.montagem; save(); }
   catch(e){ if(e.code!=="cancelled") ui.cutErr=e.message||"A montagem falhou."; }
   clearBusy(); renderPanel();
 }
