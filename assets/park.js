@@ -387,7 +387,7 @@ function plant(g, p, r) {
 }
 const FEATURES = {
   virais: ["screens", "board"], ideias: ["board", "board"], titulos: ["board", "shelf"], roteiro: ["shelf", "shelf"], descricao: ["shelf", "board"],
-  capa: ["frames", "easel"], imagens: ["easel", "frames"], narracao: ["booth"], montagem: ["timeline"], admin: ["cabinet"]
+  capa: ["frames", "easel"], imagens: ["easel", "frames"], stories: ["frames", "screens"], narracao: ["booth"], montagem: ["timeline"], admin: ["cabinet"]
 };
 function renderBuilding(b, locked) {
   const bb = bbox(b), c = canvas(bb.w, bb.h), f = canvas(bb.w, bb.h), g = c.getContext("2d"), gf = f.getContext("2d"), r = rng(300 + b.gx * 7 + b.gy);

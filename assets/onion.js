@@ -22,7 +22,7 @@ async function withSeg(seg, fn){ const prev = SEG; SEG = seg; renderProd(); try 
 const STAGES = ["titulos","roteiro","descricao","imagens","narracao","montagem"];
 const STAGE_LABEL = {titulos:"Título",roteiro:"Roteiro",descricao:"Descrição",capa:"Capa",imagens:"Imagens",narracao:"Voz",montagem:"Edição"};
 function isUnlocked(k){
-  if (k==="virais"||k==="ideias"||k==="arquivo"||k==="admin"||k==="auto") return true;
+  if (k==="stories"||k==="ideias"||k==="arquivo"||k==="admin"||k==="auto") return true;
   const P=S.project; if(!P) return false;
   const i=STAGES.indexOf(k); let ok=true; for(let j=0;j<i;j++) if(!P.done[STAGES[j]]) ok=false;
   P.reached=P.reached||{};
@@ -65,6 +65,7 @@ const CAPTIONS=["Palavra por palavra","Karaokê","Frase curta","Sem legenda"];
 
 /* ============ BUILDINGS ============ */
 const B=[
+ {k:"stories",n:"Estúdio de Stories",gx:16,gy:2,w:9,d:8,c:"#ef6f9a",role:"Editor de stories",desc:"Envie o seu vídeo e as fotos do produto: a IA estuda e edita com cortes, inserções, textos, legendas e trilha."},
  {k:"ideias",n:"Laboratório de Ideias",gx:3,gy:3,w:12,d:7,c:"#e0b14a",role:"Produtor",idle:"organizando a fila",desc:"Configure o canal ou a marca, busque temas em alta (opcional) e comece um vídeo novo."},
  {k:"titulos",n:"Torre dos Títulos",gx:29,gy:3,w:7,d:7,c:"#5fbf95",role:"Copywriter",step:1,h:24,desc:"Cria 10 títulos com ângulos e gatilhos diferentes. O roteiro inteiro é escrito pro título que você escolher."},
  {k:"arquivo",n:"Arquivo e Datacenter",gx:39,gy:2,w:6,d:9,c:"#6f93d6",desc:"Onde ficam guardados os vídeos prontos. Abra pra ver e baixar tudo o que já foi produzido."},
@@ -189,7 +190,7 @@ async function comboAfter(stage){
 let panelKey=null;
 function openPanel(k){
   panelKey=k; const b=BK[k]||PSEUDO[k];
-  document.getElementById("ptitle").innerHTML=esc(b.n)+(b.step?`<span class="step">Etapa ${b.step} de 6 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Configurações":(k==="auto"?"O gerente decide tudo":"Sempre aberto"))}</span>`);
+  document.getElementById("ptitle").innerHTML=esc(b.n)+(b.step?`<span class="step">Etapa ${b.step} de 6 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Configurações":(k==="auto"?"O gerente decide tudo":(k==="stories"?"Edite o vídeo que você gravou":"Sempre aberto")))}</span>`);
   document.getElementById("psq").style.background=b.c;
   document.getElementById("panel").classList.add("open"); document.getElementById("panel").setAttribute("aria-hidden","false");
   document.getElementById("scrim").classList.toggle("open", k!=="auto");
@@ -937,6 +938,91 @@ async function drawAssets(ids,mode="auto"){
 function creditsText(P){ const A=(P.board&&P.board.assets)||[], c=A.filter(a=>a.real&&a.credit).map(a=>"• "+a.credit); const ia=P.board&&P.board.kind==="doc"&&A.some(a=>a.img==="ok"&&!a.real);
   return (c.length?"\n\nImagens:\n"+c.join("\n"):"")+(ia?"\n\nAlgumas imagens são reconstruções feitas com IA.":""); }
 
+/* ---- Estúdio de Stories ---- */
+const DESTINOS=["Stories / Reels / TikTok (vertical)","YouTube Shorts (vertical)","YouTube (horizontal)","Feed (quadrado)"];
+function story(){ if(!S.story) S.story={id:Date.now(),desc:"",dest:DESTINOS[0],media:[],hasSrc:false,srcName:"",study:null,opts:{legendas:"ia",musica:"ia",efeitos:"ia",formato:"ia",cortar:true},result:null}; return S.story; }
+function stResolved(T){ const g=(T.study&&T.study.sugestoes)||{}, o=T.opts;
+  const fmtDest=/horizontal/.test(T.dest)?"horizontal":/quadrado/.test(T.dest)?"quadrado":"vertical";
+  return {legendas:o.legendas==="ia"?(CAPTIONS.includes(g.legendas)?g.legendas:"Palavra por palavra"):o.legendas,
+    musica:o.musica==="ia"?((Sound.MOODS[g.trilha]||g.trilha==="Sem trilha")?g.trilha:"Promocional (animado)"):o.musica,
+    efeitos:o.efeitos==="ia"?(Sound.SFX_SETS.includes(g.efeitos)?g.efeitos:"Promocional (pop e brilho)"):o.efeitos,
+    formato:o.formato==="ia"?(Story.FORMATS[g.formato]&&!/horizontal|quadrado/.test(T.dest)===(g.formato==="vertical")?g.formato:fmtDest):o.formato,cortar:o.cortar}; }
+VIEWS.stories=()=>{ const T=story(), working=busy&&busy.k==="stories", st=T.study, R=stResolved(T), g=!!AI.get().keys.google;
+  const sel=(id,opts,cur,ia)=>`<select id="${id}">${ia?`<option value="ia" ${cur==="ia"?"selected":""}>✨ IA decide${ia!==true?` (${esc(ia)})`:""}</option>`:""}${opts.map(o=>`<option ${o===cur?"selected":""}>${esc(o)}</option>`).join("")}</select>`;
+  return `
+  <p class="lead">Envie o vídeo que você gravou, diga o que quer transmitir e, se quiser, as fotos e vídeos do produto. A IA estuda e o Onion edita: corta as pausas, mostra o produto na hora certa, coloca textos de destaque, legendas e trilha.</p>
+  <div class="card" style="padding:12px 14px">
+    <div class="field"><label>1. Seu vídeo</label>
+      <label class="btn ${T.hasSrc?"ghost ":""}small" style="cursor:pointer">🎥 ${T.hasSrc?"Trocar o vídeo":"Escolher vídeo (computador ou galeria)"}<input type="file" id="stsrc" accept="video/*" style="display:none"></label>
+      ${T.hasSrc?`<div class="m" style="font-size:12.5px;margin-top:6px">✓ ${esc(T.srcName)}</div><video id="stprev" controls playsinline style="width:${/horizontal/.test(T.dest)?"100%":"56%"};margin-top:6px;border-radius:10px;background:#000"></video>`:""}</div>
+    <div class="field"><label for="stdesc">2. O que você quer transmitir com esse vídeo</label><textarea id="stdesc" rows="3" placeholder="Ex.: propaganda do nosso sérum facial, que hidrata e tira as manchas em 15 dias. Público: mulheres 25–45. Chamar pro WhatsApp no final.">${esc(T.desc)}</textarea></div>
+    <div class="field"><label>3. Mídias do produto (opcional)</label>
+      <label class="btn ghost small" style="cursor:pointer">📁 Adicionar fotos e vídeos<input type="file" id="stmedia" accept="image/*,video/*" multiple style="display:none"></label>
+      ${T.media.length?`<div class="scenes" style="margin-top:8px">${T.media.map(m=>`<div class="scene" ${m.type.startsWith("image")?`data-img="st${T.id}:${m.id}"`:""} style="background:#222;background-size:cover;background-position:center"><span>${m.type.startsWith("video")?"🎬":"🖼"} ${esc(m.id)}</span><small style="position:absolute;left:4px;right:4px;bottom:3px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</small><button class="x" data-mdel="${m.id}" style="position:absolute;right:3px;top:3px;width:22px;height:22px;font-size:12px" aria-label="Remover">×</button></div>`).join("")}</div>`:""}</div>
+    <div class="field" style="max-width:340px"><label for="stdest">Pra onde vai</label><select id="stdest">${DESTINOS.map(d=>`<option ${d===T.dest?"selected":""}>${d}</option>`).join("")}</select></div>
+    <div class="btns"><button class="btn" id="ststudy" ${!T.hasSrc||busy||!g?"disabled":""}>🔍 ${st?"Estudar de novo":"Iniciar estudo"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}${!g?`<span class="m" style="font-size:12px">O estudo usa o Gemini: cole a chave do Google na Administração.</span>`:""}</div>
+    ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>${T.prog!=null?`<div class="bar"><i style="width:${T.prog*100}%"></i></div>`:""}`:""}
+    ${ui.stErr?`<div class="err">${esc(ui.stErr)}</div>`:""}
+  </div>
+  ${st?`<div class="card" style="padding:12px 14px;margin-top:10px">
+    <div class="t">O que a IA entendeu</div><div class="m">${esc(st.resumo)}</div>
+    <div class="m" style="font-size:12.5px;margin-top:6px">${[st.tem_fala?`🗣 ${st.transcricao.length} falas`:"sem fala",st.remover.length?`✂ ${st.remover.length} trechos ruins pra cortar`:"",st.insercoes.length?`🖼 ${st.insercoes.length} inserções do produto`:"",st.textos.length?`✨ ${st.textos.length} textos de destaque`:""].filter(Boolean).join(" · ")}</div>
+    <h3>4. Ajustes (o que ficar em "IA decide" ela escolhe)</h3>
+    <div class="row"><div class="field"><label for="stcap">Legendas</label>${sel("stcap",CAPTIONS,T.opts.legendas,R.legendas)}</div>
+      <div class="field"><label for="stfmt">Formato</label>${sel("stfmt",["vertical","horizontal","quadrado"],T.opts.formato,R.formato)}</div></div>
+    <div class="row"><div class="field"><label for="stmus">Música de fundo</label><select id="stmus"><option value="ia" ${T.opts.musica==="ia"?"selected":""}>✨ IA decide (${esc(R.musica)})</option>${[...Object.keys(Sound.MOODS),"Sem trilha"].map(o=>`<option ${o===T.opts.musica?"selected":""}>${esc(o)}</option>`).join("")}<option value="custom" ${T.opts.musica==="custom"?"selected":""}>🎵 Minha música (enviar)</option></select></div>
+      <div class="field"><label for="stsfx">Efeitos sonoros</label>${sel("stsfx",Sound.SFX_SETS,T.opts.efeitos,R.efeitos)}</div></div>
+    ${T.opts.musica==="custom"?`<label class="btn ghost small" style="cursor:pointer">🎵 ${T.hasMusic?"Trocar a música":"Enviar a música (mp3)"}<input type="file" id="stmusf" accept="audio/*" style="display:none"></label>${T.hasMusic?` <span class="tag gold">música carregada</span>`:""}`:""}
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:8px 0"><input type="checkbox" id="stcut" ${T.opts.cortar?"checked":""}> Cortar pausas longas e os trechos ruins</label>
+    <div class="btns"><button class="btn" id="stmake" ${busy||!Cut.supported()?"disabled":""}>🎬 Criar vídeo</button></div>
+    <p class="m" style="font-size:12px">A montagem toca o seu vídeo em tempo real: um story de 30 s leva uns 30 s. Deixe a aba aberta.</p>
+  </div>`:""}
+  ${T.result&&T.result.stored?`<div class="card" style="padding:12px 14px;margin-top:10px"><div class="t">✓ Vídeo pronto</div>
+    <video id="stout" controls playsinline style="width:${T.result.W>T.result.H?"100%":"56%"};margin:6px 0;border-radius:10px;background:#000"></video>
+    ${st&&st.legenda_post?`<div class="field"><label>Legenda do post</label><textarea id="stpost" rows="3">${esc(st.legenda_post)}</textarea></div>`:""}
+    <div class="btns"><button class="btn small" id="stdl">⬇ Baixar o vídeo</button>${st&&st.legenda_post?`<button class="btn ghost small" id="stcopy">📋 Copiar a legenda</button>`:""}<button class="btn ghost small" id="stsave">Salvar na Biblioteca</button><button class="btn ghost small" id="stnew">Novo story</button></div></div>`:""}`; };
+BIND.stories=el=>{
+  const T=story();
+  (async()=>{ const pv=el.querySelector("#stprev"); if(pv){ const b=await Store.get(`st${T.id}:src`); if(b) pv.src=URL.createObjectURL(b); } const ov=el.querySelector("#stout"); if(ov){ const b=await Store.get(mkey(T.id,"video",0)); if(b) ov.src=URL.createObjectURL(b); } })();
+  paintImgs(el);
+  el.querySelector("#stsrc").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await Store.put(`st${T.id}:src`,f); Object.assign(T,{hasSrc:true,srcName:f.name,study:null,result:null}); save(); renderPanel(); };
+  el.querySelector("#stdesc").oninput=e=>{ T.desc=e.target.value; save(); };
+  el.querySelector("#stdest").onchange=e=>{ T.dest=e.target.value; save(); renderPanel(); };
+  el.querySelector("#stmedia").onchange=async e=>{ for(const f of e.target.files){ const id="m"+((T.media.reduce((a,m)=>Math.max(a,+m.id.slice(1)),0))+1); await Store.put(`st${T.id}:${id}`,f); T.media.push({id,name:f.name,type:f.type||"image/jpeg"}); } save(); renderPanel(); };
+  el.querySelectorAll("[data-mdel]").forEach(b=>b.onclick=async ev=>{ ev.stopPropagation(); const id=b.dataset.mdel; T.media=T.media.filter(m=>m.id!==id); await Store.delPrefix(`st${T.id}:${id}`); save(); renderPanel(); });
+  el.querySelector("#ststudy").onclick=runStudy;
+  const on=(id,k)=>{ const x=el.querySelector(id); if(x) x.onchange=e=>{ T.opts[k]=e.target.value; save(); renderPanel(); }; };
+  on("#stcap","legendas"); on("#stfmt","formato"); on("#stmus","musica"); on("#stsfx","efeitos");
+  const ct=el.querySelector("#stcut"); if(ct) ct.onchange=e=>{ T.opts.cortar=e.target.checked; save(); };
+  const mf=el.querySelector("#stmusf"); if(mf) mf.onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await Store.put(`st${T.id}:music`,f); T.hasMusic=true; save(); renderPanel(); };
+  const mk=el.querySelector("#stmake"); if(mk) mk.onclick=runStoryRender;
+  const dl=el.querySelector("#stdl"); if(dl) dl.onclick=async()=>{ const b=await Store.get(mkey(T.id,"video",0)); if(b) saveBlob(b,`${slug(T.study&&T.study.titulo||"story")}.mp4`); };
+  const cp=el.querySelector("#stcopy"); if(cp) cp.onclick=()=>navigator.clipboard?.writeText(el.querySelector("#stpost").value).then(()=>toast("Legenda copiada"));
+  const sv=el.querySelector("#stsave"); if(sv) sv.onclick=()=>{ const st=T.study||{}; S.library.unshift({id:T.id,kind:"story",title:st.titulo||T.desc.slice(0,60)||"Story",description:st.legenda_post||"",hashtags:[],idea:{tema:st.titulo||""},config:{...(S.config||{}),nicho:(S.config||{}).nicho||"Story"},script:[(st.transcricao||[]).map(x=>x.t).join(" ")],scenes:[],done:{},render:{name:"story.mp4",res:T.result.formato,stored:true,secs:T.result.secs},savedAt:Date.now()});
+    const keepId=T.id; S.story=null; save(); Store.delPrefix(`st${keepId}:`); toast("Story salvo na Biblioteca"); openPanel("arquivo"); };
+  const nw=el.querySelector("#stnew"); if(nw) nw.onclick=()=>{ if(!confirm("Começar um story novo? O atual será descartado (salve antes se quiser).")) return; Store.delPrefix(`st${T.id}:`); Store.delPrefix(`p${T.id}:`); S.story=null; save(); renderPanel(); };
+};
+async function runStudy(){
+  const T=story(); ui.stErr=null; setBusy("stories","assistindo o vídeo"); renderPanel();
+  try{
+    const file=await Store.get(`st${T.id}:src`); if(!file) throw {message:"Envie o vídeo de novo."};
+    const media=[]; for(const m of T.media){ const b=await Store.get(`st${T.id}:${m.id}`); if(b) media.push({...m,blob:b}); }
+    T.study=await Story.study({file,desc:T.desc,dest:T.dest,media,signal:busy.ctl.signal,onStatus:a=>{ setAction(a); renderPanel(); }}); T.result=null; save();
+    toast("Estudo pronto! Confira os ajustes e clique em Criar vídeo.");
+  }catch(e){ if(e.code!=="cancelled") ui.stErr=e.message||"O estudo falhou."; }
+  clearBusy(); renderPanel();
+}
+async function runStoryRender(){
+  const T=story(); ui.stErr=null; const R=stResolved(T); setBusy("stories","montando o seu vídeo"); T.prog=0; renderPanel();
+  try{
+    const file=await Store.get(`st${T.id}:src`); const media=[]; for(const m of T.media){ const b=await Store.get(`st${T.id}:${m.id}`); if(b) media.push({...m,blob:b}); }
+    const out=await Story.render({id:T.id,file,media,st:T.study,opts:{...R},signal:busy.ctl.signal,onProgress:p=>{ T.prog=p; setAction(`montando ${Math.round(p*100)}%`); const bar=document.querySelector("#pbody .bar>i"); if(bar) bar.style.width=(p*100)+"%"; }});
+    await Store.put(mkey(T.id,"video",0),out.blob); T.result={stored:true,secs:out.secs,W:out.W,H:out.H,formato:R.formato}; save();
+    toast("Vídeo pronto!");
+  }catch(e){ if(e.code!=="cancelled") ui.stErr=e.message||"A montagem falhou."; }
+  T.prog=null; clearBusy(); renderPanel();
+}
+
 /* ---- Narração ---- */
 let voiceCache={}, sampleUrls={}, playing=null, fullUrl=null;
 function stopAudio(){ if(playing){ try{ playing.pause(); }catch(e){} playing=null; } }
@@ -1293,7 +1379,7 @@ VIEWS.arquivo=()=>`<div class="lib">
     <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
     ${P.sub?`<div class="m" style="font-size:12.5px;margin:6px 0">📱 Short junto: <b>${esc(P.sub.title||"")}</b>${P.sub.render&&P.sub.render.stored?` · <a href="#" data-splay="${i}" style="color:var(--accent)">assistir</a> · <a href="#" data-svid="${i}" style="color:var(--accent)">baixar .mp4</a>`:" · ainda sem vídeo renderizado"}</div><div data-sbox="${i}"></div>`:""}
-    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}${!P.sub&&!AP.on?`<button class="btn small" data-pair="${i}">${P.kind==="short"?"🎬 Gerar o vídeo longo deste Short":"📱 Gerar o Short deste vídeo"}</button>`:""}<button class="btn ghost small" data-recut="${i}" title="Volta pro OnionCut pra mudar template, trilha ou mural e renderizar de novo, sem gastar nada">🎬 Reabrir no OnionCut</button><button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button><button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}${!P.sub&&!AP.on&&P.kind!=="story"?`<button class="btn small" data-pair="${i}">${P.kind==="short"?"🎬 Gerar o vídeo longo deste Short":"📱 Gerar o Short deste vídeo"}</button>`:""}${P.kind==="story"?"":`<button class="btn ghost small" data-recut="${i}" title="Volta pro OnionCut pra mudar template, trilha ou mural e renderizar de novo, sem gastar nada">🎬 Reabrir no OnionCut</button>`}${P.kind==="story"?"":`<button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button>`}<button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
   <p class="m" id="usage" style="font-size:12px;color:var(--muted)"></p>
 </div>`;
 BIND.arquivo=el=>{

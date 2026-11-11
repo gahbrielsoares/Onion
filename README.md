@@ -9,6 +9,7 @@ Cada prédio do **Onion Park** é uma etapa da produção: você clica, configur
 
 | Prédio | Etapa |
 |---|---|
+| Estúdio de Stories | Edita o vídeo que você gravou: estudo por IA, cortes, inserções do produto, textos, legendas e trilha |
 | Laboratório de Ideias | Canal ou marca, busca de temas em alta (opcional) e novo vídeo |
 | Torre dos Títulos | 10 títulos com ângulos e gatilhos |
 | Prédio dos Roteiros | Roteiro em blocos com engenharia de retenção |
@@ -50,6 +51,7 @@ assets/trends.js    sinais de tendência em tempo real
 assets/collage.js   colagem animada: storyboard, elenco recortado, imagens reais e quadros
 assets/doc.js       documentário cinematográfico: storyboard e quadros
 assets/sound.js     trilhas, efeitos sonoros e mixagem
+assets/story.js     Estúdio de Stories: estudo do vídeo e edição em tempo real
 assets/park.js      o parque em pixel art 2.5D, personagens, gerente e câmera
 assets/auto.js      piloto automático e diário do gerente
 assets/vendor/      JSZip e mp4-muxer (MIT)

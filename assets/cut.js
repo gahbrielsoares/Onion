@@ -359,5 +359,27 @@ const Cut = (() => {
     }
   }
 
-  return { pauses, TEMPLATES, prepare, preview, still, render, supported };
+  // gravador genérico de MP4 (usado pelo Estúdio de Stories)
+  async function writer(W, H) {
+    const cfg = await pickConfigs(W, H);
+    const target = new Mp4Muxer.ArrayBufferTarget();
+    const muxer = new Mp4Muxer.Muxer({ target, fastStart: "in-memory", firstTimestampBehavior: "offset", video: { codec: "avc", width: W, height: H, frameRate: FPS }, audio: { codec: cfg.acodec, numberOfChannels: 1, sampleRate: SR } });
+    let err = null, n = 0, last = -1;
+    const ve = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: e => err = e }); ve.configure(cfg.video);
+    const ae = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: e => err = e }); ae.configure(cfg.audio);
+    return {
+      async audio(f32) { for (let off = 0; off < f32.length; off += SR) { const k = Math.min(SR, f32.length - off); const ad = new AudioData({ format: "f32-planar", sampleRate: SR, numberOfFrames: k, numberOfChannels: 1, timestamp: Math.round(off / SR * 1e6), data: f32.slice(off, off + k) }); ae.encode(ad); ad.close(); } await ae.flush(); },
+      async frame(canvas, t) { if (err) throw { code: "encode", message: "O codificador falhou: " + (err.message || err) }; let ts = Math.round(t * 1e6); if (ts <= last) ts = last + 1000; last = ts;
+        const vf = new VideoFrame(canvas, { timestamp: ts, duration: Math.round(1e6 / FPS) }); ve.encode(vf, { keyFrame: n % 60 === 0 }); vf.close(); n++; while (ve.encodeQueueSize > 6) await new Promise(r => setTimeout(r, 2)); },
+      async finish() { await ve.flush(); muxer.finalize(); return new Blob([target.buffer], { type: "video/mp4" }); },
+      close() { try { ve.close(); ae.close(); } catch (e) {} }
+    };
+  }
+  // legendas a partir de palavras com tempo (frases curtas de até 4 palavras)
+  function capsFromWords(words) {
+    const phrases = []; let cur = [];
+    words.forEach((w, i) => { cur.push(w); const nx = words[i + 1]; if (cur.length >= 4 || /[.!?…,;:]["”’)]*$/.test(w.w) || !nx || nx.s - w.e > .45) { phrases.push(cur); cur = []; } });
+    return phrases.map((ws, i) => ({ ws, s: ws[0].s, e: Math.min(ws[ws.length - 1].e + .35, phrases[i + 1] ? phrases[i + 1][0].s : 1e9) }));
+  }
+  return { writer, capsFromWords, drawCaption, pauses, TEMPLATES, prepare, preview, still, render, supported };
 })();
