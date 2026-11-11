@@ -9,13 +9,11 @@ Cada prédio do **Onion Park** é uma etapa da produção: você clica, configur
 
 | Prédio | Etapa |
 |---|---|
-| Laboratório de Virais | Temas com potencial de viralizar por região |
-| Laboratório de Ideias | Configuração do canal e fila de ideias |
+| Laboratório de Ideias | Canal ou marca, busca de temas em alta (opcional) e novo vídeo |
 | Torre dos Títulos | 10 títulos com ângulos e gatilhos |
 | Prédio dos Roteiros | Roteiro em blocos com engenharia de retenção |
 | Redação | Descrição e hashtags |
-| Ateliê de Capas | Textos e composição da thumbnail |
-| Prédio das Imagens | Cenas e prompts no estilo escolhido |
+| Imagens e Marketing | Lista de imagens (Google, Gemini, arquivo ou IA) e a capa |
 | Estúdio de Narração | Voz e velocidade |
 | OnionCut | Montagem do vídeo |
 | Arquivo e Datacenter | Biblioteca de vídeos prontos |
@@ -74,5 +72,6 @@ assets/vendor/      JSZip e mp4-muxer (MIT)
 - [x] Produção casada: cada etapa do vídeo longo já faz a do Short que leva pra ele (abas Longo/Short)
 - [x] Biblioteca: gerar o par que falta (vídeo longo a partir de um Short, ou Short a partir de um vídeo longo)
 - [x] .zip organizado em pastas VIDEO LONGO e SHORT
+- [x] 6 estilos visuais com prévia (Documentário, Moderno, Promocional, Texto em destaque, Colagem, Cenas por IA) e conteúdo de marca/loja
 - [x] Piloto automático: gera N vídeos sozinho, o gerente decide cada etapa e caminha entre os prédios
 - [x] Render em MP4 (H.264) direto no navegador, com WebCodecs (Chrome ou Edge no computador)

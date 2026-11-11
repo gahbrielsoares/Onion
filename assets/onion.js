@@ -19,7 +19,7 @@ var SEG = "long";
 })();
 async function withSeg(seg, fn){ const prev = SEG; SEG = seg; renderProd(); try { return await fn(); } finally { SEG = prev; save(); renderProd(); if (typeof panelKey !== "undefined" && panelKey) renderPanel(); } }
 
-const STAGES = ["titulos","roteiro","descricao","capa","imagens","narracao","montagem"];
+const STAGES = ["titulos","roteiro","descricao","imagens","narracao","montagem"];
 const STAGE_LABEL = {titulos:"Título",roteiro:"Roteiro",descricao:"Descrição",capa:"Capa",imagens:"Imagens",narracao:"Voz",montagem:"Edição"};
 function isUnlocked(k){
   if (k==="virais"||k==="ideias"||k==="arquivo"||k==="admin"||k==="auto") return true;
@@ -35,23 +35,24 @@ function isUnlocked(k){
 }
 function nextStage(){
   if(!AI.ready()) return "admin";
-  const P=S.project; if(!P) return S.ideias.length?"ideias":"virais";
+  const P=S.project; if(!P) return "ideias";
   for(const s of STAGES) if(!P.done[s]) return s;
   return null;
 }
 
 /* ============ OPTIONS ============ */
-const NICHOS=["Orações","Histórias Bíblicas","Mistérios e Casos Não Resolvidos","História Antiga","Curiosidades Científicas","Espaço e Astronomia","Psicologia e Comportamento","Finanças Pessoais","Milionários e Histórias de Sucesso","Motivação e Disciplina","Meditação e Mindfulness","Realeza e Dinastias","True Crime","Saúde 60+","Receitas e Culinária","Outro"];
-const PUBLICOS=["Americanos 50+","Americanos 25–45","Britânicos 40+","Global em inglês","Hispânicos nos EUA","Brasileiros adultos"];
-const FORMATOS=["Documentário contado (estilo história/tour)","Lista (Como morreram, Top 10…)","Narrativa / História","Documentário","Explicativo","Batalha (X vs Y)","Motivacional / Discurso","Oração guiada"];
-const VISUAIS=[["documentario","Documentário cinematográfico (fotos de arquivo, títulos dourados, trilha e efeitos)"],["colagem","Colagem animada (explicador desenhado)"],["cinema","Cenas geradas por IA (imagem inteira)"]];
+const NICHOS=["Mistérios e Casos Não Resolvidos","História","Curiosidades","Crimes Reais","Ciência e Espaço","Psicologia e Comportamento","Finanças e Dinheiro","Milionários e Sucesso","Motivação","Fé e Orações","Saúde e Bem-estar","Tecnologia","Games","Esportes","Animais e Natureza","Viagem","Culinária","Moda e Beleza","Loja / Produto","Serviços / Empresa local","Educação / Curso","Imobiliária","Restaurante / Delivery"];
+const PUBLICOS=["Brasileiros adultos","Jovens 18–30","Público 50+","Mulheres 25–45","Homens 25–45","Pais e mães","Empreendedores","Estudantes","Americanos 50+","Americanos 25–45","Público global em inglês","Clientes da minha loja","Seguidores do Instagram","Moradores da minha cidade"];
+const FORMATOS=["Documentário contado (estilo história/tour)","Narrativa / História","Lista (Top 10, Como morreram…)","Explicativo / Curiosidade","Batalha (X vs Y)","Motivacional / Discurso","Oração guiada","Promocional: venda de produto","Lançamento / oferta relâmpago","Stories do dia a dia da empresa","Depoimento / prova social","Tutorial do produto","Bastidores da marca"];
+const VISUAIS=[["documentario","Documentário"],["moderno","Moderno"],["promocional","Promocional"],["cinetico","Texto em destaque"],["colagem","Colagem animada"],["cinema","Cenas por IA"]];
 const visOf=P=>(((P&&P.config)||S.config||{}).visual)||"documentario";
 const isColagem=P=>visOf(P)!=="cinema";
-const isDoc=P=>visOf(P)==="documentario";
+const isDoc=P=>["documentario","moderno","promocional","cinetico"].includes(visOf(P));
 const isBattle=P=>/batalha/i.test((P.config||{}).formato||"");
-const GANCHOS=["História pessoal","Pergunta intrigante","Fato chocante","Promessa direta","Mistério em aberto"];
+const isPromo=P=>/promocional|lançamento|stories|depoimento|tutorial do produto|bastidores/i.test(((P&&P.config)||S.config||{}).formato||"");
+const GANCHOS=["Fato chocante","Pergunta intrigante","História pessoal","Mistério em aberto","Promessa direta","Problema → solução","Antes e depois","Oferta / benefício direto","Urgência (últimas unidades, só hoje)","Prova social (clientes reais)","Curiosidade (\"você sabia?\")"];
 const IDIOMAS=[["Português","🇧🇷","pt-BR"],["Inglês","🇺🇸","en-US"],["Espanhol","🇪🇸","es-ES"],["Francês","🇫🇷","fr-FR"],["Alemão","🇩🇪","de-DE"],["Japonês","🇯🇵","ja-JP"],["Hindi","🇮🇳","hi-IN"],["Árabe","🇸🇦","ar-SA"]];
-const REGIOES=["Mundo todo","Estados Unidos","Reino Unido","Canadá","Austrália","Brasil","Índia","Alemanha"];
+const REGIOES=()=>Object.keys(Trends.REG);
 const STYLES=[["Cinemático realista","#2b3a4a","#c9a26b"],["Pintura a óleo","#5a3a1e","#d8a35a"],["Aquarela suave","#9ec5d8","#f2d6e3"],["Natureza sagrada","#24452c","#e8d27a"],["Documentário sci-fi","#0f2a3d","#4fd1e8"],["Gravura medieval","#3a3226","#cbbd9a"],["Polaroid vintage","#a88f6a","#efe1c2"],["Massinha (claymation)","#d86a4a","#f6c35a"],["Livro infantil","#f0b46a","#9ad0e8"],["Anime cinematográfico","#3a2a6a","#ff9ac8"],["Pixel art","#2a2a4a","#7cff9a"],["Noir em P&B","#111111","#9a9a9a"],["Isométrico 3D","#4a6aff","#ffd36a"],["Quadro de true crime","#2a1a14","#d84a3a"],["Ilustração médica","#e8eef2","#d85a6a"],["Low poly 3D","#3a7a9a","#f2a65a"],["Zen minimalista","#e8e4dc","#9aa88a"],["Surreal conceitual","#3a1a4a","#ff8a3a"],["Whiteboard animado","#f4f4f4","#3a3a3a"],["Stop motion","#7a4a2a","#e8c08a"],["Jornal antigo","#d8d0bc","#4a4436"],["Luz divina","#f2e2b0","#ffffff"],["Editorial de luxo","#1a1a1a","#d4af37"],["Origami","#f2efe6","#e86a5a"]];
 const VOICES={
   "ElevenLabs":[["Roger","masculina, calma, ressonante","#5b6ee1"],["George","masculina, contador de histórias","#7a5be1"],["Brian","masculina, grave, madura","#3a7ae1"],["Sarah","feminina, madura, confiante","#e15b9a"],["Lily","feminina, suave, britânica","#c75be1"],["Bella","feminina, calorosa","#e17a5b"]],
@@ -64,17 +65,15 @@ const CAPTIONS=["Palavra por palavra","Karaokê","Frase curta","Sem legenda"];
 
 /* ============ BUILDINGS ============ */
 const B=[
- {k:"virais",n:"Laboratório de Virais",gx:3,gy:3,w:9,d:7,c:"#e8836a",role:"Analista",idle:"de olho nas tendências",desc:"Escolha uma região e a equipe levanta temas com potencial de viralizar. Mande os melhores pro Laboratório de Ideias."},
- {k:"ideias",n:"Laboratório de Ideias",gx:16,gy:2,w:9,d:8,c:"#e0b14a",role:"Produtor",idle:"organizando a fila",desc:"Guarda as configurações do canal e a fila de ideias. Escolha uma e comece a produção."},
+ {k:"ideias",n:"Laboratório de Ideias",gx:3,gy:3,w:12,d:7,c:"#e0b14a",role:"Produtor",idle:"organizando a fila",desc:"Configure o canal ou a marca, busque temas em alta (opcional) e comece um vídeo novo."},
  {k:"titulos",n:"Torre dos Títulos",gx:29,gy:3,w:7,d:7,c:"#5fbf95",role:"Copywriter",step:1,h:24,desc:"Cria 10 títulos com ângulos e gatilhos diferentes. O roteiro inteiro é escrito pro título que você escolher."},
  {k:"arquivo",n:"Arquivo e Datacenter",gx:39,gy:2,w:6,d:9,c:"#6f93d6",desc:"Onde ficam guardados os vídeos prontos. Abra pra ver e baixar tudo o que já foi produzido."},
  {k:"roteiro",n:"Prédio dos Roteiros",gx:3,gy:15,w:10,d:7,c:"#9b84e0",role:"Roteirista",step:2,desc:"Escreve o roteiro em blocos, com gancho, contexto e desenvolvimento, conectando as partes pra segurar a atenção."},
  {k:"descricao",n:"Redação",gx:17,gy:16,w:7,d:5,c:"#56b7c9",role:"Redator",step:3,desc:"Lê o roteiro inteiro e escreve a descrição, com convite pra se inscrever, uma pergunta e hashtags."},
- {k:"capa",n:"Ateliê de Capas",gx:28,gy:15,w:8,d:6,c:"#e57aa5",role:"Diretor de arte",step:4,desc:"Cria 4 versões de capa com frase de impacto. A marcada é a que vai pro vídeo."},
- {k:"imagens",n:"Prédio das Imagens",gx:3,gy:27,w:10,d:7,c:"#c46fc9",role:"Ilustrador",step:5,desc:"Divide o roteiro em cenas, escreve um prompt pra cada uma e gera as imagens no estilo escolhido."},
- {k:"narracao",n:"Estúdio de Narração",gx:17,gy:27,w:7,d:6,c:"#e09a52",role:"Narrador",step:6,dark:true,desc:"Grava o roteiro com a voz escolhida, no ritmo certo pro seu público."},
+ {k:"imagens",n:"Imagens e Marketing",gx:3,gy:27,w:10,d:7,c:"#c46fc9",role:"Ilustrador",step:4,desc:"Lista as imagens que o vídeo precisa e ajuda a preencher (Google, Gemini, arquivo ou IA). A capa do vídeo também fica aqui."},
+ {k:"narracao",n:"Estúdio de Narração",gx:17,gy:27,w:7,d:6,c:"#e09a52",role:"Narrador",step:5,dark:true,desc:"Grava o roteiro com a voz escolhida, no ritmo certo pro seu público."},
  {k:"admin",n:"Administração",gx:41,gy:28,w:4,d:5,c:"#8e98ab",role:"Gestor",desc:"Onde ficam as chaves das APIs e as preferências do Onion. Comece por aqui."},
- {k:"montagem",n:"OnionCut",gx:30,gy:27,w:10,d:8,c:"#a77be0",role:"Editor",step:7,desc:"O montador automático: junta cenas, voz e legendas, corta nas pausas da narração e entrega o vídeo."},
+ {k:"montagem",n:"OnionCut",gx:30,gy:27,w:10,d:8,c:"#a77be0",role:"Editor",step:6,desc:"O montador automático: junta cenas, voz e legendas, corta nas pausas da narração e entrega o vídeo."},
 ];
 const BK=Object.fromEntries(B.map(b=>[b.k,b]));
 
@@ -85,13 +84,13 @@ function showInfo(b){
   const el=document.getElementById("info");
   if(!b){ el.innerHTML=`<h2>Você no comando</h2><p>Cada prédio é uma etapa. Clique num prédio pra abrir as opções e mande o trabalho pro próximo.</p>`; return; }
   const locked=!isUnlocked(b.k);
-  el.innerHTML=`<h2><span class="sq" style="background:${b.c}"></span>${esc(b.n)}</h2><p>${esc(b.desc)}</p><div class="hint">${b.step?`Etapa ${b.step} de 7 · `:""}${locked?"Bloqueado até a etapa anterior terminar":"Clique no prédio pra abrir"}</div>`;
+  el.innerHTML=`<h2><span class="sq" style="background:${b.c}"></span>${esc(b.n)}</h2><p>${esc(b.desc)}</p><div class="hint">${b.step?`Etapa ${b.step} de 6 · `:""}${locked?"Bloqueado até a etapa anterior terminar":"Clique no prédio pra abrir"}</div>`;
 }
 function renderProd(){
   const el=document.getElementById("prod"); const P=S.project;
   const ap=(typeof AP!=="undefined"&&AP.on)?`<div class="st" style="color:var(--accent);font-weight:700">🤖 Piloto automático · vídeo ${AP.cur} de ${AP.total} <button class="btn ghost small" style="padding:2px 8px;margin-left:auto" onclick="openPanel('auto')">ver</button></div>`:"";
   el.classList.toggle("mobile", !!(busy||P) && vw<720 && !panelKey);
-  if(!P){ el.innerHTML=ap+`<div class="st">Nada em produção</div><div class="tt">Comece no Laboratório de Virais ou de Ideias</div><div class="bar"><i style="width:0"></i></div>`; return; }
+  if(!P){ el.innerHTML=ap+`<div class="st">Nada em produção</div><div class="tt">Comece no Laboratório de Ideias</div><div class="bar"><i style="width:0"></i></div>`; return; }
   const done=STAGES.filter(s=>P.done[s]).length;
   const all=done===STAGES.length;
   el.innerHTML=ap+`<div class="st">${busy?`<span class="spin"></span> ${esc(BK[busy.k].n)}: ${esc(busy.action||"trabalhando")}`:(all?"✓ Vídeo concluído":"Em produção")}</div>
@@ -133,10 +132,10 @@ function aiNote(){
 }
 
 function newProject(idea,kind){
-  kind=kind||"long"; const v=visOf(null), col=v!=="cinema", doc=v==="documentario";
+  kind=kind||"long"; const v=visOf(null), col=v!=="cinema", doc=["documentario","moderno","promocional","cinetico"].includes(v);
   const P={id:Date.now(),kind,idea,config:{...S.config,visual:v},done:{},titles:[],script:[],scenes:[],style:STYLES[0][0],voice:null,voiceName:null,speed:1,
-    res:kind==="short"?"short":"1080p",template:doc?"Azul noturno":col?"Azul explicador":TEMPLATES[0],captions:kind==="short"?"Palavra por palavra":(col?"Sem legenda":CAPTIONS[0]),
-    sound:{mood:doc?"Tensão (documentário)":col?"Leve (curiosidades)":"Inspirador",sfx:true,custom:false}};
+    res:kind==="short"?"short":"1080p",template:doc?Doc.DEF[v]||"Azul noturno":col?"Azul explicador":TEMPLATES[0],captions:kind==="short"?"Palavra por palavra":(col?"Sem legenda":CAPTIONS[0]),
+    sound:{mood:v==="promocional"?"Promocional (animado)":v==="cinetico"?"Pop animado":v==="moderno"?"Inspirador":doc?"Tensão (documentário)":col?"Leve (curiosidades)":"Inspirador",sfx:true,sfxSet:v==="promocional"||v==="cinetico"?"Promocional (pop e brilho)":"Documentário (whoosh, impacto, clique)",custom:false}};
   if(kind==="short"){ P.config.duracao=1; P.done.capa=true; }
   return P;
 }
@@ -190,7 +189,7 @@ async function comboAfter(stage){
 let panelKey=null;
 function openPanel(k){
   panelKey=k; const b=BK[k]||PSEUDO[k];
-  document.getElementById("ptitle").innerHTML=esc(b.n)+(b.step?`<span class="step">Etapa ${b.step} de 7 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Configurações":(k==="auto"?"O gerente decide tudo":"Sempre aberto"))}</span>`);
+  document.getElementById("ptitle").innerHTML=esc(b.n)+(b.step?`<span class="step">Etapa ${b.step} de 6 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Configurações":(k==="auto"?"O gerente decide tudo":"Sempre aberto"))}</span>`);
   document.getElementById("psq").style.background=b.c;
   document.getElementById("panel").classList.add("open"); document.getElementById("panel").setAttribute("aria-hidden","false");
   document.getElementById("scrim").classList.toggle("open", k!=="auto");
@@ -223,78 +222,97 @@ function bindPills(el,name,cb){ el.querySelectorAll(`[data-group="${name}"] .pil
 const VIEWS={}, BIND={};
 let ui={}; // transient UI errors etc
 
-/* ---- Virais ---- */
-function vSources(){ if(!S.viraisSources||S.viraisSources.v!==2) S.viraisSources={v:2,sites:true,youtube:false,google:true,wiki:true}; return S.viraisSources; }
-function srcStatus(){
-  const k=AI.get().keys;
-  return { sites: !!k.google, youtube: !!(k.youtube||k.google), google: !!k.google, wiki: true };
+/* ---- Prévias dos estilos visuais (desenhadas com o próprio motor do OnionCut) ---- */
+const _prev={};
+function sampleScene(w,h){
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const g=c.getContext("2d");
+  const sky=g.createLinearGradient(0,0,0,h); sky.addColorStop(0,"#6f93b5"); sky.addColorStop(.7,"#e3c9a0"); g.fillStyle=sky; g.fillRect(0,0,w,h);
+  g.fillStyle="#7a8794"; [[.02,.42,.16],[.2,.3,.12],[.34,.48,.1],[.6,.36,.15],[.8,.44,.18]].forEach(([x,y,ww])=>g.fillRect(x*w,y*h,ww*w,(.74-y)*h));
+  g.fillStyle="#4d5a63"; for(let i=0;i<40;i++) g.fillRect(((i*37)%100)/100*w,(.45+((i*17)%25)/100)*h,w*.012,h*.02);
+  g.fillStyle="#3b4337"; g.fillRect(0,h*.74,w,h*.26);
+  g.fillStyle="#241f1c"; g.beginPath(); g.arc(w*.47,h*.5,h*.055,0,7); g.fill(); g.fillRect(w*.435,h*.56,w*.07,h*.22);
+  return c;
 }
-VIEWS.virais=()=>{ const src=vSources(), ok=srcStatus(), sig=S.viraisSig; const live=(src.sites&&ok.sites)||(src.youtube&&ok.youtube)||(src.google&&ok.google)||src.wiki; return `
-  <p class="lead">A equipe lê o que está bombando agora e transforma em temas de vídeo. Mande os melhores pro Laboratório de Ideias.</p>
-  <h3>Região</h3>${pills("reg",REGIOES,S.viraisRegion)}
-  <h3>Fontes ao vivo</h3>
-  <div class="card" style="padding:10px 12px">
-    ${[["sites","🌐 Sites de tendência","Google Trends, X (trends24), TikTok Creative Center, Reddit, Google Notícias e Exploding Topics, lidos pelo Gemini agora",ok.sites?"":"precisa da chave do Google"],
-       ["youtube","▶ YouTube em alta","vídeos que mais ganham views por hora na região",ok.youtube?"":"precisa da chave do Google com a YouTube Data API ativada"],
-       ["google","🔎 Google agora","o Gemini pesquisa no Google o que está em alta nos últimos 7 dias",ok.google?"":"precisa da chave do Google"],
-       ["wiki","📖 Wikipedia mais lidas","o que mais gente leu ontem (grátis, sem chave)",""]].map(([k,t,d,need])=>`
-      <label style="display:flex;gap:10px;align-items:flex-start;padding:5px 0;${need?"opacity:.55":""}"><input type="checkbox" data-src="${k}" ${src[k]&&!need?"checked":""} ${need?"disabled":""} style="margin-top:3px">
-      <span><b>${t}</b><br><span class="m" style="font-size:12.5px">${d}${need?` · <a href="#" onclick="openPanel('admin');return false" style="color:var(--accent)">${need}</a>`:""}</span></span></label>`).join("")}
-  </div>
-  <div class="field" style="margin-top:12px"><label for="vn">Nicho ou palavra-chave (opcional)</label><input id="vn" value="${esc(S.viraisNicho)}" placeholder="${esc(S.config?S.config.nicho:"Ex.: mistérios, golpes, games")}"></div>
-  <div class="field"><label>Temas</label>${pills("vmodo",["Ligados ao nicho do canal","Qualquer assunto bombando"],S.viraisModo||"Ligados ao nicho do canal")}</div>
-  ${aiNote()}
-  <div class="btns"><button class="btn" id="vgo" ${busy||!AI.ready()?"disabled":""}>✦ ${S.viraisResults.length?"Buscar de novo":"Buscar o que está bombando"}</button>${busy&&busy.k==="virais"?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
-  ${busy&&busy.k==="virais"?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>`:""}
-  ${ui.virErr?`<div class="err">${esc(ui.virErr)}</div>`:""}
-  ${sig&&sig.avisos&&sig.avisos.length?`<div class="note">${sig.avisos.map(a=>"⚠ "+esc(a)).join("<br>")}</div>`:""}
-  ${!live?`<div class="note">Sem fontes ao vivo ligadas, os temas vêm só do conhecimento da IA, sem dados de agora.</div>`:""}
-  ${sig?`<details class="card" style="padding:10px 12px"><summary style="cursor:pointer;font-weight:700">Sinais coletados · ${new Date(sig.at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})} · ${esc(sig.region)}</summary>
-    ${sig.sites?`<h3>🌐 Sites de tendência</h3>${sig.sites.porFonte.map(f=>`<div style="margin:6px 0"><b style="font-size:13px">${f.lido?"✓":"🔎"} <a href="${esc(f.url)}" target="_blank" rel="noopener" style="color:var(--text)">${esc(f.nome)}</a></b>${f.lido?"":` <span class="m" style="font-size:11.5px">(via Pesquisa Google)</span>`}
-      <div class="m" style="font-size:12.5px">${f.itens.length?f.itens.slice(0,6).map(i=>`${esc(i.assunto)}${i.ev?` <span style="opacity:.75">(${esc(i.ev)})</span>`:""}`).join(" · "):"nada encontrado agora"}</div></div>`).join("")}`:""}
-    ${sig.youtube?`<h3>▶ YouTube em alta (mais views por hora)</h3>${sig.youtube.pop.slice(0,10).map(v=>`<div class="m" style="font-size:12.5px;padding:3px 0"><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener" style="color:var(--text)">${esc(v.titulo)}</a> · ${Trends.fmtN(v.views)} views · <b>${Trends.fmtN(v.porHora)}/h</b></div>`).join("")}
-      ${sig.youtube.nicho.length?`<h3>No nicho, última semana</h3>${sig.youtube.nicho.slice(0,8).map(v=>`<div class="m" style="font-size:12.5px;padding:3px 0"><a href="https://www.youtube.com/watch?v=${esc(v.id)}" target="_blank" rel="noopener" style="color:var(--text)">${esc(v.titulo)}</a> · ${Trends.fmtN(v.views)} · <b>${Trends.fmtN(v.porHora)}/h</b></div>`).join("")}`:""}`:""}
-    ${sig.google&&sig.google.fontes.length?`<h3>🔎 Fontes do Google</h3>${sig.google.fontes.map(f=>`<div class="m" style="font-size:12.5px;padding:2px 0"><a href="${esc(f.url)}" target="_blank" rel="noopener" style="color:var(--accent)">${esc(f.titulo)}</a></div>`).join("")}`:""}
-    ${sig.wiki?`<h3>📖 Wikipedia, ${esc(sig.wiki.dia)}</h3><div class="m" style="font-size:12.5px">${sig.wiki.artigos.slice(0,15).map(a=>`${esc(a.titulo)} (${Trends.fmtN(a.views)})`).join(" · ")}</div>`:""}
-  </details>`:""}
-  ${S.viraisResults.map((v,i)=>`<div class="card"><div class="t">${esc(v.tema)}</div><div class="m">${esc(v.angulo)}</div><div class="m">${esc(v.porque)}</div>
-    ${v.sinal?`<div class="m" style="margin-top:4px;color:var(--text)">📈 ${esc(v.sinal)}</div>`:""}
-    <div class="tags"><span class="tag ${v.potencial==="alto"?"hot":""}">potencial ${esc(v.potencial)}</span>${v.urgencia?`<span class="tag ${v.urgencia==="agora"?"hot":"gold"}">${v.urgencia==="agora"?"🔥 surfar agora":v.urgencia==="esta semana"?"esta semana":"perene"}</span>`:""}<span class="tag">${esc(v.nicho)}</span></div>
-    <div class="btns" style="margin-top:8px">${v.enviado?`<span class="tag gold">✓ Enviado pro Laboratório de Ideias</span>`:`<button class="btn small" data-send="${i}">Enviar pro Laboratório de Ideias</button>`}</div></div>`).join("")}
-`; };
-BIND.virais=el=>{
-  bindPills(el,"reg",v=>{S.viraisRegion=v; save();});
-  bindPills(el,"vmodo",v=>{S.viraisModo=v; save();});
-  el.querySelectorAll("[data-src]").forEach(c=>c.onchange=()=>{ vSources()[c.dataset.src]=c.checked; save(); renderPanel(); });
-  const vn=el.querySelector("#vn"); vn.oninput=()=>{S.viraisNicho=vn.value; save();};
+function sampleProduct(w,h){
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const g=c.getContext("2d");
+  const bg=g.createLinearGradient(0,0,w,h); bg.addColorStop(0,"#f6e7dc"); bg.addColorStop(1,"#e4c8b6"); g.fillStyle=bg; g.fillRect(0,0,w,h);
+  g.fillStyle="rgba(0,0,0,.15)"; g.beginPath(); g.ellipse(w*.5,h*.86,w*.13,h*.04,0,0,7); g.fill();
+  g.fillStyle="#2f6f5e"; g.beginPath(); g.roundRect(w*.42,h*.3,w*.16,h*.56,18); g.fill(); g.fillStyle="#24584a"; g.fillRect(w*.465,h*.18,w*.07,h*.14);
+  g.fillStyle="#f3efe6"; g.fillRect(w*.435,h*.5,w*.13,h*.16); g.fillStyle="#2f6f5e"; g.fillRect(w*.45,h*.55,w*.1,h*.02); g.fillRect(w*.46,h*.6,w*.08,h*.015);
+  return c;
+}
+function sampleChar(w,h){
+  const c=document.createElement("canvas"); c.width=w; c.height=h; const g=c.getContext("2d"); g.lineWidth=6; g.strokeStyle="#2b2b2b";
+  g.fillStyle="#b9b9c4"; g.beginPath(); g.moveTo(w*.3,h*.95); g.lineTo(w*.36,h*.4); g.lineTo(w*.64,h*.4); g.lineTo(w*.7,h*.95); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle="#e8c6a8"; g.beginPath(); g.arc(w*.5,h*.26,h*.13,0,7); g.fill(); g.stroke();
+  g.fillStyle="#5a3b25"; g.beginPath(); g.arc(w*.5,h*.2,h*.11,Math.PI,0); g.fill();
+  g.fillStyle="#d8c79c"; g.fillRect(w*.58,h*.5,w*.1,h*.2); g.strokeRect(w*.58,h*.5,w*.1,h*.2);
+  return c;
+}
+async function stylePreview(v){
+  if(_prev[v]) return _prev[v];
+  try{ await Promise.all(["700 40px Cinzel","40px Anton","800 40px Figtree"].map(f=>document.fonts.load(f))); }catch(e){}
+  const W=480,H=270,c=document.createElement("canvas"); c.width=W; c.height=H;
+  const scene=sampleScene(960,540), cap=[{ws:[{w:"ESSA",s:0,e:.6},{w:"HISTÓRIA",s:.6,e:1.6},{w:"MUDOU",s:1.6,e:2.4}],s:0,e:4}];
+  let R,o,t=2.4;
+  if(v==="colagem"){ R={mode:"colagem",dur:9,assets:{a:{bmp:sampleChar(300,400),real:false,nome:""}},scenes:[{s:0,e:9,beat:{elementos:["a"],texto:"filósofa",titulo:"Hipátia",avatar:"a"}}],caps:[]}; o={template:"Azul explicador",captions:"Sem legenda"}; }
+  else if(v==="cinema"){ R={mode:"cinema",dur:9,bitmaps:[scene],scenes:[{s:0,e:9,j:0,v:0}],caps:cap}; o={template:TEMPLATES[0],captions:"Palavra por palavra"}; t=1; }
+  else {
+    const beat={documentario:{tipo:"nome",img:"p",texto:"Winston Churchill",subtexto:"Primeiro-ministro *britânico*"},
+      moderno:{tipo:"nome",img:"p",texto:"Como tudo começou",subtexto:"Berlim, *1945*"},
+      promocional:{tipo:"titulo",img:"q",texto:"50% OFF",subtexto:"Só *hoje*"},
+      cinetico:{tipo:"titulo",img:"",texto:"VOCÊ SABIA?",subtexto:""}}[v];
+    R={mode:"doc",dur:9,assets:{p:{bmp:scene,nome:""},q:{bmp:sampleProduct(960,540),nome:""}},scenes:[{s:0,e:9,beat}],caps:[]};
+    o={template:Doc.DEF[v],captions:"Sem legenda",theme:v};
+  }
+  Cut.still(R,c,o,t);
+  return _prev[v]=c.toDataURL("image/jpeg",.85);
+}
+
+/* ---- Buscar temas (dentro do Laboratório de Ideias) ---- */
+function vSources(){ if(!S.viraisSources||S.viraisSources.v!==3) S.viraisSources={v:3,sites:true,ia:true}; return S.viraisSources; }
+function viraisSection(){
+  const src=vSources(), g=!!AI.get().keys.google, sig=S.viraisSig, open=ui.virOpen||S.viraisResults.length>0;
+  return `<details class="card" style="padding:0;margin-top:10px" ${open?"open":""} id="virdet"><summary style="padding:12px;cursor:pointer;font-weight:700">🔥 Buscar temas em alta <span class="m" style="font-weight:400;font-size:12.5px">(opcional)</span></summary><div style="padding:0 12px 12px">
+    <div class="field"><label for="vreg">País</label><select id="vreg">${REGIOES().map(r=>`<option ${r===S.viraisRegion?"selected":""}>${r}</option>`).join("")}</select></div>
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:4px 0"><input type="checkbox" data-src="sites" ${src.sites?"checked":""} style="margin-top:3px"><span><b>🌐 Sites de tendência</b><br><span class="m" style="font-size:12.5px">Google Trends, X (trends24), Reddit, Google Notícias e Wikipedia${g?"":" (sem a chave do Google, só a Wikipedia)"}</span></span></label>
+    <label style="display:flex;gap:10px;align-items:flex-start;padding:4px 0;${g?"":"opacity:.55"}"><input type="checkbox" data-src="ia" ${src.ia&&g?"checked":""} ${g?"":"disabled"} style="margin-top:3px"><span><b>🤖 Sugestão da IA</b><br><span class="m" style="font-size:12.5px">a IA pesquisa no Google os virais do momento${g?"":" · precisa da chave do Google"}</span></span></label>
+    <div class="field" style="margin-top:6px"><label for="vn">✍️ Escolha o tema você mesmo (opcional)</label><input id="vn" value="${esc(S.viraisNicho)}" placeholder="Ex.: cangaço, GTA 6, minha loja de tênis…"></div>
+    <div class="btns"><button class="btn small" id="vgo" ${busy||!AI.ready()?"disabled":""}>🔎 Buscar temas</button>${busy&&busy.k==="ideias"?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
+    ${busy&&busy.k==="ideias"?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>`:""}
+    ${ui.virErr?`<div class="err">${esc(ui.virErr)}</div>`:""}
+    ${sig&&sig.avisos&&sig.avisos.length?`<div class="m" style="font-size:12px">${sig.avisos.map(a=>"⚠ "+esc(a)).join("<br>")}</div>`:""}
+    ${S.viraisResults.map((v,i)=>`<div class="card" style="margin-top:8px"><div class="t">${esc(v.tema)}</div><div class="m">${esc(v.angulo||"")}</div>
+      ${v.sinal?`<div class="m" style="margin-top:3px;color:var(--text)">📈 ${esc(v.sinal)}</div>`:""}
+      <div class="tags">${v.urgencia?`<span class="tag ${v.urgencia==="agora"?"hot":"gold"}">${v.urgencia==="agora"?"🔥 surfar agora":v.urgencia==="esta semana"?"esta semana":"perene"}</span>`:""}<span class="tag">${esc(v.nicho||"")}</span></div>
+      <div class="btns" style="margin-top:6px"><button class="btn small" data-usev="${i}">Usar este tema</button><button class="btn ghost small" data-fila="${i}" ${v.enviado?"disabled":""}>${v.enviado?"Na fila ✓":"Guardar na fila"}</button></div></div>`).join("")}
+  </div></details>`;
+}
+function bindVirais(el){
+  const det=el.querySelector("#virdet"); if(det) det.ontoggle=()=>{ ui.virOpen=det.open; };
+  const reg=el.querySelector("#vreg"); if(reg) reg.onchange=()=>{ S.viraisRegion=reg.value; save(); };
+  el.querySelectorAll("[data-src]").forEach(c=>c.onchange=()=>{ vSources()[c.dataset.src]=c.checked; save(); });
+  const vn=el.querySelector("#vn"); if(vn) vn.oninput=()=>{ S.viraisNicho=vn.value; save(); };
   const go=el.querySelector("#vgo"); if(go) go.onclick=runVirais;
-  el.querySelectorAll("[data-send]").forEach(b=>b.onclick=()=>{
-    const v=S.viraisResults[+b.dataset.send]; v.enviado=true;
-    S.ideias.push({id:Date.now()+Math.random(),tema:v.tema,angulo:v.angulo,origem:"Virais · "+S.viraisRegion}); save();
-    courier("virais","ideias"); toast("Ideia enviada pro Laboratório de Ideias"); renderPanel();
-  });
-};
+  el.querySelectorAll("[data-usev]").forEach(b=>b.onclick=()=>{ const v=S.viraisResults[+b.dataset.usev]; const D=draft(); D.tema=v.tema; if(!D.ideia) D.ideia=v.angulo||""; D.origem="Em alta · "+S.viraisRegion; save(); renderPanel(); const t=document.getElementById("dtema"); if(t){ t.scrollIntoView({behavior:"smooth",block:"center"}); t.focus(); } toast("Tema colocado no Novo vídeo"); });
+  el.querySelectorAll("[data-fila]").forEach(b=>b.onclick=()=>{ const v=S.viraisResults[+b.dataset.fila]; v.enviado=true; S.ideias.push({id:Date.now()+Math.random(),tema:v.tema,angulo:v.angulo,origem:"Em alta · "+S.viraisRegion}); save(); toast("Guardado na fila"); renderPanel(); });
+}
 async function runVirais(){
-  ui.virErr=null; setBusy("virais","varrendo "+S.viraisRegion); renderPanel();
-  const src=vSources(), ok=srcStatus();
-  const niche=(S.viraisNicho||"").trim()||(S.viraisModo==="Qualquer assunto bombando"?"":(S.config?S.config.nicho:""));
+  ui.virErr=null; setBusy("ideias","buscando temas em "+S.viraisRegion); renderPanel();
+  const src=vSources(), g=!!AI.get().keys.google, kw=(S.viraisNicho||"").trim();
   let sig=null;
   try{
-    sig=await Trends.collect({region:S.viraisRegion,niche,sources:{sites:src.sites&&ok.sites,youtube:src.youtube&&ok.youtube,google:src.google&&ok.google,wiki:src.wiki},onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal});
-    if(sig&&sig.avisos.some(a=>/^YouTube: .*recusou|^YouTube: .*não está ativada/.test(a))){ vSources().youtube=false; }
+    sig=await Trends.collect({region:S.viraisRegion,niche:kw,sources:{sites:src.sites&&g,wiki:src.sites,google:src.ia&&g},onStatus:a=>{ setAction(a); renderPanel(); },signal:busy.ctl.signal});
     S.viraisSig=sig; save();
   }catch(e){ if(e.code==="cancelled"){ clearBusy(); return renderPanel(); } }
   if(busy&&busy.cancel){ clearBusy(); return renderPanel(); }
-  setAction("transformando os sinais em temas"); renderPanel();
-  const dados=sig?Trends.asPrompt(sig):"";
-  const livre=S.viraisModo==="Qualquer assunto bombando";
-  const hoje=new Date().toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"});
-  const prompt=`Você é o analista de tendências de uma produtora de canais faceless ("dark") no YouTube. Hoje é ${hoje}.
-Região do público: ${S.viraisRegion}. ${S.config?`Canal: ${cfgText()}`:""}
-${livre?"Modo: qualquer assunto que esteja bombando, mesmo fora do nicho do canal.":`Modo: ligue o que está em alta ao nicho do canal${niche?` (${niche})`:""}. Ex.: se um game está em alta e o canal é de mistérios, um tema seria “os mistérios escondidos de <game>”.`}
-${dados?`\nDADOS COLETADOS AGORA (use como base principal; prefira assuntos com mais views por hora e que aparecem em mais de uma fonte):\n${dados}\n`:"\nNão há dados ao vivo; use datas e assuntos recorrentes do período.\n"}
-Liste 8 temas de vídeo longo (10+ min) com alto potencial de clique imediato: a pessoa bate o olho e quer assistir. Nada genérico; cada tema específico o bastante pra virar um título. Priorize o que está em crescimento agora pra surfar a onda.
-Para cada item: "tema" (em português, 1 frase curta), "angulo" (como abordar pra ser diferente do que já existe), "porque" (por que vai dar views agora), "sinal" (a evidência dos dados acima: qual vídeo, busca ou artigo, com números; vazio se não houver), "urgencia" ("agora", "esta semana" ou "perene"), "nicho" (1-3 palavras), "potencial" ("alto" ou "médio").
+  setAction("escolhendo os melhores temas"); renderPanel();
+  const dados=sig?Trends.asPrompt(sig):"", hoje=new Date().toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"});
+  const prompt=`Você é o analista de tendências de uma produtora de vídeos (YouTube, Shorts, Reels e conteúdo de marca). Hoje é ${hoje}.
+País do público: ${S.viraisRegion}. ${S.config?`Canal/marca: ${cfgText()}`:""}
+${kw?`O criador escolheu este tema/palavra-chave: "${kw}". Todos os temas devem girar em torno dele, usando o que estiver em alta pra deixá-lo atual.`:"Ligue o que está em alta ao nicho do canal/marca quando fizer sentido."}
+${dados?`\nDADOS COLETADOS AGORA (base principal; prefira o que aparece em mais de uma fonte):\n${dados}\n`:"\nSem dados ao vivo: use datas e assuntos recorrentes do período.\n"}
+Liste 8 temas de vídeo com alto potencial de clique imediato, específicos o bastante pra virar título. Para cada: "tema" (português, 1 frase curta), "angulo" (como abordar), "sinal" (a evidência dos dados, com números; vazio se não houver), "urgencia" ("agora", "esta semana" ou "perene"), "nicho" (1-3 palavras).
 Responda só com JSON: {"ideias":[...]}`;
   try{ const r=await ask(prompt,{json:true}); S.viraisResults=(r.ideias||[]).slice(0,10); save(); }
   catch(e){ ui.virErr=errMsg(e); }
@@ -305,26 +323,25 @@ Responda só com JSON: {"ideias":[...]}`;
 function draft(){ if(!S.draft) S.draft={tema:"",ideia:"",comeco:"",meio:"",fim:"",mural:false,nomes:""}; return S.draft; }
 VIEWS.ideias=()=>{
   const D=draft();
-  const c=S.config||{nicho:"Orações",publico:"Americanos 50+",formato:"Motivacional / Discurso",gancho:"História pessoal",voz:"Masculina",duracao:15,idioma:"Inglês"};
-  const blocks=Math.max(2,Math.round(c.duracao/5));
+  const c=S.config||{nicho:"",publico:"",formato:FORMATOS[0],gancho:GANCHOS[0],voz:"Masculina",duracao:10,idioma:"Português",visual:"documentario",ipm:3};
   return `
-  <details ${S.config?"":"open"} class="card" style="padding:0"><summary style="padding:12px;cursor:pointer;font-weight:700">Seu canal ${S.config?`<span class="tag gold">${esc(c.nicho)} · ${esc(c.idioma)}</span>`:`<span class="tag hot">configure primeiro</span>`}</summary>
+  <details ${S.config?"":"open"} class="card" style="padding:0"><summary style="padding:12px;cursor:pointer;font-weight:700">Seu canal ou marca ${S.config?`<span class="tag gold">${esc(c.nicho)} · ${esc(c.idioma)}</span>`:`<span class="tag hot">configure primeiro</span>`}</summary>
   <div style="padding:0 12px 12px">
-  <p class="lead" style="margin-top:0">Você escolhe uma vez e vale pro canal inteiro.</p>
-  <div class="field"><label for="cn">Nicho do canal</label><select id="cn">${NICHOS.map(n=>`<option ${n===c.nicho||(!NICHOS.includes(c.nicho)&&n==="Outro")?"selected":""}>${n}</option>`).join("")}</select></div>
-  <div class="field" id="cno" style="${NICHOS.includes(c.nicho)&&c.nicho!=="Outro"?"display:none":""}"><label for="cnx">Qual é o seu nicho?</label><input id="cnx" value="${NICHOS.includes(c.nicho)?"":esc(c.nicho)}" placeholder="Digite o seu nicho"></div>
-  <div class="row"><div class="field"><label for="cp">Público-alvo</label><select id="cp">${PUBLICOS.map(n=>`<option ${n===c.publico?"selected":""}>${n}</option>`).join("")}</select></div>
+  <datalist id="dl-nicho">${NICHOS.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+  <datalist id="dl-publico">${PUBLICOS.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+  <div class="field"><label for="cn">Nicho ou assunto do canal / marca</label><input id="cn" list="dl-nicho" value="${esc(c.nicho)}" placeholder="Escreva ou escolha: mistérios, minha loja de roupas, imobiliária…"></div>
+  <div class="row"><div class="field"><label for="cp">Público-alvo</label><input id="cp" list="dl-publico" value="${esc(c.publico)}" placeholder="Escreva ou escolha"></div>
   <div class="field"><label for="cf">Formato</label><select id="cf">${FORMATOS.map(n=>`<option ${n===c.formato?"selected":""}>${n}</option>`).join("")}</select></div></div>
   <div class="row"><div class="field"><label for="cg">Estilo do gancho</label><select id="cg">${GANCHOS.map(n=>`<option ${n===c.gancho?"selected":""}>${n}</option>`).join("")}</select></div>
   <div class="field"><label for="cv">Voz</label><select id="cv">${["Masculina","Feminina"].map(n=>`<option ${n===c.voz?"selected":""}>${n}</option>`).join("")}</select></div></div>
-  <div class="field"><label for="cd">Duração, de 10 a 60 min</label><input id="cd" type="number" min="10" max="60" value="${c.duracao}"><div class="m" style="font-size:12px;color:var(--muted);margin-top:4px" id="cdb">${blocks} blocos de roteiro</div></div>
-  <div class="field"><label for="cvis2">Estilo visual</label><select id="cvis2">${VISUAIS.map(([v,t])=>`<option value="${v}" ${(c.visual||"documentario")===v?"selected":""}>${t}</option>`).join("")}</select>
-  <div class="m" style="font-size:12px;color:var(--muted);margin-top:4px">Documentário: fotos e filmes históricos reais tratados, nomes e títulos em dourado, capítulos, diagramas 3D, trilha e efeitos de transição. Colagem: fundo liso, personagens e objetos desenhados entrando no ritmo da fala, como nos canais explicativos. Usa imagens reais de domínio público quando existem (grátis).</div></div>
-  <div class="field"><label for="cipm">Imagens por minuto (estilo cinematográfico)</label><select id="cipm">${[["2","2 por minuto · econômico"],["3","3 por minuto · mais variado"],["4","4 por minuto · bem dinâmico"]].map(([v,t])=>`<option value="${v}" ${String(c.ipm||2)===v?"selected":""}>${t}</option>`).join("")}</select>
-  <div class="m" style="font-size:12px;color:var(--muted);margin-top:4px">Cada imagem é uma chamada paga. Entre uma imagem e outra o OnionCut muda o enquadramento a cada ~7 s, de graça.</div></div>
-  <div class="field"><label>Idioma dos vídeos</label>${pills("lang",IDIOMAS.map(i=>i[0]),c.idioma).replace(/data-v="([^"]+)">([^<]+)</g,(m,v,t)=>`data-v="${v}">${(IDIOMAS.find(i=>i[0]===v)||["","" ])[1]} ${t}<`)}</div>
+  <div class="row"><div class="field"><label for="cd">Duração do vídeo longo (min)</label><input id="cd" type="number" min="1" max="60" value="${c.duracao}"></div>
+  <div class="field"><label for="clang">Idioma dos vídeos</label><select id="clang">${IDIOMAS.map(i=>`<option value="${i[0]}" ${i[0]===c.idioma?"selected":""}>${i[0]}</option>`).join("")}</select></div></div>
+  <div class="field"><label>Estilo visual</label><div class="stylecards">${VISUAIS.map(([v,t])=>`<button type="button" class="stylecard" data-vis="${v}" aria-pressed="${(c.visual||"documentario")===v}"><img alt="" data-prev="${v}"><span>${t}</span></button>`).join("")}</div></div>
+  <div class="field" style="max-width:220px"><label for="cipm">Imagens por minuto</label><input id="cipm" type="number" min="1" max="20" step="1" value="${c.ipm||3}"></div>
   <div class="btns"><button class="btn" id="csave">${S.config?"Salvar alterações":"Salvar canal"}</button></div>
   </div></details>
+
+  ${viraisSection()}
 
   <h3 style="margin-top:18px">Novo vídeo</h3>
   ${S.project?`<div class="note">Já tem um vídeo em produção: “${esc(S.project.title||S.project.idea.tema)}”. Termine ou descarte antes de começar outro. <button class="btn ghost small" id="discard" style="margin-top:6px">Descartar produção atual</button></div>`:""}
@@ -339,7 +356,7 @@ VIEWS.ideias=()=>{
       ${D.mural?`<div class="field"><label for="dnomes">Nomes no mural (um por linha; copie dos inscritos recentes do YouTube Studio)</label><textarea id="dnomes" rows="3" placeholder="Maria S.&#10;João Pedro&#10;Ana Lima">${esc(D.nomes)}</textarea>
       <div class="m" style="font-size:12px;margin-top:4px">Sem nomes, o mural mostra “Seu nome pode aparecer aqui no próximo vídeo”. Use nomes reais: inventar inscritos engana quem assiste e pode virar denúncia.</div></div>`:""}
     </details>
-    <div class="field" style="margin-top:10px"><label>Tipo</label>${pills("kind",["Casada: longo + Short","Vídeo longo","Short (vertical, ~1 min)"],ui.kind==="short"?"Short (vertical, ~1 min)":ui.kind==="long"?"Vídeo longo":"Casada: longo + Short")}</div>
+    <div class="field" style="margin-top:10px;max-width:320px"><label for="dkind">Tipo</label><select id="dkind">${[["combo","Casada: longo + Short"],["long","Vídeo longo"],["short","Short / Reels / Stories (vertical)"]].map(([v,t])=>`<option value="${v}" ${(ui.kind||"combo")===v?"selected":""}>${t}</option>`).join("")}</select></div>
     <div class="btns"><button class="btn" id="start" ${!S.config||!D.tema.trim()||S.project?"disabled":""}>🚀 Começar produção</button><button class="btn ghost small" id="dqueue" ${!D.tema.trim()?"disabled":""}>Guardar na fila pra depois</button>${!S.config?`<span class="m" style="font-size:12.5px;color:var(--muted)">Salve o canal primeiro</span>`:""}</div>
   </div>
   ${S.ideias.length?`<details class="card" style="padding:0;margin-top:10px" ${S.ideias.length<6?"open":""}><summary style="padding:12px;cursor:pointer;font-weight:700">Fila de ideias <span class="tag">${S.ideias.length}</span></summary><div style="padding:0 12px 10px">
@@ -348,17 +365,15 @@ VIEWS.ideias=()=>{
   </div></details>`:""}`;
 };
 BIND.ideias=el=>{
-  let lang=(S.config&&S.config.idioma)||"Inglês";
-  const cn=el.querySelector("#cn"), cd=el.querySelector("#cd");
-  const readCfg=()=>{ const nicho=cn.value==="Outro"?(el.querySelector("#cnx").value.trim()||"Outro"):cn.value;
-    return {nicho,publico:el.querySelector("#cp").value,formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,duracao:Math.max(10,Math.min(60,+cd.value||15)),idioma:lang,ipm:+(el.querySelector("#cipm")||{}).value||2,visual:(el.querySelector("#cvis2")||{}).value||"documentario"}; };
-  // depois do primeiro "Salvar canal", toda mudança é salva na hora
+  bindVirais(el);
+  let vis=(S.config&&S.config.visual)||"documentario";
+  const cd=el.querySelector("#cd");
+  const readCfg=()=>({nicho:el.querySelector("#cn").value.trim()||"Geral",publico:el.querySelector("#cp").value.trim()||"Público geral",formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,
+    duracao:Math.max(1,Math.min(60,+cd.value||10)),idioma:el.querySelector("#clang").value,visual:vis,ipm:Math.max(1,Math.min(20,+el.querySelector("#cipm").value||3))});
   const autosave=()=>{ if(S.config){ S.config=readCfg(); save(); renderProd(); } };
-  bindPills(el,"lang",v=>{ lang=v; autosave(); if(S.config) toast("Idioma dos vídeos: "+v); });
-  cn.onchange=()=>{ el.querySelector("#cno").style.display=cn.value==="Outro"?"":"none"; autosave(); };
-  ["#cnx","#cp","#cf","#cg","#cv","#cipm","#cvis2"].forEach(q=>{ const i=el.querySelector(q); if(i) i.onchange=autosave; });
-  cd.oninput=()=>{ const v=Math.max(10,Math.min(60,+cd.value||15)); el.querySelector("#cdb").textContent=Math.max(2,Math.round(v/5))+" blocos de roteiro"; };
-  cd.onchange=autosave;
+  ["#cn","#cp","#cf","#cg","#cv","#cd","#clang","#cipm"].forEach(q=>{ const i=el.querySelector(q); if(i) i.onchange=autosave; });
+  el.querySelectorAll("[data-vis]").forEach(b=>b.onclick=()=>{ vis=b.dataset.vis; el.querySelectorAll("[data-vis]").forEach(x=>x.setAttribute("aria-pressed",x===b)); autosave(); });
+  el.querySelectorAll("img[data-prev]").forEach(im=>stylePreview(im.dataset.prev).then(u=>{ if(u) im.src=u; }));
   el.querySelector("#csave").onclick=()=>{ S.config=readCfg(); save(); toast("Canal salvo · vídeos em "+S.config.idioma); renderPanel(); };
   // formulário do novo vídeo (rascunho salvo a cada tecla)
   const D=draft();
@@ -372,7 +387,7 @@ BIND.ideias=el=>{
   el.querySelectorAll("[data-pick]").forEach(c=>c.onclick=e=>{ if(e.target.dataset.del) return; const i=S.ideias.find(x=>x.id===+c.dataset.pick); if(!i) return;
     S.draft={tema:i.tema||"",ideia:i.intencao||"",comeco:i.comeco||"",meio:i.meio||"",fim:i.fim||"",mural:!!(i.mural&&i.mural.on),nomes:((i.mural&&i.mural.nomes)||[]).join("\n"),angulo:i.angulo||"",origem:i.origem||"",fromId:i.id}; save(); renderPanel(); el.scrollTop=0; });
   el.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ S.ideias=S.ideias.filter(i=>i.id!==+b.dataset.del); save(); renderPanel(); });
-  bindPills(el,"kind",v=>{ ui.kind=/Casada/.test(v)?"combo":/^Short/.test(v)?"short":"long"; });
+  el.querySelector("#dkind").onchange=e=>{ ui.kind=e.target.value; };
   const d=el.querySelector("#discard"); if(d) d.onclick=()=>{ if(busy) interrupt(); Store.delPrefix(`p${S.project.id}:`); S.project=null; save(); toast("Produção descartada"); renderPanel(); renderProd(); };
   el.querySelector("#start").onclick=()=>{
     sync(); if(!D.tema.trim()) return;
@@ -414,7 +429,7 @@ Responda só com JSON: {"titulos":[...]}`;
 }
 
 /* ---- Roteiro ---- */
-function nBlocks(){ return S.project.kind==="short"?1:Math.max(2,Math.round(S.project.config.duracao/5)); }
+function nBlocks(){ const d=S.project.config.duracao; return S.project.kind==="short"||d<=6?1:Math.max(2,Math.round(d/5)); }
 function scriptText(){ return S.project.script.join("\n\n"); }
 function wc(s){ return (s.match(/\S+/g)||[]).length; }
 // mudanças no roteiro não apagam o resto: marcam o que ficou desatualizado
@@ -491,13 +506,14 @@ async function runRoteiro(){
     while(P.script.length<n){
       const i=P.script.length; setAction(`escrevendo o bloco ${i+1} de ${n}`); renderPanel();
       const prev=P.script.join("\n\n");
-      const docStyle=/documentário contado/i.test(P.config.formato||"")?` ESTILO DE NARRAÇÃO: conte como um contador de histórias carismático e muito bem informado. Abra no meio da ação, com data e lugar (ex.: "16 de julho de 1945. Berlim está em ruínas…"). Apresente cada pessoa com nome e quem ela é. Use números, datas e detalhes concretos e sensoriais, perguntas retóricas, ironia leve na medida certa e frases curtas de impacto. Organize em capítulos anunciados com naturalidade (ex.: "Capítulo 2: o mundo lá de baixo"), cada um terminando com um gancho. Fale com o espectador ("você"), sem parecer aula.`:"";
+      const promoStyle=isPromo(P)?` CONTEÚDO DE MARCA: fale como a própria marca/loja (${P.config.nicho}), de forma próxima e verdadeira. Mostre o benefício principal logo no início, prove com detalhes concretos (como funciona, pra quem é, resultado), crie desejo sem exagero enganoso e termine com uma chamada clara pra ação (comprar, chamar no WhatsApp, visitar a loja ou o link). Se for stories do dia a dia, use tom leve de bastidores.`:"";
+      const docStyle=(/documentário contado/i.test(P.config.formato||"")?` ESTILO DE NARRAÇÃO: conte como um contador de histórias carismático e muito bem informado. Abra no meio da ação, com data e lugar (ex.: "16 de julho de 1945. Berlim está em ruínas…"). Apresente cada pessoa com nome e quem ela é. Use números, datas e detalhes concretos e sensoriais, perguntas retóricas, ironia leve na medida certa e frases curtas de impacto. Organize em capítulos anunciados com naturalidade (ex.: "Capítulo 2: o mundo lá de baixo"), cada um terminando com um gancho. Fale com o espectador ("você"), sem parecer aula.`:"")+promoStyle;
       const battle=(isBattle(P)?` FORMATO BATALHA: compare os dois lados rodada por rodada (ex.: força, velocidade, inteligência, resistência, poder especial), diga a vantagem e a desvantagem de cada um em cada rodada, mantenha um placar falado e anuncie o vencedor com um argumento forte no final.`:"")+docStyle;
       const role = P.kind==="short" ? `Isto é um SHORT vertical de cerca de 55 segundos (~140 palavras). A primeira frase É o gancho e prende em 2 segundos, sem introdução. Frases curtas, ritmo rápido, uma informação surpreendente atrás da outra. ${P.linkToLong?" Termine chamando pro vídeo completo, de forma natural (ex.: \"a história inteira tá no vídeo completo do canal\").":" Termine com uma frase que faça a pessoa querer comentar ou assistir de novo."}${battle}${P.parentScript?`\nBaseie-se neste vídeo longo do canal e pegue a parte mais impressionante dele:\n"""${P.parentScript.slice(0,5000)}"""`:""}`
         : (i===0 ? `Este é o PRIMEIRO bloco. Abra com um gancho no estilo "${P.config.gancho}" nas 2-3 primeiras frases, que prenda nos primeiros 15 segundos. Prometa o que o espectador vai ganhar ficando até o fim e abra um "loop" (uma pergunta ou história) que só será resolvido no último bloco. Termine o bloco com uma virada que puxe pro próximo.`
         : i===n-1 ? `Este é o ÚLTIMO bloco. Feche o loop aberto no início, entregue o clímax e a lição. Inclua de forma natural um convite pra se inscrever e uma pergunta específica pra responder nos comentários. Termine com uma frase memorável.`
         : `Este é um bloco do MEIO (${i+1} de ${n}). Aprofunde com detalhes concretos, uma mini-história ou exemplo, mude o ritmo pra evitar monotonia e termine com um mini-suspense que puxe pro próximo bloco.`)+battle;
-      const prompt=`Você é roteirista de um canal faceless de YouTube com engenharia de retenção.
+      const prompt=`Você é roteirista de vídeos (YouTube, Shorts, Reels e conteúdo de marca) com engenharia de retenção.
 Canal: ${cfgText()}
 Título do vídeo: "${P.title}".
 ${P.kind==="short"?`Escreva o roteiro do short, com cerca de ${words} palavras`:`Escreva o bloco ${i+1} de ${n} do roteiro, com cerca de ${words} palavras`}, no idioma ${P.config.idioma}.
@@ -528,7 +544,7 @@ BIND.descricao=el=>{
   const P=S.project; const go=el.querySelector("#dgo"); if(go) go.onclick=runDescricao;
   el.querySelector("#dt").oninput=e=>{P.description=e.target.value; save();};
   el.querySelector("#dh").oninput=e=>{P.hashtags=e.target.value.split(/\s+/).filter(Boolean); save();};
-  el.querySelector("#dok").onclick=()=>{ if(!(P.description||"").trim()) return toast("Escreva ou gere a descrição primeiro"); P.done.descricao=true; save(); courier("descricao","capa"); toast("Descrição aprovada"); renderProd(); openPanel("capa"); comboAfter("descricao"); };
+  el.querySelector("#dok").onclick=()=>{ if(!(P.description||"").trim()) return toast("Escreva ou gere a descrição primeiro"); P.done.descricao=true; save(); courier("descricao","imagens"); toast("Descrição aprovada"); renderProd(); openPanel("imagens"); comboAfter("descricao"); };
 };
 async function runDescricao(){
   const P=S.project; ui.desErr=null; setBusy("descricao","lendo o roteiro"); renderPanel();
@@ -592,7 +608,7 @@ function imgNote(){
 
 /* ---- Capa ---- */
 const THUMB_BG=["linear-gradient(120deg,#2b1d3a 0%,#8a2f7c 55%,#f2c14e 120%)","linear-gradient(120deg,#0f2a3d 0%,#3a7ae1 60%,#9ec5d8 120%)","linear-gradient(120deg,#3a1a14 0%,#d1502f 60%,#ffd58a 120%)","linear-gradient(120deg,#1a2a1e 0%,#2e8b57 55%,#f2e2b0 120%)"];
-VIEWS.capa=()=>{ const P=S.project; if(P.kind==="short") return `<p class="lead">Shorts não usam capa: o YouTube mostra um quadro do próprio vídeo. Pode seguir pro Prédio das Imagens.</p><div class="btns"><button class="btn" onclick="openPanel('imagens')">Ir pro Prédio das Imagens</button></div>`; const working=busy&&busy.k==="capa"; const th=P.thumbs||[]; const st=P.thumbImg||[]; return `
+VIEWS.capa=()=>{ const P=S.project; if(P.kind==="short") return `<p class="lead">Shorts não usam capa: o YouTube mostra um quadro do próprio vídeo. Pode seguir pro Prédio das Imagens.</p><div class="btns"><button class="btn" onclick="openPanel('imagens')">Ir pro Prédio das Imagens</button></div>`; const working=busy&&busy.k==="imagens"&&/capa/.test(busy.action||""); const th=P.thumbs||[]; const st=P.thumbImg||[]; return `
   <p class="lead">A equipe escreve 4 frases de impacto e desenha uma capa pra cada. Marque a que vai pro vídeo.</p>
   <div class="field"><label for="cvis">Ideia visual (opcional)</label><textarea id="cvis" rows="2" placeholder="Ex.: mulher de cabelo branco orando perto da janela, luz da manhã, tons de azul">${esc(P.thumbVisual||"")}</textarea></div>
   <div class="field"><label for="ctxt">Texto da capa (opcional)</label><input id="ctxt" value="${esc(P.thumbOwn||"")}" placeholder="Deixe vazio e a equipe escreve. 4 a 6 palavras funcionam melhor"></div>
@@ -615,12 +631,12 @@ BIND.capa=el=>{ if(S.project.kind==="short") return;
   const rt=el.querySelector("#cretry"); if(rt) rt.onclick=()=>drawThumbs(true);
   el.querySelectorAll("[data-th]").forEach(b=>b.onclick=()=>{ if(P.done.capa) return; P.thumbSel=+b.dataset.th; save(); renderPanel(); });
   const dl=el.querySelector("#cdl"); if(dl) dl.onclick=async()=>{ const b=await Store.get(mkey(P.id,"thumb",P.thumbSel)); if(b) saveBlob(b,slug(P.title)+"-capa.jpg"); };
-  el.querySelector("#cok").onclick=()=>{ P.done.capa=true; save(); courier("capa","imagens"); toast("Capa aprovada"); renderProd(); openPanel("imagens"); };
+  el.querySelector("#cok").onclick=()=>{ P.done.capa=true; save(); toast("Capa aprovada"); renderPanel(); };
   paintImgs(el);
 };
 async function runCapa(){
   const P=S.project; ui.capErr=null;
-  setBusy("capa","escrevendo as frases"); renderPanel();
+  setBusy("imagens","escrevendo as frases da capa"); renderPanel();
   const prompt=`Você é diretor de arte de thumbnails de YouTube com alto CTR.
 Título: "${P.title}". Público: ${P.config.publico}. Nicho: ${P.config.nicho}.
 ${P.thumbOwn?`O texto da capa já foi definido: "${P.thumbOwn}". Crie 4 variações bem próximas dele.`:`Crie 4 textos de capa diferentes, de 3 a 6 palavras, no idioma ${P.config.idioma}. Eles devem complementar o título, não repetir.`}
@@ -637,7 +653,7 @@ Responda só com JSON: {"textos":["...","...","...","..."],"cena":"...","prompt_
 }
 async function drawThumbs(onlyFailed){
   const P=S.project; ui.capErr=null;
-  setBusy("capa","desenhando as capas"); 
+  setBusy("imagens","desenhando as capas"); 
   const idx=P.thumbs.map((_,i)=>i).filter(i=>!onlyFailed||(P.thumbImg[i]&&P.thumbImg[i]!=="ok"));
   idx.forEach(i=>P.thumbImg[i]="wait"); renderPanel();
   let done=0;
@@ -656,7 +672,8 @@ On the right third, large bold headline text in thick condensed sans-serif, whit
 /* ---- Imagens ---- */
 function styleOf(name){ return STYLES.find(s=>s[0]===name)||STYLES[0]; }
 function sceneCount(){ return Math.min(60,Math.round(S.project.config.duracao*(+S.project.config.ipm||2))); }
-VIEWS.imagens=()=>{ const P=S.project; if(isColagem(P)) return colagemView(); const working=busy&&busy.k==="imagens"; const n=sceneCount(); const ph=P.imgPhase||0;
+function capaSection(){ const P=S.project; if(P.kind==="short") return ""; return `<details class="card" style="margin-top:14px;padding:0" ${ui.capaOpen?"open":""} id="capadet"><summary style="padding:12px;cursor:pointer;font-weight:700">📣 Marketing: capa do vídeo <span class="m" style="font-weight:400;font-size:12.5px">(opcional)</span></summary><div style="padding:0 12px 12px">${VIEWS.capa()}</div></details>`; }
+VIEWS.imagens=()=>{ const P=S.project; if(isColagem(P)) return colagemView()+capaSection(); const working=busy&&busy.k==="imagens"; const n=sceneCount(); const ph=P.imgPhase||0;
   const ok=P.scenes.filter(s=>s.img==="ok").length, bad=P.scenes.filter(s=>s.img&&s.img!=="ok"&&s.img!=="wait").length;
   const sel=P.selScene!=null?P.scenes[P.selScene]:null; const st=styleOf(P.style); return `
   <p class="lead">As cenas saem do próprio roteiro, na ordem da edição. Cerca de ${n} cenas pra ${P.config.duracao} min.</p>
@@ -680,7 +697,8 @@ VIEWS.imagens=()=>{ const P=S.project; if(isColagem(P)) return colagemView(); co
     <div class="btns"><button class="btn small" id="sredo" ${busy||!AI.stageReady("image")?"disabled":""}>↻ Gerar esta de novo</button>${sel.img==="ok"?`<button class="btn ghost small" id="sdl">⬇ Baixar</button>`:""}</div></div>`:""}
   <div class="btns"><button class="btn ghost small" id="icp">Copiar os prompts</button></div>`:""}
   <div class="btns"><button class="btn" id="iok" ${!P.scenes.length||ok<P.scenes.length||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Cenas aprovadas ✓":"Aprovar cenas e mandar pro Estúdio"}</button></div>`; };
-BIND.imagens=el=>{ if(isColagem(S.project)) return bindColagem(el);
+{ const _vi=VIEWS.imagens; VIEWS.imagens=()=>{ const P=S.project; return isColagem(P)?colagemView()+capaSection():_vi()+capaSection(); }; }
+BIND.imagens=el=>{ const cd=el.querySelector("#capadet"); if(cd){ cd.ontoggle=()=>{ ui.capaOpen=cd.open; }; BIND.capa(el); } if(isColagem(S.project)) return bindColagem(el);
   const P=S.project;
   el.querySelectorAll("[data-sty]").forEach(b=>b.onclick=()=>{ P.style=b.dataset.sty; save(); renderPanel(); });
   el.querySelector("#igo").onclick=()=>{ if(P.scenes.some(s=>s.img==="ok")&&!confirm("Refazer tudo apaga as imagens atuais. Continuar?")) return; runImagens(); };
@@ -763,16 +781,10 @@ function colagemView0(){
     ${sel.img==="nofound"?`<div class="m" style="font-size:12.5px">Não achei foto livre. Pesquise no Google ou crie no Gemini e cole aqui.</div>`:(sel.img&&!["ok","wait"].includes(sel.img)?`<div class="err">${esc(sel.img)}</div>`:"")}
     <div id="pastezone" tabindex="0" style="margin-top:8px;border:2px dashed var(--line);border-radius:12px;padding:14px;text-align:center;cursor:text"><b>📋 Cole a imagem aqui: Ctrl+V</b><div class="m" style="font-size:12px">ou arraste um arquivo · vale imagem copiada do Google ou do Gemini</div></div>
     <div class="btns" style="margin-top:8px"><a class="btn small" href="${gImg(sel.busca||sel.nome)}" target="_blank" rel="noopener" style="text-decoration:none" id="agoogle">🌐 Pesquisar no Google</a>
-      <button class="btn small" id="agemini">✨ Criar no Gemini</button></div>
-    <div class="field" style="margin-top:10px"><label for="aurl">Endereço da imagem (no Google: botão direito › Copiar endereço da imagem)</label>
-      <div style="display:flex;gap:6px"><input id="aurl" placeholder="https://… ou data:image/…"><button class="btn ghost small" id="aurlgo">Trazer</button></div></div>
-    <details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;font-weight:600">Mais opções</summary>
-      <div class="field" style="margin-top:8px"><label for="abusca">Busca (curta funciona melhor)</label><input id="abusca" value="${esc(sel.busca||sel.nome)}"></div>
-      <div class="field"><label for="adesc">Descrição pra gerar com IA</label><textarea id="adesc" rows="2">${esc(sel.descricao||sel.nome)}</textarea></div>
-      <div class="btns"><button class="btn ghost small" id="asearch" ${busy?"disabled":""}>🔎 Buscar grátis nos bancos</button>
-        <button class="btn ghost small" id="aai" ${busy||!AI.stageReady("image")?"disabled":""}>🎨 Gerar pela API (pago)</button>
-        <label class="btn ghost small" style="cursor:pointer">📁 Arquivo<input type="file" id="aup" accept="image/*" style="display:none"></label></div>
-    </details></div>`:""}
+      <button class="btn small" id="agemini">✨ Criar no Gemini</button>
+      <label class="btn small" style="cursor:pointer">📁 Arquivo<input type="file" id="aup" accept="image/*" style="display:none"></label></div>
+    <div class="field" style="margin-top:10px"><label for="aurl">Ou cole o endereço da imagem (no Google: botão direito › Copiar endereço da imagem)</label>
+      <div style="display:flex;gap:6px"><input id="aurl" placeholder="https://… ou data:image/…"><button class="btn ghost small" id="aurlgo">Trazer</button></div></div></div>`:""}
   `:""}
   <div class="btns"><button class="btn" id="iok" ${!P.board||!st.ok||P.done.imagens||working?"disabled":""}>${P.done.imagens?"Imagens aprovadas ✓":"Aprovar e mandar pro Estúdio"}</button>${P.board&&st.ok&&st.pend&&!P.done.imagens?`<span class="m" style="font-size:12px">As cenas sem imagem usam a imagem anterior.</span>`:""}</div>`;
 }
@@ -792,7 +804,7 @@ async function fetchImageURL(u){
 // pedido pronto pra colar no Gemini (app grátis), no estilo do vídeo
 function geminiPrompt(P,a){
   const doc=isDoc(P), d=(a.descricao&&a.descricao!==a.nome?a.descricao:"")||a.busca||"";
-  const estilo=doc?(a.estilo==="diagrama"?"diagrama 3D isométrico em corte, render branco tipo argila sobre fundo cinza claro, estilo ilustração técnica":a.estilo==="objeto"?"foto de estúdio de um único objeto histórico sobre fundo escuro neutro, luz lateral dramática":"reconstrução histórica cinematográfica, luz dramática, cores dessaturadas, aparência fotográfica de documentário")
+  const estilo=doc&&a.estilo==="produto"?"fotografia comercial de produto, luz de estúdio suave, cores bonitas e realistas, fundo simples e elegante":doc&&a.estilo==="moderno"?"foto editorial moderna, luz natural, cores realistas, composição limpa":doc?(a.estilo==="diagrama"?"diagrama 3D isométrico em corte, render branco tipo argila sobre fundo cinza claro, estilo ilustração técnica":a.estilo==="objeto"?"foto de estúdio de um único objeto histórico sobre fundo escuro neutro, luz lateral dramática":"reconstrução histórica cinematográfica, luz dramática, cores dessaturadas, aparência fotográfica de documentário")
     :"ilustração editorial 2D plana, contornos escuros, cores suaves com sombreado leve, um único elemento inteiro e centralizado, fundo branco liso, sem sombra";
   return `Crie uma imagem de: ${a.nome}.${d?" Detalhes: "+d+".":""} Estilo: ${estilo}. Formato ${doc?"horizontal 16:9":"vertical 3:4"}. Sem texto, sem legendas e sem marca d'água.${doc?" Se aparecer uma pessoa real, não reproduza o rosto dela.":""}`;
 }
@@ -823,10 +835,10 @@ function bindColagem(el){
   el.querySelectorAll("[data-as]").forEach(b=>b.onclick=()=>{ P.selAsset=P.selAsset===b.dataset.as?null:b.dataset.as; save(); renderPanel(); });
   const sel=P.board&&P.board.assets.find(a=>a.id===P.selAsset);
   if(sel){
-    const ab=el.querySelector("#abusca"); ab.oninput=()=>{ sel.busca=ab.value; save(); const g=el.querySelector('a[href*="google.com/search"]'); if(g) g.href=gImg(ab.value); };
-    const ad=el.querySelector("#adesc"); ad.oninput=()=>{ sel.descricao=ad.value; save(); };
-    el.querySelector("#asearch").onclick=()=>{ P.done.imagens=false; drawAssets([sel.id],"search"); };
-    el.querySelector("#aai").onclick=()=>{ P.done.imagens=false; drawAssets([sel.id],"ai"); };
+    const ab=el.querySelector("#abusca"); if(ab) ab.oninput=()=>{ sel.busca=ab.value; save(); const g=el.querySelector('a[href*="google.com/search"]'); if(g) g.href=gImg(ab.value); };
+    const ad=el.querySelector("#adesc"); if(ad) ad.oninput=()=>{ sel.descricao=ad.value; save(); };
+    const asr=el.querySelector("#asearch"); if(asr) asr.onclick=()=>{ P.done.imagens=false; drawAssets([sel.id],"search"); };
+    const aai=el.querySelector("#aai"); if(aai) aai.onclick=()=>{ P.done.imagens=false; drawAssets([sel.id],"ai"); };
     el.querySelector("#aup").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await saveOwn(P,sel,f); save(); toast("Imagem colocada"); renderPanel(); };
     el.querySelector("#agemini").onclick=async()=>{ const txt=geminiPrompt(P,sel); let ok=true; try{ await navigator.clipboard.writeText(txt); }catch(e){ ok=false; }
       window.open("https://gemini.google.com/app","_blank","noopener");
@@ -854,7 +866,7 @@ async function runColagem(){
     try{
       const r=await ask(Doc.storyboardPrompt(P,{maxAssets:isShort?14:Math.min(80,Math.round(dur*5.5)),maxAI:isShort?4:Math.max(4,Math.round(dur*1.4)),beats:isShort?20:Math.round(dur*15),isShort,
         reuse:keep?keep.map(a=>`${a.id} = ${a.nome}`).join("; "):"",base:baseTxt}),{json:true,maxTokens:20000});
-      let assets=keep?keep.map(a=>({...a})):(r.imagens||[]).map((a,i)=>({id:String(a.id||("i"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="ia"?"ia":"real",busca:String(a.busca||a.nome||""),ampla:String(a.busca_ampla||""),estilo:["reconstrucao","diagrama","objeto"].includes(a.estilo)?a.estilo:"reconstrucao",descricao:String(a.descricao||""),img:null})); assets=mergeBase(assets);
+      let assets=keep?keep.map(a=>({...a})):(r.imagens||[]).map((a,i)=>({id:String(a.id||("i"+(i+1))),nome:String(a.nome||""),tipo:a.tipo==="ia"?"ia":"real",busca:String(a.busca||a.nome||""),ampla:String(a.busca_ampla||""),estilo:["reconstrucao","diagrama","objeto","produto","moderno"].includes(a.estilo)?a.estilo:(visOf(P)==="promocional"?"produto":visOf(P)==="documentario"?"reconstrucao":"moderno"),descricao:String(a.descricao||""),img:null})); assets=mergeBase(assets);
       const has=id=>assets.some(a=>a.id===id);
       const TIPOS=["foto","filme","nome","titulo","data","capitulo","citacao","retrato","diagrama"];
       const beats=(r.batidas||[]).map(b=>({trecho:String(b.trecho||""),tipo:TIPOS.includes(b.tipo)?b.tipo:"foto",img:has(String(b.img||""))?String(b.img):"",imgs:(b.imgs||[]).map(String).filter(has).slice(0,3),texto:String(b.texto||""),subtexto:String(b.subtexto||"")}))
@@ -935,7 +947,7 @@ VIEWS.narracao=()=>{ const P=S.project; const working=busy&&busy.k==="narracao";
   return staleNote(P,"narracao")+`
   <p class="lead">O roteiro narrado com voz realista. Voz por <b>${esc(AI.PROVIDERS[prov].name)}</b> · ${esc(c.voice.model)} <a href="#" onclick="openPanel('admin');return false" style="color:var(--accent)">trocar</a></p>
   <div class="row" style="align-items:end"><div class="field" style="margin:0"><label for="vq">Buscar voz</label><input id="vq" placeholder="nome, estilo, sotaque" value="${esc(ui.vq||"")}"></div>
-  <div class="field" style="margin:0"><label for="vg">Mostrar</label><select id="vg"><option value="canal" ${ui.vg!=="todas"?"selected":""}>Vozes ${esc((P.config.voz||"").toLowerCase())}s</option><option value="todas" ${ui.vg==="todas"?"selected":""}>Todas</option></select></div></div>
+  <div class="field" style="margin:0"><label for="vg">Voz</label><select id="vg">${[["todas","Todas"],["masculina","Masculina"],["feminina","Feminina"]].map(([v,t])=>`<option value="${v}" ${(ui.vg||(P.config.voz||"").toLowerCase()||"todas")===v?"selected":""}>${t}</option>`).join("")}</select></div></div>
   <div class="voices" id="vlist" style="margin-top:12px;max-height:300px;overflow:auto"><div class="status"><span class="spin"></span>Carregando vozes…</div></div>
   <div class="row" style="margin-top:14px"><div class="field"><label for="spd">Velocidade: <b id="spv">${P.speed.toFixed(2)}×</b></label><input id="spd" type="range" min="0.8" max="1.2" step="0.05" value="${P.speed}"></div>
   <div class="field"><label for="vsty">Jeito de falar (opcional)</label><input id="vsty" value="${esc(P.voiceStyle||"")}" placeholder="Ex.: calmo e acolhedor"></div></div>
@@ -953,7 +965,7 @@ function renderVoices(el,list){
   const P=S.project, box=el.querySelector("#vlist"); if(!box) return;
   const q=(ui.vq||"").toLowerCase(), want=(P.config.voz||"").toLowerCase();
   let vs=list.filter(v=>!q||(v.name+" "+v.desc).toLowerCase().includes(q));
-  if(ui.vg!=="todas") vs=vs.filter(v=>v.gender===want||v.gender==="neutra"||!want);
+  const gsel=ui.vg||want||"todas"; if(gsel!=="todas") vs=vs.filter(v=>v.gender===gsel||v.gender==="neutra");
   if(!vs.length){ box.innerHTML=`<div class="empty">Nenhuma voz com esse filtro.</div>`; return; }
   const cols=["#5b6ee1","#7a5be1","#e15b9a","#2e8b57","#b07a2e","#2e9bb0","#c75be1","#e17a5b"];
   box.innerHTML=vs.map((v,i)=>`<div class="voice" role="button" tabindex="0" aria-pressed="${P.voice===v.id}" data-voice="${esc(v.id)}" data-name="${esc(v.name)}">
@@ -963,9 +975,13 @@ function renderVoices(el,list){
   box.querySelectorAll("[data-sample]").forEach(b=>b.onclick=async e=>{
     e.stopPropagation(); stopAudio(); const id=b.dataset.sample; const v=list.find(x=>x.id===id);
     try{
-      let url=v.preview||sampleUrls[AI.get().voice.provider+":"+id];
-      if(!url){ b.innerHTML=`<span class="spin"></span>`; const txt=(P.script[0]||P.title||"").split(/(?<=[.!?])\s+/).slice(0,2).join(" ").slice(0,220)||"This is how this voice sounds.";
-        const r=await Voice.synth(txt,{voiceId:id,speed:P.speed,style:P.voiceStyle,lang:LANG_EN[P.config.idioma],idioma:P.config.idioma}); url=URL.createObjectURL(r.blob); sampleUrls[AI.get().voice.provider+":"+id]=url; }
+      // amostra: frase curta e fixa, gravada UMA vez por voz e guardada no navegador (as próximas são de graça)
+      const c=AI.get(), skey=`sample:${c.voice.provider}:${c.voice.model}:${id}:${P.config.idioma}`;
+      let url=v.preview||sampleUrls[skey];
+      if(!url){ const cached=await Store.get(skey); if(cached){ url=URL.createObjectURL(cached); sampleUrls[skey]=url; } }
+      if(!url){ b.innerHTML=`<span class="spin"></span>`;
+        const txt={"Inglês":"Hi! This is my voice, and this is how I'll narrate your video.","Espanhol":"¡Hola! Esta es mi voz, y así voy a narrar tu video.","Francês":"Bonjour ! Voici ma voix, et c'est ainsi que je vais raconter votre vidéo.","Alemão":"Hallo! Das ist meine Stimme, und so erzähle ich dein Video."}[P.config.idioma]||"Olá! Esta é a minha voz, e é assim que eu vou narrar o seu vídeo.";
+        const r=await Voice.synth(txt,{voiceId:id,speed:1,lang:LANG_EN[P.config.idioma],idioma:P.config.idioma}); await Store.put(skey,r.blob); url=URL.createObjectURL(r.blob); sampleUrls[skey]=url; }
       b.innerHTML="▶"; playing=new Audio(url); playing.play();
     }catch(err){ b.innerHTML="▶"; toast(err.message||"Não deu pra tocar a amostra"); }
   });
@@ -1035,7 +1051,7 @@ async function runNarracao(onlyFailed){
 const RES=["1080p","720p"];
 let cutPrev=null;
 function fmtT(s){ s=Math.max(0,s); return `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,"0")}`; }
-function cutOpts(P){ const m=P.idea&&P.idea.mural&&P.idea.mural.on?P.idea.mural:null; return {template:P.template,captions:P.captions,res:P.res||"1080p",mural:m,ink:isDoc(P)?"doc":"plain"}; }
+function cutOpts(P){ const m=P.idea&&P.idea.mural&&P.idea.mural.on?P.idea.mural:null; return {template:P.template,captions:P.captions,res:P.res||"1080p",mural:m,ink:visOf(P)==="documentario"?"doc":"plain",theme:visOf(P),sfxSet:(P.sound||{}).sfxSet}; }
 // o plano do criador (ideia central + começo, meio e fim) entra em cada bloco do roteiro
 function planoCriador(P,i,n){
   const I=P.idea||{}, last=i===n-1, first=i===0, mid=!first&&!last;
@@ -1052,16 +1068,16 @@ function planoCriador(P,i,n){
 VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem"; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null; const sup=Cut.supported(); return staleNote(P,"montagem")+`
   <p class="lead">O OnionCut junta cenas, voz e legendas, troca as imagens nas pausas da narração e exporta o vídeo em MP4.</p>
   ${sup?"":`<div class="err">Este navegador não consegue gerar vídeo. Abra o Onion no Chrome ou no Edge, no computador.</div>`}
-  <h3>Template</h3>${pills("tpl",isDoc(P)?Object.keys(Doc.TPL):isColagem(P)?Object.keys(Collage.TPL):TEMPLATES,P.template)}
-  <h3>Trilha</h3>${pills("mood",[...Object.keys(Sound.MOODS),"Sem trilha"],(P.sound||{}).custom?"":((P.sound||{}).mood||"Sem trilha"))}
-  <div class="btns" style="margin-top:6px"><label class="btn ghost small" style="cursor:pointer">🎵 ${(P.sound||{}).custom?"Trocar a minha música":"Usar uma música minha (mp3)"}<input type="file" id="mfile" accept="audio/*" style="display:none"></label>${(P.sound||{}).custom?`<span class="tag gold">usando a sua música</span><button class="btn ghost small" id="mfilex">tirar</button>`:""}</div>
-  <p class="m" style="font-size:12px;color:var(--muted)">As trilhas prontas são criadas aqui mesmo, sem direitos autorais. Se usar uma música sua, prefira a Biblioteca de Áudio do YouTube.</p>
-  ${true?`<h3>Mural de inscritos (depois do fim do vídeo)</h3>
-  <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="mmural" ${P.idea&&P.idea.mural&&P.idea.mural.on?"checked":""}> Depois que o conteúdo termina, mostrar uma tela preta com os nomes dos inscritos, e o narrador lê os nomes (dura o tempo da fala)</label>
-  ${P.idea&&P.idea.mural&&P.idea.mural.on?`<div class="field"><textarea id="mnomes" rows="3" placeholder="Um nome por linha (sem nomes aparece “Seu nome pode aparecer aqui”)">${esc((P.idea.mural.nomes||[]).join("\n"))}</textarea></div>`:""}`:""}
-  <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:6px 0"><input type="checkbox" id="msfx" ${(P.sound||{}).sfx!==false?"checked":""}> Efeitos sonoros nas transições (whoosh, impacto, clique)</label>
-  <h3>Legendas</h3>${pills("cap",CAPTIONS,P.captions)}
-  ${P.kind==="short"?`<p class="m" style="font-size:12.5px">Short vertical 1080×1920.</p>`:`<h3>Resolução</h3>${pills("res",RES,P.res||"1080p")}`}
+  ${(()=>{ const tpls=isDoc(P)?Doc.tplFor(visOf(P)):isColagem(P)?Object.keys(Collage.TPL):TEMPLATES, snd=P.sound||{}, sel=(id,opts,cur)=>`<select id="${id}">${opts.map(o=>`<option ${o===cur?"selected":""}>${esc(o)}</option>`).join("")}</select>`;
+    return `<div class="row"><div class="field"><label for="mtpl">Template (cores e acabamento)</label>${sel("mtpl",tpls,P.template)}</div>
+    <div class="field"><label for="mcap">Legendas</label>${sel("mcap",CAPTIONS,P.captions)}</div></div>
+    <div class="row"><div class="field"><label for="mmood">Trilha</label>${sel("mmood",[...Object.keys(Sound.MOODS),"Sem trilha"],snd.custom?"":(snd.mood||"Sem trilha"))}</div>
+    <div class="field"><label for="msfxs">Efeitos sonoros</label>${sel("msfxs",Sound.SFX_SETS,snd.sfx===false?"Sem efeitos":(snd.sfxSet||Sound.SFX_SETS[0]))}</div></div>
+    <div class="btns" style="margin-top:0"><label class="btn ghost small" style="cursor:pointer">🎵 ${snd.custom?"Trocar a minha música":"Usar uma música minha (mp3)"}<input type="file" id="mfile" accept="audio/*" style="display:none"></label>${snd.custom?`<span class="tag gold">usando a sua música</span><button class="btn ghost small" id="mfilex">tirar</button>`:""}</div>
+    <h3>Mural de inscritos (depois do fim do vídeo)</h3>
+    <label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:4px 0"><input type="checkbox" id="mmural" ${P.idea&&P.idea.mural&&P.idea.mural.on?"checked":""} style="margin-top:3px"> Tela preta com os nomes dos inscritos, lidos pelo narrador (dura o tempo da fala)</label>
+    ${P.idea&&P.idea.mural&&P.idea.mural.on?`<div class="field"><textarea id="mnomes" rows="3" placeholder="Um nome por linha (sem nomes, o narrador convida a deixar o nome nos comentários)">${esc((P.idea.mural.nomes||[]).join("\n"))}</textarea></div>`:""}`; })()}
+  ${P.kind==="short"?`<p class="m" style="font-size:12.5px">Short vertical 1080×1920.</p>`:`<div class="field" style="max-width:220px"><label for="mres">Resolução</label><select id="mres">${RES.map(r=>`<option ${r===(P.res||"1080p")?"selected":""}>${r}</option>`).join("")}</select></div>`}
   <div class="btns"><button class="btn" id="mprep" ${busy?"disabled":""}>🎬 ${R?"Montar de novo":"Montar no OnionCut"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}</div>
   ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>${P.renderProg!=null?`<div class="bar"><i style="width:${P.renderProg*100}%"></i></div>`:""}`:""}
   ${ui.cutErr?`<div class="err">${esc(ui.cutErr)}</div>`:""}
@@ -1073,9 +1089,9 @@ VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem";
     <div class="lane"><b>Legendas</b><div class="track" style="gap:4px">${R.caps.slice(0,6).map(c=>`<span class="cap">${esc(c.ws.map(w=>w.w).join(" ").toUpperCase())}</span>`).join("")}</div></div>
     <div class="lane"><b>Áudio</b><div class="track wave">${R.wave.map(v=>`<i style="height:${Math.max(6,v*100)}%"></i>`).join("")}</div></div>
   </div>
-  <div class="btns"><button class="btn" id="mrender" ${busy||!sup?"disabled":""}>⬇ Renderizar o vídeo (MP4 ${esc(P.res||"1080p")})</button></div>
+  <div class="btns"><button class="btn" id="mrender" ${busy||!sup?"disabled":""}>🎬 Renderizar o vídeo (MP4 ${esc(P.kind==="short"?"vertical":P.res||"1080p")})</button></div>
   <p class="m" style="font-size:12px;color:var(--muted)">O render roda aqui no seu computador. Deixe esta aba aberta até terminar.</p>`:""}
-  ${P.render?`<div class="card"><div class="t">✓ Vídeo renderizado</div><div class="m">${esc(P.render.name)} · ${esc(P.render.res)}${P.render.mb?` · ${P.render.mb} MB`:""} · ${fmtT(P.render.secs||0)}</div>${P.render.stored?`<div class="btns"><button class="btn small" id="mvid">🎬 Baixar o vídeo (.mp4)</button></div>`:""}</div>`:""}
+  ${P.render?`<div class="card"><div class="t">✓ Vídeo renderizado</div><div class="m">${esc(P.render.name)} · ${esc(P.render.res)}${P.render.mb?` · ${P.render.mb} MB`:""} · ${fmtT(P.render.secs||0)}</div>${P.render.stored?`<div class="btns"><button class="btn small" id="mvid">⬇ Baixar o vídeo (.mp4)</button></div>`:""}</div>`:""}
   <div class="btns">
     <button class="btn" id="mok" ${!P.render||working?"disabled":""}>Salvar na Biblioteca</button>
     <button class="btn ghost small" id="mdl">⬇ Baixar pacote (.zip)</button>
@@ -1083,16 +1099,17 @@ VIEWS.montagem=()=>{ const P=S.project; const working=busy&&busy.k==="montagem";
 BIND.montagem=el=>{
   const P=S.project; const R=Cut._R&&Cut._R.pid===P.id?Cut._R:null;
   const redraw=()=>{ const c=el.querySelector("#pv"); if(c&&R&&!cutPrev) Cut.still(R,c,cutOpts(P),Math.max(.6,ui.pt||0)); };
-  bindPills(el,"tpl",v=>{P.template=v; save(); redraw();}); bindPills(el,"cap",v=>{P.captions=v; save(); redraw();});
+  el.querySelector("#mtpl").onchange=e=>{ P.template=e.target.value; save(); redraw(); };
+  el.querySelector("#mcap").onchange=e=>{ P.captions=e.target.value; save(); redraw(); };
   P.sound=P.sound||{mood:"Tensão (documentário)",sfx:true,custom:false};
   const soundChanged=()=>{ if(Cut._R&&Cut._R.pid===P.id){ Cut._R=null; toast("Trilha alterada: clique em Montar de novo"); renderPanel(); } };
-  bindPills(el,"mood",v=>{ P.sound.mood=v; P.sound.custom=false; save(); soundChanged(); });
+  el.querySelector("#mmood").onchange=e=>{ P.sound.mood=e.target.value; P.sound.custom=false; save(); soundChanged(); };
+  el.querySelector("#msfxs").onchange=e=>{ P.sound.sfxSet=e.target.value; P.sound.sfx=e.target.value!=="Sem efeitos"; save(); soundChanged(); };
   const mm=el.querySelector("#mmural"); if(mm) mm.onchange=e=>{ P.idea=P.idea||{}; P.idea.mural={on:e.target.checked,nomes:(P.idea.mural&&P.idea.mural.nomes)||[]}; save(); Cut._R=null; toast(e.target.checked?"Mural ligado: clique em Montar de novo":"Mural desligado: clique em Montar de novo"); renderPanel(); };
   const mn=el.querySelector("#mnomes"); if(mn) mn.onchange=()=>{ P.idea.mural.nomes=mn.value.split("\n").map(x=>x.trim()).filter(Boolean); save(); Cut._R=null; toast("Nomes salvos: clique em Montar de novo pra gravar a fala do mural"); renderPanel(); };
-  el.querySelector("#msfx").onchange=e=>{ P.sound.sfx=e.target.checked; save(); soundChanged(); };
   el.querySelector("#mfile").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; await Store.put(mkey(P.id,"music",0),f); P.sound.custom=true; save(); toast("Música carregada"); soundChanged(); renderPanel(); };
   const mx=el.querySelector("#mfilex"); if(mx) mx.onclick=async()=>{ await Store.delPrefix(`p${P.id}:music:`); P.sound.custom=false; save(); soundChanged(); renderPanel(); };
-  bindPills(el,"res",v=>{P.res=v; save(); const b=el.querySelector("#mrender"); if(b) b.textContent=`⬇ Renderizar o vídeo (MP4 ${v})`;});
+  const mr=el.querySelector("#mres"); if(mr) mr.onchange=e=>{ P.res=e.target.value; save(); const b=el.querySelector("#mrender"); if(b) b.textContent=`🎬 Renderizar o vídeo (MP4 ${P.res})`; };
   el.querySelector("#mprep").onclick=runPrepare;
   el.querySelector("#mdl").onclick=e=>downloadPack(P,e.currentTarget);
   const mv=el.querySelector("#mvid"); if(mv) mv.onclick=async()=>{ const v=await Store.get(mkey(P.id,"video",0)); if(v) saveBlob(v,`${slug(P.title)}.mp4`); };
@@ -1120,9 +1137,9 @@ function muralText(P){
   const m=P.idea&&P.idea.mural; if(!m||!m.on) return "";
   const nomes=(m.nomes||[]).slice(0,18), L=(P.config&&P.config.idioma)||"Português";
   const lista=(arr,e)=>{ const x=arr.map(n=>n.replace(/[.,;:!?\s]+$/,"")); return x.length>1?x.slice(0,-1).join(", ")+` ${e} `+x[x.length-1]:x[0]; };
-  if(L==="Inglês") return nomes.length?`Thanks to our new subscribers: ${lista(nomes,"and")}. Subscribe too, and your name could show up here in the next video.`:`Subscribe to the channel, and your name could show up here in the next video.`;
-  if(L==="Espanhol") return nomes.length?`Gracias a los nuevos suscriptores: ${lista(nomes,"y")}. Suscríbete tú también y tu nombre puede aparecer aquí en el próximo video.`:`Suscríbete al canal y tu nombre puede aparecer aquí en el próximo video.`;
-  return nomes.length?`Obrigado aos novos inscritos: ${lista(nomes,"e")}. Se inscreva também, e o seu nome pode aparecer aqui no próximo vídeo.`:`Se inscreva no canal, e o seu nome pode aparecer aqui no próximo vídeo.`;
+  if(L==="Inglês") return (nomes.length?`A special thanks to ${lista(nomes,"and")}! `:"")+`Subscribe and leave your name, or the name of someone you'd like to see here, in the comments, and you'll get a special thank-you in one of our next videos.`;
+  if(L==="Espanhol") return (nomes.length?`¡Un agradecimiento especial a ${lista(nomes,"y")}! `:"")+`Suscríbete y deja tu nombre, o el de alguien que quieras ver aquí, en los comentarios, y recibirás un agradecimiento especial en uno de nuestros próximos videos.`;
+  return (nomes.length?`Um agradecimento especial pra ${lista(nomes,"e")}! `:"")+`Se inscreva e deixe o seu nome, ou o de alguém que você gostaria de ver aqui, nos comentários, pra receber um agradecimento especial em um dos nossos próximos vídeos.`;
 }
 async function ensureMuralAudio(P){
   const txt=muralText(P); if(!txt||!P.narr) return;
@@ -1145,21 +1162,17 @@ async function runPrepare(){
 async function runRender(){
   const P=S.project, R=Cut._R; ui.cutErr=null; stopPreview();
   const name=`${slug(P.title)}.mp4`;
-  let fh=null;
-  if(window.showSaveFilePicker){
-    try{ fh=await showSaveFilePicker({suggestedName:name,types:[{description:"Vídeo MP4",accept:{"video/mp4":[".mp4"]}}]}); }
-    catch(e){ if(e.name==="AbortError") return; fh=null; }
-  }
   setBusy("montagem","preparando o render"); P.renderProg=0; renderPanel();
   try{
-    const out=await Cut.render(R,cutOpts(P),{fileHandle:fh,signal:busy.ctl.signal,onProgress:({f,total,fps,eta})=>{
+    const out=await Cut.render(R,cutOpts(P),{signal:busy.ctl.signal,onProgress:({f,total,fps,eta})=>{
       P.renderProg=f/total; setAction(`renderizando ${Math.round(f/total*100)}% · ${fps.toFixed(0)} quadros/s · falta ${fmtT(eta)}`);
       const el=document.getElementById("pbody"); const bar=el&&el.querySelector(".bar>i"); const st=el&&el.querySelector(".status");
       if(bar&&st){ bar.style.width=(P.renderProg*100)+"%"; st.innerHTML=`<span class="spin"></span>${esc(busy.action)}…`; } else renderPanel();
     }});
-    const vb=await keepVideo(P,out,fh);
-    if(out.blob) saveBlob(out.blob,name);
-    P.render={name:fh?fh.name:name,res:P.res||"1080p",mb:vb?(vb.size/1048576).toFixed(0):null,secs:R.dur,at:Date.now(),stored:!!vb}; save(); toast("Vídeo pronto: "+(fh?fh.name:name));
+    const vb=await keepVideo(P,out,null);
+    P.render={name,res:P.res||"1080p",mb:vb?(vb.size/1048576).toFixed(0):null,secs:R.dur,at:Date.now(),stored:!!vb}; save();
+    toast(vb?"Vídeo renderizado! Assista ou baixe quando quiser.":"Renderizado, mas não coube no armazenamento do navegador.");
+    if(!vb&&out.blob) saveBlob(out.blob,name);
   }catch(e){ if(e.code!=="cancelled") ui.cutErr=e.message||"O render falhou."; }
   P.renderProg=null; clearBusy(); renderPanel();
 }

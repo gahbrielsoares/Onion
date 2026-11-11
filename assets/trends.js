@@ -4,14 +4,36 @@
  */
 const Trends = (() => {
   const REG = {
-    "Mundo todo":     { yt: "US", wiki: "en.wikipedia", lang: "en", nome: "no mundo todo (principalmente EUA e Europa)", t24: "", news: "hl=en-US&gl=US&ceid=US:en" },
+    "Mundo todo": { yt: "US", wiki: "en.wikipedia", lang: "en", nome: "no mundo todo (principalmente EUA e Europa)", t24: "", news: "hl=en-US&gl=US&ceid=US:en" },
+    "Brasil": { yt: "BR", wiki: "pt.wikipedia", lang: "pt", nome: "no Brasil", t24: "brazil/", news: "hl=pt-BR&gl=BR&ceid=BR:pt-419" },
+    "Portugal": { yt: "PT", wiki: "pt.wikipedia", lang: "pt", nome: "em Portugal", t24: "portugal/", news: "hl=pt-PT&gl=PT&ceid=PT:pt-150" },
     "Estados Unidos": { yt: "US", wiki: "en.wikipedia", lang: "en", nome: "nos Estados Unidos", t24: "united-states/", news: "hl=en-US&gl=US&ceid=US:en" },
-    "Reino Unido":    { yt: "GB", wiki: "en.wikipedia", lang: "en", nome: "no Reino Unido", t24: "united-kingdom/", news: "hl=en-GB&gl=GB&ceid=GB:en" },
-    "Canadá":         { yt: "CA", wiki: "en.wikipedia", lang: "en", nome: "no Canadá", t24: "canada/", news: "hl=en-CA&gl=CA&ceid=CA:en" },
-    "Austrália":      { yt: "AU", wiki: "en.wikipedia", lang: "en", nome: "na Austrália", t24: "australia/", news: "hl=en-AU&gl=AU&ceid=AU:en" },
-    "Brasil":         { yt: "BR", wiki: "pt.wikipedia", lang: "pt", nome: "no Brasil", t24: "brazil/", news: "hl=pt-BR&gl=BR&ceid=BR:pt-419" },
-    "Índia":          { yt: "IN", wiki: "en.wikipedia", lang: "en", nome: "na Índia", t24: "india/", news: "hl=en-IN&gl=IN&ceid=IN:en" },
-    "Alemanha":       { yt: "DE", wiki: "de.wikipedia", lang: "de", nome: "na Alemanha", t24: "germany/", news: "hl=de&gl=DE&ceid=DE:de" }
+    "Reino Unido": { yt: "GB", wiki: "en.wikipedia", lang: "en", nome: "no Reino Unido", t24: "united-kingdom/", news: "hl=en-GB&gl=GB&ceid=GB:en" },
+    "Canadá": { yt: "CA", wiki: "en.wikipedia", lang: "en", nome: "no Canadá", t24: "canada/", news: "hl=en-CA&gl=CA&ceid=CA:en" },
+    "Austrália": { yt: "AU", wiki: "en.wikipedia", lang: "en", nome: "na Austrália", t24: "australia/", news: "hl=en-AU&gl=AU&ceid=AU:en" },
+    "Irlanda": { yt: "IE", wiki: "en.wikipedia", lang: "en", nome: "na Irlanda", t24: "ireland/", news: "hl=en-IE&gl=IE&ceid=IE:en" },
+    "Nova Zelândia": { yt: "NZ", wiki: "en.wikipedia", lang: "en", nome: "na Nova Zelândia", t24: "new-zealand/", news: "hl=en-NZ&gl=NZ&ceid=NZ:en" },
+    "Índia": { yt: "IN", wiki: "en.wikipedia", lang: "en", nome: "na Índia", t24: "india/", news: "hl=en-IN&gl=IN&ceid=IN:en" },
+    "África do Sul": { yt: "ZA", wiki: "en.wikipedia", lang: "en", nome: "na África do Sul", t24: "south-africa/", news: "hl=en-ZA&gl=ZA&ceid=ZA:en" },
+    "Nigéria": { yt: "NG", wiki: "en.wikipedia", lang: "en", nome: "na Nigéria", t24: "nigeria/", news: "hl=en-NG&gl=NG&ceid=NG:en" },
+    "Filipinas": { yt: "PH", wiki: "en.wikipedia", lang: "en", nome: "nas Filipinas", t24: "philippines/", news: "hl=en-PH&gl=PH&ceid=PH:en" },
+    "México": { yt: "MX", wiki: "es.wikipedia", lang: "es", nome: "no México", t24: "mexico/", news: "hl=es-419&gl=MX&ceid=MX:es-419" },
+    "Espanha": { yt: "ES", wiki: "es.wikipedia", lang: "es", nome: "na Espanha", t24: "spain/", news: "hl=es&gl=ES&ceid=ES:es" },
+    "Argentina": { yt: "AR", wiki: "es.wikipedia", lang: "es", nome: "na Argentina", t24: "argentina/", news: "hl=es-419&gl=AR&ceid=AR:es-419" },
+    "Colômbia": { yt: "CO", wiki: "es.wikipedia", lang: "es", nome: "na Colômbia", t24: "colombia/", news: "hl=es-419&gl=CO&ceid=CO:es-419" },
+    "Chile": { yt: "CL", wiki: "es.wikipedia", lang: "es", nome: "no Chile", t24: "chile/", news: "hl=es-419&gl=CL&ceid=CL:es-419" },
+    "Peru": { yt: "PE", wiki: "es.wikipedia", lang: "es", nome: "no Peru", t24: "peru/", news: "hl=es-419&gl=PE&ceid=PE:es-419" },
+    "França": { yt: "FR", wiki: "fr.wikipedia", lang: "fr", nome: "na França", t24: "france/", news: "hl=fr&gl=FR&ceid=FR:fr" },
+    "Alemanha": { yt: "DE", wiki: "de.wikipedia", lang: "de", nome: "na Alemanha", t24: "germany/", news: "hl=de&gl=DE&ceid=DE:de" },
+    "Itália": { yt: "IT", wiki: "it.wikipedia", lang: "it", nome: "na Itália", t24: "italy/", news: "hl=it&gl=IT&ceid=IT:it" },
+    "Holanda": { yt: "NL", wiki: "nl.wikipedia", lang: "nl", nome: "na Holanda", t24: "netherlands/", news: "hl=nl&gl=NL&ceid=NL:nl" },
+    "Japão": { yt: "JP", wiki: "ja.wikipedia", lang: "ja", nome: "no Japão", t24: "japan/", news: "hl=ja&gl=JP&ceid=JP:ja" },
+    "Coreia do Sul": { yt: "KR", wiki: "ko.wikipedia", lang: "ko", nome: "na Coreia do Sul", t24: "korea/", news: "hl=ko&gl=KR&ceid=KR:ko" },
+    "Indonésia": { yt: "ID", wiki: "id.wikipedia", lang: "id", nome: "na Indonésia", t24: "indonesia/", news: "hl=id&gl=ID&ceid=ID:id" },
+    "Turquia": { yt: "TR", wiki: "tr.wikipedia", lang: "tr", nome: "na Turquia", t24: "turkey/", news: "hl=tr&gl=TR&ceid=TR:tr" },
+    "Arábia Saudita": { yt: "SA", wiki: "ar.wikipedia", lang: "ar", nome: "na Arábia Saudita", t24: "saudi-arabia/", news: "hl=ar&gl=SA&ceid=SA:ar" },
+    "Emirados Árabes": { yt: "AE", wiki: "ar.wikipedia", lang: "ar", nome: "nos Emirados Árabes", t24: "united-arab-emirates/", news: "hl=ar&gl=AE&ceid=AE:ar" },
+    "Egito": { yt: "EG", wiki: "ar.wikipedia", lang: "ar", nome: "no Egito", t24: "egypt/", news: "hl=ar&gl=EG&ceid=EG:ar" }
   };
   const fail = (code, message) => ({ code, message });
   const ytKey = () => AI.get().keys.youtube || AI.get().keys.google || "";

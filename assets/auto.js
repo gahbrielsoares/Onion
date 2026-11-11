@@ -52,18 +52,17 @@ async function apIdea() {
     idea = opts[d.i]; S.ideias = S.ideias.filter(i => i.id !== idea.id);
     apLog("Ideias", `escolhi “${idea.tema}”. ${d.motivo}`, "decision");
   } else {
-    await walk("virais", "indo buscar temas virais");
+    await walk("ideias", "pesquisando temas em alta");
     if (AP.region) S.viraisRegion = AP.region;
     await attempt("Virais", () => runVirais(), () => S.viraisResults.length > 0 && !ui.virErr);
     const cands = S.viraisResults.filter(v => !v.enviado && !used.includes(v.tema));
     const pool = cands.length ? cands : S.viraisResults;
     const d = await decide(`Qual destes temas virais (${S.viraisRegion}) vira o próximo vídeo? Evite repetir: ${used.slice(-10).join("; ") || "nenhum"}.`,
-      pool.map(v => `${v.tema} — ${v.angulo} (potencial ${v.potencial}; ${v.porque})`));
+      pool.map(v => `${v.tema} — ${v.angulo || ""}${v.sinal ? ` (sinal: ${v.sinal})` : ""}${v.urgencia ? ` [${v.urgencia}]` : ""}`));
     const v = pool[d.i]; v.enviado = true;
     idea = { id: Date.now() + Math.random(), tema: v.tema, angulo: v.angulo, origem: "Piloto · " + S.viraisRegion };
     apLog("Virais", `escolhi “${v.tema}”. ${d.motivo}`, "decision");
-    courier("virais", "ideias");
-    await walk("ideias", "levando a ideia pro Laboratório");
+        await walk("ideias", "levando a ideia pro Laboratório");
   }
   (AP.usedTopics = AP.usedTopics || []).push(idea.tema);
   S.project = newProject(idea, AP.mode === "short" ? "short" : "long"); save(); renderProd();
@@ -90,16 +89,16 @@ async function apDescricao() {
   await walk("descricao", "indo pra Redação");
   await attempt("Descrição", () => runDescricao(), () => !!(P.description || "").trim() && !ui.desErr);
   P.done.descricao = true; save(); renderProd();
-  apLog("Descrição", "descrição e hashtags prontas", "ok"); courier("descricao", "capa");
+  apLog("Descrição", "descrição e hashtags prontas", "ok"); courier("descricao", "imagens");
 }
 async function apCapa() {
   const P = S.project; if (P.done.capa) return;
-  await walk("capa", "indo pro Ateliê de Capas");
+  await walk("imagens", "criando a capa (marketing)");
   await attempt("Capa", () => runCapa(), () => (P.thumbs || []).length > 0 && (!AI.stageReady("image") || (P.thumbImg || []).some(x => x === "ok")));
   const okIdx = P.thumbs.map((_, i) => i).filter(i => !AI.stageReady("image") || P.thumbImg[i] === "ok");
   const d = await decide(`Qual texto de capa (thumbnail) usar para o título “${P.title}”?`, okIdx.map(i => P.thumbs[i]), P.thumbScene ? "Composição: " + P.thumbScene : "");
   P.thumbSel = okIdx[d.i]; P.done.capa = true; save(); renderProd();
-  apLog("Capa", `versão ${P.thumbSel + 1}: “${P.thumbs[P.thumbSel]}”. ${d.motivo}`, "decision"); courier("capa", "imagens");
+  apLog("Capa", `versão ${P.thumbSel + 1}: “${P.thumbs[P.thumbSel]}”. ${d.motivo}`, "decision"); renderProd();
 }
 async function apImagens() {
   const P = S.project; if (P.done.imagens) return;
@@ -146,7 +145,7 @@ async function apNarracao() {
 async function apMontagem() {
   const P = S.project;
   await walk("montagem", "indo pro OnionCut");
-  const tpls = isDoc(P) ? Object.keys(Doc.TPL) : isColagem(P) ? Object.keys(Collage.TPL) : TEMPLATES;
+  const tpls = isDoc(P) ? Doc.tplFor(visOf(P)) : isColagem(P) ? Object.keys(Collage.TPL) : TEMPLATES;
   const d = await decide(`Qual template de edição combina com o vídeo “${P.title}”?`, tpls);
   P.template = tpls[d.i]; if (P.kind !== "short") P.res = AP.res || "1080p"; save();
   apLog("OnionCut", `template “${P.template}”, legenda: ${P.captions.toLowerCase()}. ${d.motivo}`, "decision");
@@ -171,7 +170,6 @@ async function apRender(P) {
       if (panelKey === "auto") renderAutoHead();
     } });
     const vb = await keepVideo(P, out, fh);
-    if (out.blob) saveBlob(out.blob, name);
     P.render = { name, res: P.res, mb: vb ? (vb.size / 1048576).toFixed(0) : null, secs: R.dur, at: Date.now(), stored: !!vb };
     // capa e descrição junto do vídeo
     const thumb = await Store.get(mkey(P.id, "thumb", P.thumbSel));
@@ -179,7 +177,7 @@ async function apRender(P) {
     if (AP.dir) {
       const put = async (n, b) => { try { const h = await AP.dir.getFileHandle(n, { create: true }); const w = await h.createWritable(); await w.write(b); await w.close(); } catch (e) {} };
       if (thumb) await put(`${slug(P.title)}-capa.jpg`, thumb); await put(`${slug(P.title)}-descricao.txt`, desc);
-    } else { if (thumb) saveBlob(thumb, `${slug(P.title)}-capa.jpg`); saveBlob(desc, `${slug(P.title)}-descricao.txt`); }
+    }
   } catch (e) {
     P.renderProg = null; clearBusy();
     if (e.code === "cancelled") throw { code: "stopped", message: "Piloto automático parado por você." };
@@ -252,7 +250,7 @@ VIEWS.auto = () => {
   ${S.project ? `<div class="note" style="${S.config && S.project.config.idioma !== S.config.idioma ? "border:1px solid var(--danger)" : ""}"><b>Tem um vídeo pela metade:</b> “${esc(S.project.title || S.project.idea.tema)}” em ${esc(S.project.config.idioma)}. O piloto continua ele primeiro.${S.config && S.project.config.idioma !== S.config.idioma ? ` <b style="color:var(--danger)">Atenção: ele está em ${esc(S.project.config.idioma)}, mas o canal agora está em ${esc(S.config.idioma)}.</b>` : ""}<div class="btns" style="margin-top:6px"><button class="btn ghost small" id="apdisc">Descartar esse vídeo</button></div></div>` : ""}
   ${miss.length ? `<div class="note"><b>Antes de começar:</b>${miss.map(([t, k]) => `<div style="margin-top:6px">• ${esc(t)} ${k ? `<button class="btn ghost small" style="padding:3px 8px" onclick="openPanel('${k}')">abrir</button>` : ""}</div>`).join("")}</div>` : ""}
   <div class="row"><div class="field"><label for="apn">Quantos vídeos</label><input id="apn" type="number" min="1" max="20" value="${AP.total}"></div>
-  <div class="field"><label for="apr">Região dos temas virais</label><select id="apr">${REGIOES.map(r => `<option ${r === (AP.region || S.viraisRegion) ? "selected" : ""}>${r}</option>`).join("")}</select></div></div>
+  <div class="field"><label for="apr">Região dos temas virais</label><select id="apr">${REGIOES().map(r => `<option ${r === (AP.region || S.viraisRegion) ? "selected" : ""}>${r}</option>`).join("")}</select></div></div>
   <div class="field"><label>O que produzir</label>${pills("apmode", ["Longo + 1 Short", "Só vídeos longos", "Só Shorts"], AP.mode === "short" ? "Só Shorts" : AP.mode === "long" ? "Só vídeos longos" : "Longo + 1 Short")}
     <p class="m" style="font-size:12px;margin:5px 0 0">O Short de cada vídeo reaproveita o elenco do vídeo longo: não gera imagens novas, só roteiro e narração.</p></div>
   <div class="field"><label>Resolução dos vídeos longos</label>${pills("apres", RES, AP.res || "1080p")}</div>

@@ -8,7 +8,11 @@ const Sound = (() => {
     "Tensão (documentário)": { chords: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], cut: 700, pulse: true, wave: "sawtooth", rev: 3.2, gain: .9 },
     "Mistério":              { chords: [[50, 53, 57], [51, 55, 58], [50, 53, 56], [46, 50, 53]], cut: 520, pulse: false, wave: "sawtooth", rev: 4.5, gain: .85 },
     "Leve (curiosidades)":   { chords: [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]], cut: 1600, pulse: false, wave: "triangle", rev: 2.2, gain: .8 },
-    "Inspirador":            { chords: [[48, 55, 64], [45, 52, 60], [41, 48, 57], [43, 50, 59]], cut: 1200, pulse: false, wave: "triangle", rev: 3.5, gain: .85 }
+    "Inspirador":            { chords: [[48, 55, 64], [45, 52, 60], [41, 48, 57], [43, 50, 59]], cut: 1200, pulse: false, wave: "triangle", rev: 3.5, gain: .85 },
+    "Épico":                 { chords: [[45, 52, 57], [41, 48, 53], [43, 50, 55], [40, 47, 52]], cut: 900, pulse: true, wave: "sawtooth", rev: 4, gain: .95 },
+    "Calmo (bem-estar)":     { chords: [[60, 64, 71], [57, 60, 67], [53, 57, 64], [55, 59, 66]], cut: 1000, pulse: false, wave: "sine", rev: 4.5, gain: .9 },
+    "Promocional (animado)": { chords: [[60, 64, 67], [55, 59, 62], [57, 60, 64], [53, 57, 60]], cut: 2400, pulse: true, wave: "square", rev: 1.6, gain: .55, beat: true },
+    "Pop animado":           { chords: [[62, 66, 69], [59, 62, 66], [55, 59, 62], [57, 61, 64]], cut: 2200, pulse: true, wave: "triangle", rev: 1.8, gain: .75, beat: true }
   };
   const hz = m => 440 * Math.pow(2, (m - 69) / 12);
   function impulse(ctx, secs, decay) {
@@ -37,8 +41,8 @@ const Sound = (() => {
       const sub = ctx.createOscillator(), sg = ctx.createGain(); sub.type = "sine"; sub.frequency.value = hz(ch[0] - 12);
       sg.gain.setValueAtTime(0, t0); sg.gain.linearRampToValueAtTime(.09, t0 + 2); sg.gain.setValueAtTime(.09, t0 + 6.5); sg.gain.linearRampToValueAtTime(0, t0 + 9.8);
       sub.connect(sg); sg.connect(master); sub.start(t0); sub.stop(Math.min(L, t0 + 10));
-      if (M.pulse) for (let b = 0; b < 4; b++) {
-        const tb = t0 + b * 2, o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sine";
+      if (M.pulse) for (let b = 0; b < (M.beat ? 16 : 4); b++) {
+        const tb = t0 + b * (M.beat ? .5 : 2), o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sine";
         o.frequency.setValueAtTime(70, tb); o.frequency.exponentialRampToValueAtTime(38, tb + .35);
         g.gain.setValueAtTime(.0001, tb); g.gain.exponentialRampToValueAtTime(.16, tb + .02); g.gain.exponentialRampToValueAtTime(.0001, tb + .6);
         o.connect(g); g.connect(master); o.start(tb); o.stop(tb + .7);
@@ -75,6 +79,14 @@ const Sound = (() => {
       const g = ctx.createGain(); g.gain.setValueAtTime(.0001, 0); g.gain.exponentialRampToValueAtTime(.6, 1.7); g.gain.linearRampToValueAtTime(0, 1.8);
       s.connect(f); f.connect(g); g.connect(ctx.destination); s.start();
     });
+    else if (kind === "pop") out = await render(.25, ctx => {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sine"; o.frequency.setValueAtTime(900, 0); o.frequency.exponentialRampToValueAtTime(260, .12);
+      g.gain.setValueAtTime(.0001, 0); g.gain.exponentialRampToValueAtTime(.9, .008); g.gain.exponentialRampToValueAtTime(.0001, .16); o.connect(g); g.connect(ctx.destination); o.start(); o.stop(.2);
+    });
+    else if (kind === "sparkle") out = await render(1.2, ctx => {
+      [2093, 2637, 3136, 4186].forEach((f, i) => { const o = ctx.createOscillator(), g = ctx.createGain(), t = i * .06; o.type = "sine"; o.frequency.value = f;
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.35, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + .9); o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 1); });
+    });
     else out = await render(.25, ctx => {   // "shutter": clique de foto/projetor
       const s = ctx.createBufferSource(); s.buffer = noiseBuf(ctx, .25); const f = ctx.createBiquadFilter(); f.type = "highpass"; f.frequency.value = 1800;
       const g = ctx.createGain(); g.gain.setValueAtTime(.8, 0); g.gain.exponentialRampToValueAtTime(.0001, .05); g.gain.setValueAtTime(.5, .09); g.gain.exponentialRampToValueAtTime(.0001, .16);
@@ -110,5 +122,22 @@ const Sound = (() => {
   }
   async function custom(blob) { return Voice.decode(blob); }
 
-  return { MOODS, loop, sfx, mix, custom };
+  const SFX_SETS = ["Documentário (whoosh, impacto, clique)", "Suave (só whoosh leve)", "Promocional (pop e brilho)", "Cinematográfico (impactos fortes)", "Sem efeitos"];
+  // efeitos conforme o tipo de cena e o pacote escolhido
+  function events(scenes, set) {
+    if (set === "Sem efeitos") return [];
+    const ev = []; let last = -9;
+    scenes.forEach((s, i) => {
+      if (i === 0) return; const ty = (s.beat && s.beat.tipo) || "foto", big = /titulo|data/.test(ty);
+      if (set === "Suave (só whoosh leve)") { if (s.s - last > 3) { ev.push({ t: s.s - .3, kind: "whoosh", gain: .35 }); last = s.s; } return; }
+      if (set === "Promocional (pop e brilho)") { if (big) ev.push({ t: s.s, kind: "sparkle", gain: .7 }); else if (s.s - last > 1.2) ev.push({ t: s.s, kind: "pop", gain: .5 }); if (ty === "capitulo") ev.push({ t: s.s, kind: "impact", gain: .6 }); last = s.s; return; }
+      if (set === "Cinematográfico (impactos fortes)") { if (big || ty === "capitulo") { if (ty === "capitulo") ev.push({ t: s.s - 1.7, kind: "riser", gain: 1 }); ev.push({ t: s.s, kind: "impact", gain: 1.2 }); } else if (s.s - last > 2.5) ev.push({ t: s.s - .3, kind: "whoosh", gain: .7 }); last = s.s; return; }
+      if (ty === "capitulo") { ev.push({ t: s.s - 1.7, kind: "riser", gain: .8 }, { t: s.s, kind: "impact", gain: 1 }); last = s.s; }
+      else if (big) { ev.push({ t: s.s, kind: "impact", gain: .8 }); last = s.s; }
+      else if (ty === "retrato") { ev.push({ t: s.s + .05, kind: "shutter", gain: .8 }); last = s.s; }
+      else if (s.s - last > 2.2) { ev.push({ t: s.s - .3, kind: "whoosh", gain: .55 }); last = s.s; }
+    });
+    return ev;
+  }
+  return { MOODS, SFX_SETS, events, loop, sfx, mix, custom };
 })();

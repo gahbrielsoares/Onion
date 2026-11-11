@@ -160,3 +160,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .player:hover .playbtn,.player:focus-visible .playbtn{transform:translate(-50%,-50%) scale(1.08)}
 .player .playlbl{position:absolute;left:8px;bottom:8px;background:rgba(20,14,30,.72);color:#fff;font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px}
 .scene.pend{border:1.5px dashed var(--line);background:var(--surface-2)!important;align-items:center;justify-content:center;text-align:center}
+.stylecards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stylecard{border:2px solid var(--line);border-radius:10px;padding:4px 4px 6px;background:var(--surface-2);cursor:pointer;display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:var(--text);text-align:center}
+.stylecard img{width:100%;aspect-ratio:16/9;border-radius:6px;background:#1c1c22;display:block;object-fit:cover}
+.stylecard[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 30%,transparent)}
+@media (max-width:520px){.stylecards{grid-template-columns:repeat(2,1fr)}}
+.row>.field{min-width:0}
+.field select,.field input{max-width:100%}

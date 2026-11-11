@@ -171,7 +171,8 @@ const Cut = (() => {
       let music = null;
       if (snd.custom) { const mb = await Store.get(`p${P.id}:music:0`); if (mb) try { music = await Sound.custom(mb); } catch (e) {} }
       if (!music && snd.mood && snd.mood !== "Sem trilha") music = await Sound.loop(snd.mood);
-      const ev = snd.sfx === false ? [] : doc ? Doc.events(scenes) : col ? scenes.filter((s, i) => i > 0 && i % 2 === 0).map(s => ({ t: s.s - .25, kind: "whoosh", gain: .35 })) : [];
+      const set = snd.sfx === false ? "Sem efeitos" : (snd.sfxSet || "Documentário (whoosh, impacto, clique)");
+      const ev = Sound.events(scenes, set);
       mixed = await Sound.mix(voiceEnd, { music, events: ev, musicGain: snd.custom ? .14 : .11 });
     }
     return { audio: mixed, voice: audio, endCard: END, muralDur, dur, words, scenes, caps, bitmaps, assets, mode: doc ? "doc" : col ? "colagem" : "cinema", pauses: ps, hits, exact, chunks: N.chunks.length, wave, nImages: col ? Object.keys(assets).length : sc };
@@ -211,10 +212,10 @@ const Cut = (() => {
     g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = doc ? "#E3A93C" : "#ffffff";
     g.font = `${doc ? "700" : "800"} ${Math.round(52 * S2)}px ${doc ? "Cinzel, Georgia, serif" : "Figtree, Arial, sans-serif"}`;
     const portrait = H > W;
-    if (portrait) { g.font = `${doc ? "700" : "800"} ${Math.round(64 * S2)}px ${doc ? "Cinzel, Georgia, serif" : "Figtree, Arial, sans-serif"}`; g.fillText(nomes.length ? "OBRIGADO AOS" : "SEU NOME PODE", W / 2, H * .24); g.fillText(nomes.length ? "NOVOS INSCRITOS" : "APARECER AQUI", W / 2, H * .24 + 78 * S2); }
-    else g.fillText(nomes.length ? "OBRIGADO AOS NOVOS INSCRITOS" : "SEU NOME PODE APARECER AQUI", W / 2, H * .2);
+    if (portrait) { g.font = `${doc ? "700" : "800"} ${Math.round(64 * S2)}px ${doc ? "Cinzel, Georgia, serif" : "Figtree, Arial, sans-serif"}`; g.fillText(nomes.length ? "AGRADECIMENTO" : "SEU NOME PODE", W / 2, H * .24); g.fillText(nomes.length ? "ESPECIAL" : "APARECER AQUI", W / 2, H * .24 + 78 * S2); }
+    else g.fillText(nomes.length ? "AGRADECIMENTO ESPECIAL" : "SEU NOME PODE APARECER AQUI", W / 2, H * .2);
     g.font = `600 ${Math.round(30 * S2)}px Figtree, Arial, sans-serif`; g.fillStyle = "#d8d3c8";
-    if (!nomes.length) g.fillText("Inscreva-se e apareça no mural do próximo vídeo", W / 2, H * (portrait ? .36 : .3));
+    g.fillText("Se inscreva e deixe seu nome nos comentários", W / 2, nomes.length ? H * (portrait ? .86 : .88) : H * (portrait ? .36 : .3));
     const cols = W > H ? 3 : (nomes.length > 9 ? 2 : 1), rows = Math.ceil(nomes.length / cols), lh = (portrait ? 72 : 54) * S2;
     nomes.forEach((n, k) => {
       const step = R.muralDur ? (R.muralDur * .75) / Math.max(1, nomes.length) : .12, lead = R.muralDur ? .6 + R.muralDur * .12 : .5;
