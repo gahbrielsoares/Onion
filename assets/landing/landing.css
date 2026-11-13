@@ -180,3 +180,16 @@ footer .copy{width:100%;border-top:1.5px solid var(--line);padding-top:16px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}.browser{transform:none}html{scroll-behavior:auto}}
 .hero .wrap,.hero .stage,.hero .marquee{position:relative;z-index:1}
 .cloud{z-index:0}
+
+/* botão de entrar com destaque e mãozinha clicando */
+.enter-wrap{position:relative;display:flex;justify-content:center;margin-top:30px}
+.btn.enter{position:relative;background:#3BE07A;color:var(--ink);font-size:19px;padding:16px 26px;animation:enterGlow 2.4s ease-in-out infinite}
+.btn.enter .pulse{position:absolute;inset:-2px;border-radius:16px;border:3px solid #3BE07A;animation:ring 2.4s ease-out infinite;pointer-events:none}
+@keyframes enterGlow{0%,100%{box-shadow:4px 4px 0 var(--ink),0 0 0 0 rgba(59,224,122,.0)}50%{box-shadow:4px 4px 0 var(--ink),0 0 26px 4px rgba(59,224,122,.55)}}
+@keyframes ring{0%{transform:scale(1);opacity:.9}70%,100%{transform:scale(1.18,1.45);opacity:0}}
+.hand{position:absolute;left:50%;top:50%;margin-left:min(150px,34vw);margin-top:2px;pointer-events:none;animation:tap 2.4s ease-in-out infinite;filter:drop-shadow(2px 2px 0 rgba(27,20,36,.25))}
+@keyframes tap{0%,100%{transform:translate(14px,14px) rotate(-12deg)}40%{transform:translate(0,0) rotate(-12deg)}48%{transform:translate(0,4px) rotate(-12deg) scale(.92)}56%{transform:translate(0,0) rotate(-12deg)}}
+.enter-wrap+.ctas{margin-top:18px}
+.only-m{display:none}
+@media (max-width:900px){.only-m{display:block}}
+@media (max-width:560px){.btn.enter{font-size:17px;padding:14px 18px}.hand{margin-left:min(120px,30vw)}}
