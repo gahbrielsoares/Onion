@@ -397,6 +397,7 @@ const SHOPS = [
   { n: "PIZZARIA", x: 8, y: GH + 6.6, w: 7, d: 3.8, wall: "#f6e0c0", aw: "#d94a3c", roof: "#8a5a4a", icon: "🍕" },
   { n: "", x: 31, y: GH + 6.6, w: 7, d: 3.8, wall: "#d7e4dc", aw: "#46a7b5", roof: "#5a6b66" }
 ];
+SHOPS.length = 0; // os prédios do bairro foram retirados (ficam ruas, calçadas, carros e árvores)
 SHOPS.forEach(sh => {
   const cx = sh.x + sh.w / 2, cy = sh.y + sh.d / 2;
   // porta virada pro campus
@@ -661,7 +662,7 @@ function plan(s, want) {
   let goal, final = null;
   if (want === "desk") { goal = from.door; final = deskOf(s); }
   else if (want === "away") goal = EXIT;
-  else if (shopOpen() && NF < .3 && Math.random() < .35) { const sh = OPEN_SHOPS[(Math.random() * OPEN_SHOPS.length) | 0], gt = gateFor(sh); pts.push(...routeTo(start[0], start[1], gt.in[0], gt.in[1]), ...toShop(sh).slice(1)); s.path = pts; s.state = "walk"; s.next = "break"; s.goingShop = sh; return; }
+  else if (OPEN_SHOPS.length && shopOpen() && NF < .3 && Math.random() < .35) { const sh = OPEN_SHOPS[(Math.random() * OPEN_SHOPS.length) | 0], gt = gateFor(sh); pts.push(...routeTo(start[0], start[1], gt.in[0], gt.in[1]), ...toShop(sh).slice(1)); s.path = pts; s.state = "walk"; s.next = "break"; s.goingShop = sh; return; }
   else { const sp = SPOTS[(Math.random() * SPOTS.length) | 0]; goal = [sp[0] + (Math.random() - .5) * .5, sp[1] + (Math.random() - .5) * .5]; }
   pts.push(...routeTo(start[0], start[1], goal[0], goal[1]));
   if (final) pts.push([final.x, final.y]);
