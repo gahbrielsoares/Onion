@@ -6,8 +6,9 @@
 
 /* ============ MUNDO / ISO ============ */
 const TW = 32, TH = 16, GW = 48, GH = 44;
-const OX = GH * TW / 2 + 60, OY = 140;
-const WORLD_W = (GW + GH) * TW / 2 + 120, WORLD_H = (GW + GH) * TH / 2 + 230;
+const ME = 11;   // margem de cidade em volta do campus (em tiles)
+const OX = (GH + 2 * ME) * TW / 2 + 60, OY = ME * TH + 120;
+const WORLD_W = (GW + GH + 4 * ME) * TW / 2 + 120, WORLD_H = (GW + GH + 4 * ME) * TH / 2 + 200;
 const EX = [TW / 2, TH / 2], EY = [-TW / 2, TH / 2];          // vetores de 1 tile em x e em y
 function W(gx, gy) { return [(gx - gy) * TW / 2 + OX, (gx + gy) * TH / 2 + OY]; }
 function rng(seed) { return () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
@@ -308,6 +309,8 @@ function addSpoke(from, bend) {
 }
 B.forEach((b, i) => { if (b.door) addSpoke(b.door, i % 2 ? .9 : -.9); });
 addSpoke([PARK_LOT[0] + .5, PARK_LOT[1] + 1], .6);
+const GATES = [[16, .05], [.05, 25.5], [25, GH - .05], [GW - .05, 25]].map(([x, y]) => ({ in: [x, y], out: [x < .5 ? -.7 : x > GW - .5 ? GW + .7 : x, y < .5 ? -.7 : y > GH - .5 ? GH + .7 : y] }));
+GATES.forEach(gt => addSpoke(gt.in, .25));
 // trilhas internas do jardim: um círculo em volta do lago e 3 ligações curvas até o anel
 const INNER = 4.8;
 for (let k = 0; k < 3; k++) { const a = k / 3 * Math.PI * 2 - .4; SPOKES.push(bez([C0[0] + Math.cos(a) * INNER, C0[1] + Math.sin(a) * INNER], [C0[0] + Math.cos(a + .5) * 7.4, C0[1] + Math.sin(a + .5) * 7.4], [C0[0] + Math.cos(a + .35) * RING, C0[1] + Math.sin(a + .35) * RING], 16)); }
@@ -366,14 +369,99 @@ function paintGround() {
   const rr = rng(5);
   for (let i = 0; i < 40; i++) { const a = rr() * 6.283, d = 1.3 + rr() * 1.4, [x, y] = W(C0[0] + Math.cos(a) * d, C0[1] + Math.sin(a) * d); g.fillStyle = "#7cc6ea"; g.fillRect(Math.round(x), Math.round(y), 2 + (rr() * 3 | 0), 1); }
   [[1.8, .4], [-1.6, 1.2], [.5, -2.1]].forEach(([dx, dy]) => { const [x, y] = W(C0[0] + dx, C0[1] + dy); blob(g, x, y, 5, 2, "#3f8f3a"); blob(g, x - 1, y - 1, 3, 1, "#62b04c"); px(g, x + 2, y - 1, "#ff9ec4"); });
-  // penhasco nas bordas
-  const a = W(0, GH), b2 = W(GW, GH), c = W(GW, 0), H = 26;
-  fillPoly(g, [a, b2, up(b2, -H), up(a, -H)], "#8a6844"); fillPoly(g, [b2, c, up(c, -H), up(b2, -H)], "#6f5236");
-  [[3, "#4d9a3a"], [5, "#7b5c3c"], [13, "#7f5f3e"], [20, "#73563a"]].forEach(([d, col]) => fillPoly(g, [a, b2, up(b2, -d), up(a, -d)], col));
-  fillPoly(g, [b2, c, up(c, -3), up(b2, -3)], "#3f8530");
-  for (let i = 0; i < 900; i++) { const u = r(), d = 4 + r() * (H - 5), L = r() < .55, p = L ? [a[0] + (b2[0] - a[0]) * u, a[1] + (b2[1] - a[1]) * u + d] : [b2[0] + (c[0] - b2[0]) * u, b2[1] + (c[1] - b2[1]) * u + d]; px(g, p[0], p[1], r() < .5 ? (L ? "#6e5134" : "#5a422b") : (L ? "#a07c55" : "#836445")); }
-  line(g, ...a, ...b2, "#3c7a2e"); line(g, ...b2, ...c, "#336a27");
+  paintCity(g);
 }
+
+/* ============ A CIDADE EM VOLTA ============ */
+function ringM(x, y) { const dx = x < 0 ? -x : x > GW ? x - GW : 0, dy = y < 0 ? -y : y > GH ? y - GH : 0; return Math.max(dx, dy); }
+function cityAt(x, y) { const m = ringM(x, y); if (m <= 1.2) return "sidewalk"; if (m <= 4.4) return "road"; if (m <= 5.4) return "sidewalk"; return "block"; }
+// caminhar em volta do quarteirão (retângulo a uma distância m do campus)
+function perimLen(m) { return 2 * (GW + 2 * m) + 2 * (GH + 2 * m); }
+function perimAt(m, s) { const L0 = GW + 2 * m, L1 = GH + 2 * m; s = ((s % perimLen(m)) + perimLen(m)) % perimLen(m);
+  if (s < L0) return [-m + s, -m, 0]; s -= L0; if (s < L1) return [GW + m, -m + s, 1]; s -= L1; if (s < L0) return [GW + m - s, GH + m, 2]; s -= L0; return [-m, GH + m - s, 3]; }
+function perimOf(m, p) { const [x, y] = p, L0 = GW + 2 * m, L1 = GH + 2 * m, c = [[Math.abs(y + m), x + m], [Math.abs(x - GW - m), L0 + y + m], [Math.abs(y - GH - m), L0 + L1 + (GW + m - x)], [Math.abs(x + m), 2 * L0 + L1 + (GH + m - y)]]; c.sort((a, b) => a[0] - b[0]); return c[0][1]; }
+function perimRoute(m, a, b) {
+  const L = perimLen(m), sa = perimOf(m, a), sb = perimOf(m, b); let fwd = ((sb - sa) % L + L) % L; const dir = fwd <= L / 2 ? 1 : -1, dist = dir > 0 ? fwd : L - fwd;
+  const pts = []; for (let t = 0; t <= dist; t += .5) { const q = perimAt(m, sa + dir * t); if (!pts.length || q[2] !== pts[pts.length - 1][2]) pts.push(q); }
+  const out = pts.map(q => [q[0], q[1]]); out.push(perimAt(m, sb).slice(0, 2)); return out;
+}
+// estabelecimentos do bairro (os funcionários também vão lá)
+const SHOPS = [
+  { n: "CAFÉ", x: 8, y: -10.4, w: 6, d: 3.8, wall: "#f4e3c8", aw: "#8b5a3c", roof: "#7a6a5a", icon: "☕" },
+  { n: "ACADEMIA", x: 30, y: -10.4, w: 8, d: 3.8, wall: "#dfe6ef", aw: "#d9584c", roof: "#5e6578", icon: "🏋" },
+  { n: "", x: 19.5, y: -10.4, w: 7, d: 3.8, wall: "#c9d4e3", aw: "#4f8fdc", roof: "#6b7385" },
+  { n: "RESTAURANTE", x: -10.4, y: 11, w: 3.8, d: 8, wall: "#f2d7c9", aw: "#3f9d6a", roof: "#8a5a4a", icon: "🍽" },
+  { n: "", x: -10.4, y: 30, w: 3.8, d: 6, wall: "#e6dccb", aw: "#c96f4a", roof: "#7a6a5a" },
+  { n: "MERCADO", x: GW + 6.6, y: 8, w: 3.8, d: 8, wall: "#e9f0e1", aw: "#e3a43f", roof: "#5e6a55", icon: "🛒" },
+  { n: "", x: GW + 6.6, y: 29, w: 3.8, d: 6, wall: "#dcd3e8", aw: "#7a64d8", roof: "#625a75" },
+  { n: "PIZZARIA", x: 8, y: GH + 6.6, w: 7, d: 3.8, wall: "#f6e0c0", aw: "#d94a3c", roof: "#8a5a4a", icon: "🍕" },
+  { n: "", x: 31, y: GH + 6.6, w: 7, d: 3.8, wall: "#d7e4dc", aw: "#46a7b5", roof: "#5a6b66" }
+];
+SHOPS.forEach(sh => {
+  const cx = sh.x + sh.w / 2, cy = sh.y + sh.d / 2;
+  // porta virada pro campus
+  const side = sh.y + sh.d < 0 ? "n" : sh.y > GH ? "s" : sh.x + sh.w < 0 ? "w" : "e";
+  sh.door = side === "n" ? [cx, sh.y + sh.d + .35] : side === "s" ? [cx, sh.y - .35] : side === "w" ? [sh.x + sh.w + .35, cy] : [sh.x - .35, cy];
+  sh.cross1 = side === "n" ? [cx, -4.9] : side === "s" ? [cx, GH + 4.9] : side === "w" ? [-4.9, cy] : [GW + 4.9, cy];
+  sh.cross0 = side === "n" ? [cx, -.7] : side === "s" ? [cx, GH + .7] : side === "w" ? [-.7, cy] : [GW + .7, cy];
+  sh.side = side;
+});
+const OPEN_SHOPS = SHOPS.filter(sh => sh.n);
+function shopOpen() { return NF < .9; }
+function drawShop(g, sh) {
+  const o = W(sh.x, sh.y), H = 22, lit = NF > .3 && shopOpen() && sh.n;
+  g.fillStyle = "rgba(28,40,24,.22)"; fillPoly(g, [W(sh.x + sh.w, sh.y), W(sh.x + sh.w + 1.1, sh.y + .4), W(sh.x + sh.w + 1.1, sh.y + sh.d + .4), W(sh.x + sh.w, sh.y + sh.d)], "rgba(28,40,24,.18)");
+  box(g, o, sh.w, sh.d, H, sh.roof, shade(sh.wall, -.04), shade(sh.wall, -.16), "#2b2340");
+  // janelas nas duas faces visíveis
+  const winL = (u0, u1, hy0, hy1) => [up(W(sh.x + u0, sh.y + sh.d), hy0), up(W(sh.x + u1, sh.y + sh.d), hy0), up(W(sh.x + u1, sh.y + sh.d), hy1), up(W(sh.x + u0, sh.y + sh.d), hy1)];
+  const winR = (v0, v1, hy0, hy1) => [up(W(sh.x + sh.w, sh.y + v0), hy0), up(W(sh.x + sh.w, sh.y + v1), hy0), up(W(sh.x + sh.w, sh.y + v1), hy1), up(W(sh.x + sh.w, sh.y + v0), hy1)];
+  const wc = lit ? "#ffd98a" : "#7fa6c4";
+  for (let u = .4; u < sh.w - .5; u += 1.3) { fillPoly(g, winL(u, u + .8, 4, 13), wc); line(g, ...winL(u, u + .8, 4, 13)[3], ...winL(u, u + .8, 4, 13)[2], "#2b2340"); }
+  for (let v = .4; v < sh.d - .5; v += 1.3) { fillPoly(g, winR(v, v + .8, 4, 13), shade(wc, -.08)); line(g, ...winR(v, v + .8, 4, 13)[3], ...winR(v, v + .8, 4, 13)[2], "#2b2340"); }
+  // toldo listrado (toque de cartoon)
+  for (let u = 0; u < sh.w; u += .5) fillPoly(g, [up(W(sh.x + u, sh.y + sh.d + .25), 14), up(W(sh.x + Math.min(sh.w, u + .5), sh.y + sh.d + .25), 14), up(W(sh.x + Math.min(sh.w, u + .5), sh.y + sh.d), 18), up(W(sh.x + u, sh.y + sh.d), 18)], (u * 2) % 2 ? "#fff6e6" : sh.aw);
+  for (let v = 0; v < sh.d; v += .5) fillPoly(g, [up(W(sh.x + sh.w + .25, sh.y + v), 14), up(W(sh.x + sh.w + .25, sh.y + Math.min(sh.d, v + .5)), 14), up(W(sh.x + sh.w, sh.y + Math.min(sh.d, v + .5)), 18), up(W(sh.x + sh.w, sh.y + v), 18)], (v * 2) % 2 ? "#fff6e6" : shade(sh.aw, -.1));
+  // ar-condicionado no telhado e placa
+  const t = up(W(sh.x + sh.w * .3, sh.y + sh.d * .4), H); box(g, t, .7, .6, 4, "#d9dce3", "#c3c7cf", "#a7abb5", "#2b2340");
+  if (sh.n) { const [x, y] = up(W(sh.x + sh.w / 2, sh.y + sh.d / 2), H + 2); g.font = `700 9px "Pixelify Sans", monospace`; const tw = Math.round(g.measureText(sh.n).width) + 10, bx = Math.round(x - tw / 2), by = Math.round(y - 20);
+    g.fillStyle = "#2b2340"; g.fillRect(bx + 2, by + 2, tw, 13); g.fillStyle = lit ? "#fff3c8" : "#ffffff"; g.fillRect(bx, by, tw, 13); g.fillStyle = sh.aw; g.fillRect(bx, by, tw, 2);
+    g.fillStyle = "#2b2340"; g.fillRect(bx, by, tw, 1); g.fillRect(bx, by + 12, tw, 1); g.fillRect(bx, by, 1, 13); g.fillRect(bx + tw - 1, by, 1, 13); g.fillRect(Math.round(x) - 1, by + 13, 2, 5);
+    g.textBaseline = "middle"; g.fillText(sh.n, bx + 5, by + 7.5); }
+}
+function paintCity(g) {
+  const r = rng(91);
+  for (let y = -ME; y < GH + ME; y++) for (let x = -ME; x < GW + ME; x++) {
+    if (x >= 0 && y >= 0 && x < GW && y < GH) continue;
+    const t = cityAt(x + .5, y + .5), q = r();
+    const col = t === "road" ? (q < .5 ? "#5b5e66" : "#585b63") : t === "sidewalk" ? ((x + y) % 2 ? "#d7d2c8" : "#cfc9bd") : (q < .5 ? "#8fbf6a" : "#88b864");
+    fillPoly(g, [W(x, y), W(x + 1, y), W(x + 1, y + 1), W(x, y + 1)], col);
+    if (t === "block" && q < .25) px(g, ...W(x + r(), y + r()), "#6ea24e");
+  }
+  // faixa central tracejada e meio-fio
+  for (let s = 0; s < perimLen(2.8); s += 1.4) { const a = perimAt(2.8, s), b = perimAt(2.8, s + .6); if (a[2] === b[2]) line(g, ...W(a[0], a[1]), ...W(b[0], b[1]), "#f2c14e"); }
+  [1.2, 4.4].forEach(m => { for (let s = 0; s < perimLen(m); s += .5) { const a = perimAt(m, s), b = perimAt(m, s + .5); if (a[2] === b[2]) line(g, ...W(a[0], a[1]), ...W(b[0], b[1]), "#a7a197"); } });
+  // faixas de pedestre nos portões e na frente das lojas
+  const zebra = (p, horiz) => { for (let k = 0; k < 6; k++) { const o = 1.4 + k * .5; const a = horiz ? [p[0] - .6, p[1]] : [p[0], p[1]]; if (horiz) { const y = p[1] < 0 ? -o : GH + o; line(g, ...W(p[0] - .6, y), ...W(p[0] + .6, y), "#eeeeee"); } else { const x = p[0] < 0 ? -o : GW + o; line(g, ...W(x, p[1] - .6), ...W(x, p[1] + .6), "#eeeeee"); } } };
+  [...GATES.map(gt => gt.out), ...SHOPS.filter(sh => sh.n).map(sh => sh.cross0)].forEach(p => zebra(p, p[1] < 0 || p[1] > GH));
+  // cerca viva em volta do campus, aberta nos portões e no estacionamento
+  const open = (x, y) => GATES.some(gt => Math.hypot(gt.in[0] - x, gt.in[1] - y) < 1.3) || (x >= PARK_LOT[0] - .2 && y >= PARK_LOT[1] - .2);
+  const hedge = (a, b) => { fillPoly(g, [a, b, up(b, 4), up(a, 4)], "#3f8a35"); fillPoly(g, [up(a, 4), up(b, 4), up(b, 5), up(a, 5)], "#5fae49"); };
+  for (let x = 0; x < GW; x += .5) { if (!open(x + .25, 0)) hedge(W(x, 0), W(x + .5, 0)); }
+  for (let y = 0; y < GH; y += .5) { if (!open(0, y + .25)) hedge(W(0, y), W(0, y + .5)); }
+  for (let x = 0; x < GW; x += .5) { if (!open(x + .25, GH)) hedge(W(x, GH), W(x + .5, GH)); }
+  for (let y = 0; y < GH; y += .5) { if (!open(GW, y + .25)) hedge(W(GW, y), W(GW, y + .5)); }
+}
+// carros passando nas duas mãos
+const traffic = Array.from({ length: 9 }, (_, i) => ({ m: i % 2 ? 3.6 : 2.0, s: i * 23.7, sp: (i % 2 ? -1 : 1) * (.05 + (i % 3) * .012), c: ["#d9584c", "#4f8fdc", "#e8e4dc", "#2e3440", "#3f9d6a", "#e3a43f", "#9aa0ad", "#7a64d8", "#46a7b5"][i] }));
+function drawMovingCar(g, car) {
+  const [x, y, seg] = perimAt(car.m, car.s), horiz = seg === 0 || seg === 2, w = horiz ? 1.05 : .55, d = horiz ? .55 : 1.05, o = W(x - w / 2, y - d / 2);
+  g.fillStyle = "rgba(0,0,0,.18)"; fillPoly(g, [W(x - w / 2 + .1, y - d / 2 + .15), W(x + w / 2 + .1, y - d / 2 + .15), W(x + w / 2 + .1, y + d / 2 + .15), W(x - w / 2 + .1, y + d / 2 + .15)], "rgba(0,0,0,.18)");
+  box(g, o, w, d, 5, car.c, shade(car.c, -.1), shade(car.c, -.25), "#1c1c22");
+  box(g, up(W(x - w * .3, y - d * .3), 5), w * .6, d * .6, 4, shade(car.c, .15), "#9fc6e0", "#7fa8c4", "#1c1c22");
+  if (NF > .4) { const f = W(x + (horiz ? (car.sp > 0 === (seg === 0) ? w / 2 : -w / 2) : 0), y + (horiz ? 0 : (car.sp > 0 === (seg === 1) ? d / 2 : -d / 2))); g.fillStyle = "#fff6c8"; g.fillRect(Math.round(f[0]) - 1, Math.round(f[1]) - 3, 3, 2); }
+}
+// pedestres do bairro
+const cityWalkers = Array.from({ length: 7 }, (_, i) => ({ m: i % 2 ? 5.0 : .7, s: i * 31, sp: (i % 3 ? 1 : -1) * (.025 + (i % 4) * .006), dir: 1, ph: i * 3, ...person() }));
 
 /* ============ NATUREZA E OBJETOS ============ */
 const trees = [], lamps = [], benches = [], umbrellas = [], cars = [];
@@ -392,6 +480,14 @@ const trees = [], lamps = [], benches = [], umbrellas = [], cars = [];
     if (trees.some(t2 => Math.abs(t2.x - x) + Math.abs(t2.y - y) < (edge ? .8 : 1.15))) continue;
     const q = r(); trees.push({ x, y, spr: TREE_SPR[q < .38 ? "pine" : q < .64 ? "round" : q < .82 ? "round2" : "bush"][(r() * 6) | 0] });
   }
+  // bairro: árvores nas quadras (fora das lojas) e postes na calçada de fora
+  for (let i = 0; i < 2600; i++) {
+    const x = -ME + r() * (GW + 2 * ME), y = -ME + r() * (GH + 2 * ME); if (ringM(x, y) < 5.9) continue;
+    if (SHOPS.some(sh => x > sh.x - .8 && x < sh.x + sh.w + .8 && y > sh.y - .8 && y < sh.y + sh.d + .8)) continue;
+    if (r() > .22) continue; if (trees.some(t2 => Math.abs(t2.x - x) + Math.abs(t2.y - y) < 1.1)) continue;
+    const q = r(); trees.push({ x, y, spr: TREE_SPR[q < .3 ? "pine" : q < .6 ? "round" : q < .85 ? "round2" : "bush"][(r() * 6) | 0] });
+  }
+  for (let s2 = 3; s2 < perimLen(4.95); s2 += 7.5) { const q = perimAt(4.95, s2); lamps.push({ x: q[0], y: q[1] }); }
   for (let k = 0; k < 14; k++) { const a = k / 14 * Math.PI * 2, x = C0[0] + Math.cos(a) * (RING + .95), y = C0[1] + Math.sin(a) * (RING + .95); if (terrainAt(x, y) === "grass" || terrainAt(x, y) === "garden") lamps.push({ x, y }); }
   SPOKES.slice(0, B.length + 1).forEach(s => { const p = s[Math.floor(s.length / 2)]; const x = p[0] + .8, y = p[1] + .4; if (terrainAt(x, y) === "grass") lamps.push({ x, y }); });
   for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + .3, x = C0[0] + Math.cos(a) * (INNER + .7), y = C0[1] + Math.sin(a) * (INNER + .7); if (terrainAt(x, y) === "garden") benches.push({ x, y }); }
@@ -399,6 +495,11 @@ const trees = [], lamps = [], benches = [], umbrellas = [], cars = [];
   const CC = ["#d9584c", "#4f8fdc", "#e8e4dc", "#2e3440", "#3f9d6a", "#e3a43f", "#9aa0ad"];
   for (let i = 0; i < 12; i++) cars.push({ x: PARK_LOT[0] + .5 + (i % 7), y: PARK_LOT[1] + (i < 7 ? 1.2 : 6), c: CC[i % CC.length] });
 })();
+const outerOf = p => p[0] < .5 ? [-4.9, p[1]] : p[0] > GW - .5 ? [GW + 4.9, p[1]] : p[1] < .5 ? [p[0], -4.9] : [p[0], GH + 4.9];
+function gateFor(sh) { let best = GATES[0], bd = 1e9; GATES.forEach(gt => { const d = Math.hypot(gt.out[0] - sh.cross1[0], gt.out[1] - sh.cross1[1]); if (d < bd) { bd = d; best = gt; } }); return best; }
+// do campus até a loja (pelo portão, faixa de pedestre e calçada) e de volta
+function toShop(sh) { const gt = gateFor(sh), o = outerOf(gt.in); return [gt.in, gt.out, o, ...perimRoute(4.9, o, sh.cross1), sh.door]; }
+function fromShop(sh) { return toShop(sh).reverse().slice(1); }
 const SPOTS = [...benches.map(b => [b.x + .25, b.y + .5]), ...umbrellas.map(u => [u.x + .5, u.y + .4]), [CAFE[0], CAFE[1] + .2]];
 function drawUmbrella(g, u) {
   const [x0, y0] = W(u.x, u.y), x = Math.round(x0), y = Math.round(y0);
@@ -427,6 +528,24 @@ function deskSpots(b) {
   c.sort((p, q) => Math.hypot(p[0] - b.cx, p[1] - b.cy) - Math.hypot(q[0] - b.cx, q[1] - b.cy));
   return c.slice(0, b.ndesks);
 }
+// porta de vidro com toldo na cor do prédio, voltada pro caminho
+function drawDoor(g, b, e, H) {
+  const len = e.len, dx = (e.c[0] - e.a[0]) / len, dy = (e.c[1] - e.a[1]) / len;
+  const t = Math.max(.6, Math.min(len - .6, (b.door[0] - e.a[0]) * dx + (b.door[1] - e.a[1]) * dy));
+  const A = [e.a[0] + dx * (t - .45), e.a[1] + dy * (t - .45)], Cc = [e.a[0] + dx * (t + .45), e.a[1] + dy * (t + .45)];
+  const out = [b.door[0] - (e.a[0] + dx * t), b.door[1] - (e.a[1] + dy * t)], ol = Math.hypot(...out) || 1, n = [out[0] / ol * .32, out[1] / ol * .32];
+  const pa = up(W(...A), SLAB), pc = up(W(...Cc), SLAB), DH = 17;
+  fillPoly(g, [W(A[0] + n[0] * 2.2, A[1] + n[1] * 2.2), W(Cc[0] + n[0] * 2.2, Cc[1] + n[1] * 2.2), W(...Cc), W(...A)], "#b8a27a");
+  fillPoly(g, [pa, pc, up(pc, DH), up(pa, DH)], "rgba(52,70,96,.72)");
+  const mid = [(pa[0] + pc[0]) / 2, (pa[1] + pc[1]) / 2]; line(g, mid[0], mid[1], mid[0], mid[1] - DH, "#2b2340");
+  [pa, pc].forEach(q => { g.fillStyle = "#2b2340"; g.fillRect(Math.round(q[0]) - 1, Math.round(q[1]) - DH, 2, DH); });
+  line(g, pa[0], pa[1] - DH, pc[0], pc[1] - DH, "#2b2340");
+  const a1 = up(W(A[0] + n[0], A[1] + n[1]), SLAB + DH + 2), c1 = up(W(Cc[0] + n[0], Cc[1] + n[1]), SLAB + DH + 2);
+  fillPoly(g, [up(pa, DH + 5), up(pc, DH + 5), c1, a1], b.c);
+  for (let k = 1; k < 4; k += 2) { const u = k / 4, v = (k + 1) / 4, P = (p, q2, w) => [p[0] + (q2[0] - p[0]) * w, p[1] + (q2[1] - p[1]) * w]; fillPoly(g, [P(up(pa, DH + 5), up(pc, DH + 5), u), P(up(pa, DH + 5), up(pc, DH + 5), v), P(a1, c1, v), P(a1, c1, u)], "#fff6e6"); }
+  line(g, ...a1, ...c1, "#2b2340");
+  g.fillStyle = "#ffd36b"; const kn = W(Cc[0] - dx * .25, Cc[1] - dy * .25); g.fillRect(Math.round(kn[0]) - 1, Math.round(kn[1]) - SLAB - 9, 2, 2);
+}
 function renderBuilding(b, locked) {
   const bb = bbox(b), c = canvas(bb.w, bb.h), f = canvas(bb.w, bb.h), g = c.getContext("2d"), gf = f.getContext("2d"), r = rng(300 + Math.round(b.gx * 7 + b.gy));
   g.translate(-bb.x, -bb.y); gf.translate(-bb.x, -bb.y);
@@ -454,8 +573,14 @@ function renderBuilding(b, locked) {
     if (b.k === "narracao") { const o = up(W(b.cx - .8, b.cy - 1.6), SLAB); box(g, o, 1.6, .9, 18, "#4a3f63", "#5a4d78", "#3e3454", "#2a2238"); const m = up(add(o, .8, .9), 9); g.fillStyle = "#9aa0b0"; g.fillRect(Math.round(m[0]) - 1, Math.round(m[1]) - 9, 3, 3); g.fillStyle = "#ff4d4d"; g.fillRect(Math.round(m[0]) + 6, Math.round(m[1]) - 14, 2, 1); }
     if (b.k === "montagem") { const o = up(W(b.cx - 1.6, b.cy - 2.6), SLAB); wallItem(g, { gx: b.cx - 1.6, gy: b.cy - 2.7, c: acc }, "timeline", 0, 3.2, r); }
     const pl = [[b.gx + b.w * .15, b.gy + b.d * .82], [b.gx + b.w * .85, b.gy + b.d * .2]].filter(p => inPolyG(p[0], p[1], b.poly)); pl.forEach(p => plant(g, W(...p), r));
+    const dEdge = E.slice().sort((p, q) => distSeg(b.door[0], b.door[1], p.a, p.c) - distSeg(b.door[0], b.door[1], q.a, q.c))[0];
+    if (!dEdge.front) drawDoor(g, b, dEdge, H);
+    E.filter(e => !e.front).forEach(e => line(g, ...up(W(...e.a), SLAB + H), ...up(W(...e.c), SLAB + H), "#3b3350"));
     // paredes da frente
     E.filter(e => e.front).forEach(e => { glassWall(gf, W(...e.a), W(...e.c), H, acc, true, r); posts(gf, W(...e.a), W(...e.c), Math.max(1, Math.round(e.len / 2)), H, acc); });
+    if (dEdge.front) drawDoor(gf, b, dEdge, H);
+    E.filter(e => e.front).forEach(e => { line(gf, ...up(W(...e.a), SLAB + H), ...up(W(...e.c), SLAB + H), "#2b2340"); line(gf, ...W(...e.a), ...W(...e.c), "#2b2340"); });
+    E.forEach(e => { const q = up(W(...e.a), SLAB); (e.front ? gf : g).fillStyle = "#2b2340"; (e.front ? gf : g).fillRect(Math.round(q[0]) - 1, Math.round(q[1]) - H, 2, H); });
     if (b.pavilion) { const top = P.map(p => up(p, SLAB + H)); for (let i = 0; i < top.length; i++) line(gf, ...top[i], ...top[(i + 1) % top.length], "#ffffff"); }
   }
   if (locked) { const dim = cv2 => { const k = canvas(cv2.width, cv2.height), kg = k.getContext("2d"); kg.filter = "grayscale(.75) brightness(.82)"; kg.drawImage(cv2, 0, 0); return k; }; return { back: dim(c), front: dim(f), bb }; }
@@ -524,13 +649,19 @@ const visitors = [];
 (function guests() { const pts = []; for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (TILE[y][x] === "path") pts.push([x + .5, y + .5]); for (let i = 0; i < 6; i++) { const p = pts[(R() * pts.length) | 0]; visitors.push({ x: p[0], y: p[1], tx: p[0], ty: p[1], sp: .03 + R() * .015, dir: 1, ph: R() * 8 | 0, ...person() }); } })();
 function deskOf(s) { const b = BK[s.b]; return b.desks[s.desk]; }
 function plan(s, want) {
-  const from = BK[s.b], pts = [];
+  const from = BK[s.b]; let pts = [];
+  if (s.shop) { const sh = s.shop, back = fromShop(sh); s.shop = null; pts = back.slice(0, -1); s.x = sh.door[0]; s.y = sh.door[1];
+    const gi = back[back.length - 1]; pts.push(gi);
+    const goal = want === "away" ? EXIT : from.door; pts.push(...routeTo(gi[0], gi[1], goal[0], goal[1])); if (want === "desk") { const d = deskOf(s); pts.push([d.x, d.y]); }
+    if (want === "break") want = "desk";
+    s.path = pts; s.state = "walk"; s.next = want; return; }
   const inside = s.state === "desk" || (from && inPolyG(s.x, s.y, from.poly));
   if (inside) pts.push(from.door);
   const start = pts.length ? pts[pts.length - 1] : [s.x, s.y];
   let goal, final = null;
   if (want === "desk") { goal = from.door; final = deskOf(s); }
   else if (want === "away") goal = EXIT;
+  else if (shopOpen() && NF < .3 && Math.random() < .35) { const sh = OPEN_SHOPS[(Math.random() * OPEN_SHOPS.length) | 0], gt = gateFor(sh); pts.push(...routeTo(start[0], start[1], gt.in[0], gt.in[1]), ...toShop(sh).slice(1)); s.path = pts; s.state = "walk"; s.next = "break"; s.goingShop = sh; return; }
   else { const sp = SPOTS[(Math.random() * SPOTS.length) | 0]; goal = [sp[0] + (Math.random() - .5) * .5, sp[1] + (Math.random() - .5) * .5]; }
   pts.push(...routeTo(start[0], start[1], goal[0], goal[1]));
   if (final) pts.push([final.x, final.y]);
@@ -557,7 +688,7 @@ function moveStaff() {
   staff.forEach(s => {
     if (s.state !== "walk" || !s.path.length) return;
     const [tx, ty] = s.path[0], dx = tx - s.x, dy = ty - s.y, d = Math.hypot(dx, dy), sp = .06;
-    if (d <= sp) { s.x = tx; s.y = ty; s.path.shift(); if (!s.path.length) s.state = s.next; }
+    if (d <= sp) { s.x = tx; s.y = ty; s.path.shift(); if (!s.path.length) { s.state = s.next; if (s.goingShop) { s.shop = s.goingShop; s.goingShop = null; } } }
     else { s.x += dx / d * sp; s.y += dy / d * sp; s.dir = (dx + dy) >= 0 ? 1 : -1; }
   });
   visitors.forEach(w => {
@@ -602,7 +733,7 @@ const groundFinal = canvas(WORLD_W, WORLD_H);
 function bakeGround() { paintGround(); const g = groundFinal.getContext("2d"); g.drawImage(ground, 0, 0); B.forEach(b => { if (b.poly) buildingShadow(g, b); }); trees.forEach(t => treeShadow(g, t)); }
 bakeGround();
 function resize() { dpr = Math.min(window.devicePixelRatio || 1, 2); vw = window.innerWidth; vh = window.innerHeight; cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr); low.width = Math.ceil(vw / zoom) + 2; low.height = Math.ceil(vh / zoom) + 2; clampCam(); }
-function center() { zoom = vw > 2200 ? 2 : 1; low.width = Math.ceil(vw / zoom) + 2; low.height = Math.ceil(vh / zoom) + 2; camX = WORLD_W / 2 - vw / zoom / 2; camY = WORLD_H / 2 - vh / zoom / 2 + 10; clampCam(); }
+function center() { zoom = vw > 2200 ? 2 : 1; low.width = Math.ceil(vw / zoom) + 2; low.height = Math.ceil(vh / zoom) + 2; const [cx, cy] = W(C0[0], C0[1]); camX = cx - vw / zoom / 2; camY = cy - vh / zoom / 2 + 10; clampCam(); }
 function clampCam() { const mw = vw / zoom, mh = vh / zoom; camX = Math.max(-mw * .35, Math.min(WORLD_W - mw * .65, camX)); camY = Math.max(-mh * .35, Math.min(WORLD_H - mh * .65, camY)); }
 function drawDesk(g, dk, b, locked, isBusy, i, sitter) {
   const [x0, y0] = W(dk.x, dk.y), x = Math.round(x0), y = Math.round(y0) - SLAB;
@@ -631,7 +762,7 @@ function render() {
   walkers.forEach(w => { if (!w.courier) return; w.t += 1 / 110; const e = Math.min(1, w.t), nx = w.fx + (w.tox - w.fx) * e, ny = w.fy + (w.toy - w.fy) * e; w.dir = (nx + ny) >= (w.x + w.y) ? 1 : -1; w.x = nx; w.y = ny; if (w.t >= 1.15) w.dead = true; });
   for (let i = walkers.length - 1; i >= 0; i--) if (walkers[i].dead) walkers.splice(i, 1);
   if (manager && typeof AP !== "undefined" && AP.on && AP.follow && !drag) { const [mx, my] = W(manager.x, manager.y), visW = (panelKey && vw > 720) ? vw - Math.min(470, vw) : vw; camX += (mx - visW / zoom / 2 - camX) * .07; camY += (my - vh / zoom / 2 - camY) * .07; clampCam(); }
-  const g = lc; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = "#2f6b2a"; g.fillRect(0, 0, low.width, low.height);
+  const g = lc; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = "#88b864"; g.fillRect(0, 0, low.width, low.height);
   const cx = Math.round(camX), cy = Math.round(camY); g.translate(-cx, -cy); g.drawImage(groundFinal, 0, 0);
   for (let i = 0; i < 10; i++) { const a = (i * 2.399 + Math.floor(frame / 6) * .7) % 6.283, d = 1.3 + ((i * 37) % 10) / 10 * 1.4, [sx, sy] = W(C0[0] + Math.cos(a) * d, C0[1] + Math.sin(a) * d); g.fillStyle = "#d8f1ff"; g.fillRect(Math.round(sx), Math.round(sy), (i + frame >> 3) % 3 + 1, 1); }
   for (let i = 0; i < 2; i++) { const a = frame * .004 + i * 3, [sx, sy] = W(C0[0] + Math.cos(a) * 2, C0[1] + Math.sin(a) * 1.8); g.drawImage(DUCK[(frame >> 4) % 2], Math.round(sx) - 4, Math.round(sy) - 5); }
@@ -641,10 +772,13 @@ function render() {
   benches.forEach(b2 => objs.push({ d: b2.x + b2.y, f: () => drawBench(g, b2) }));
   umbrellas.forEach(u => objs.push({ d: u.x + u.y, f: () => drawUmbrella(g, u) }));
   cars.slice(0, Math.max(2, Math.round(present / 2.4))).forEach(c => objs.push({ d: c.x + c.y, f: () => drawCar(g, c) }));
-  staff.forEach(s => { if (s.state === "away" || s.state === "desk") return; if (s.state === "walk" && inBuildingAt(s.x, s.y)) return; objs.push({ d: s.x + s.y, f: () => { const [x, y] = W(s.x, s.y); const idle = s.state === "break"; drawPersonAt(g, x, y - (idle && ((frame + s.ph) >> 4) % 5 === 0 ? 1 : 0), s, s.dir > 0 ? "front" : "back", idle ? 0 : ((frame + s.ph) >> 3) % 2); } }); });
+  staff.forEach(s => { if (s.state === "away" || s.state === "desk" || (s.state === "break" && s.shop)) return; if (s.state === "walk" && inBuildingAt(s.x, s.y)) return; objs.push({ d: s.x + s.y, f: () => { const [x, y] = W(s.x, s.y); const idle = s.state === "break"; drawPersonAt(g, x, y - (idle && ((frame + s.ph) >> 4) % 5 === 0 ? 1 : 0), s, s.dir > 0 ? "front" : "back", idle ? 0 : ((frame + s.ph) >> 3) % 2); } }); });
   if (NF < .8) visitors.forEach(w => objs.push({ d: w.x + w.y, f: () => { const [x, y] = W(w.x, w.y); drawPersonAt(g, x, y, w, w.dir > 0 ? "front" : "back", ((frame + w.ph) >> 3) % 2); } }));
   walkers.forEach(w => objs.push({ d: w.x + w.y, f: () => { const [x, y] = W(w.x, w.y); drawPersonAt(g, x, y, w, w.dir > 0 ? "front" : "back", (frame >> 3) % 2); g.fillStyle = "#e3a43f"; g.fillRect(Math.round(x) - 3, Math.round(y) - 21, 7, 5); } }));
   B.forEach(b => { if (b.poly) objs.push({ d: b.cx + b.cy, f: () => drawBuilding(g, b) }); });
+  SHOPS.forEach(sh => objs.push({ d: sh.x + sh.w * .6 + sh.y + sh.d * .6, f: () => drawShop(g, sh) }));
+  traffic.forEach(car => { car.s += car.sp; const q = perimAt(car.m, car.s); objs.push({ d: q[0] + q[1], f: () => drawMovingCar(g, car) }); });
+  cityWalkers.forEach(w => { w.s += w.sp; const q = perimAt(w.m, w.s); objs.push({ d: q[0] + q[1], f: () => { const [x, y] = W(q[0], q[1]); drawPersonAt(g, x, y, w, (w.sp > 0) === (q[2] < 2) ? "front" : "back", ((frame + w.ph) >> 3) % 2); } }); });
   objs.push({ d: C0[0] + C0[1], f: () => drawFountain(g) });
   if (manager) objs.push({ d: manager.x + manager.y + .01, f: () => drawManager(g) });
   objs.sort((a, b2) => a.d - b2.d).forEach(o => o.f());
@@ -654,6 +788,7 @@ function render() {
     g.fillStyle = `rgba(14,18,52,${.58 * NF})`; g.fillRect(cx, cy, low.width, low.height);
     g.save(); g.globalCompositeOperation = "lighter";
     lamps.forEach(l => { const [x, y] = W(l.x, l.y); g.globalAlpha = .75 * NF; g.drawImage(GLOW, Math.round(x) - 32, Math.round(y) - 52); });
+    SHOPS.forEach(sh => { if (!sh.n || !shopOpen()) return; for (let u = .8; u < sh.w; u += 1.6) { const [x, y] = up(W(sh.x + u, sh.y + sh.d), 9); g.globalAlpha = .5 * NF; g.drawImage(GLOW, Math.round(x) - 32, Math.round(y) - 32); } for (let v = .8; v < sh.d; v += 1.6) { const [x, y] = up(W(sh.x + sh.w, sh.y + v), 9); g.globalAlpha = .4 * NF; g.drawImage(GLOW, Math.round(x) - 32, Math.round(y) - 32); } });
     B.forEach(b => { if (!b.poly || b.k === "arquivo" || !buildingLit(b)) return; g.globalAlpha = .32 * NF; fillPoly(g, b.poly.map(p => up(W(p[0], p[1]), SLAB + 2)), "#ffcf8a"); g.globalAlpha = .14 * NF; fillPoly(g, buildingHull(b), "#ffd9a0"); });
     g.restore();
   }
@@ -667,24 +802,39 @@ function toScreen(wx, wy) { return [(wx - camX) * zoom, (wy - camY) * zoom]; }
 function labelAnchor(b) { const h = buildingHull(b); let top = h[0]; h.forEach(p => { if (p[1] < top[1]) top = p; }); const [cx] = W(b.cx, b.cy); return [cx, top[1] - 10]; }
 function drawLabels() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const ns = nextStage();
+  const ns = nextStage(), INK = "#2b2340";
   B.forEach(b => {
     if (!b.poly) return;
     const [wx, wy] = labelAnchor(b); const [x, y] = toScreen(wx, wy);
     if (x < -220 || x > vw + 220 || y < -60 || y > vh + 60) return;
-    const locked = !isUnlocked(b.k);
-    ctx.font = `600 13px "Pixelify Sans", monospace`; ctx.textBaseline = "middle";
-    const txt = b.n, tw = ctx.measureText(txt).width, bw = Math.round(tw + 26), bh = 21, bx = Math.round(x - bw / 2), by = Math.round(y - 12);
-    ctx.fillStyle = "rgba(40,30,60,.25)"; ctx.fillRect(bx + 2, by + 2, bw, bh);
-    ctx.fillStyle = locked ? "#e9e6ee" : "#ffffff"; ctx.fillRect(bx, by, bw, bh);
-    ctx.fillStyle = locked ? "#b9b3c4" : b.c; ctx.fillRect(bx, by, bw, 1); ctx.fillRect(bx, by + bh - 1, bw, 1); ctx.fillRect(bx, by, 1, bh); ctx.fillRect(bx + bw - 1, by, 1, bh); ctx.fillRect(bx + 7, by + bh / 2 - 3, 6, 6);
-    ctx.fillStyle = locked ? "#8f879c" : "#2b2340"; ctx.fillText(txt, bx + 18, by + bh / 2 + 1);
-    if (busy && busy.k === b.k) {
+    const locked = !isUnlocked(b.k), working = busy && busy.k === b.k, active = working || (ns === b.k && !busy), hov = hoverK === b.k;
+    ctx.font = `700 13px "Pixelify Sans", monospace`; ctx.textBaseline = "middle";
+    const txt = b.n, tw = ctx.measureText(txt).width, bw = Math.round(tw + 30), bh = 24, bx = Math.round(x - bw / 2), by = Math.round(y - 13) - (hov ? 2 : 0);
+    // botão com sombra deslocada, no estilo do site
+    const bg = locked ? "#ece8f1" : active ? "#f2c14e" : "#fff8ec";
+    ctx.fillStyle = locked ? "rgba(43,35,64,.35)" : INK; ctx.fillRect(bx + 3, by + 3, bw, bh);
+    ctx.fillStyle = bg; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = locked ? "#9d94ab" : INK; ctx.fillRect(bx, by, bw, 2); ctx.fillRect(bx, by + bh - 2, bw, 2); ctx.fillRect(bx, by, 2, bh); ctx.fillRect(bx + bw - 2, by, 2, bh);
+    ctx.fillStyle = locked ? "#b9b3c4" : b.c; ctx.fillRect(bx + 8, by + bh / 2 - 4, 8, 8); ctx.fillStyle = locked ? "#9d94ab" : INK; ctx.fillRect(bx + 8, by + bh / 2 - 4, 8, 1); ctx.fillRect(bx + 8, by + bh / 2 + 3, 8, 1); ctx.fillRect(bx + 8, by + bh / 2 - 4, 1, 8); ctx.fillRect(bx + 15, by + bh / 2 - 4, 1, 8);
+    ctx.fillStyle = locked ? "#8f879c" : INK; ctx.fillText(txt, bx + 22, by + bh / 2 + 1);
+    if (working) {
       ctx.font = `500 12px "Figtree", sans-serif`; const t1 = busy.role || b.role, t2 = busy.action || "trabalhando";
-      const w2 = Math.max(ctx.measureText(t1).width, ctx.measureText(t2).width) + 22, yb = by + bh + 6, xb = Math.round(x - w2 / 2);
-      ctx.fillStyle = "rgba(40,30,60,.25)"; ctx.fillRect(xb + 2, yb + 2, Math.round(w2), 36); ctx.fillStyle = "#ffffff"; ctx.fillRect(xb, yb, Math.round(w2), 36); ctx.fillStyle = b.c; ctx.fillRect(xb, yb, 3, 36);
-      ctx.fillStyle = "#6c5f7b"; ctx.fillText(t1, xb + 10, yb + 11); ctx.fillStyle = "#231a2e"; ctx.font = `700 12px "Figtree", sans-serif`; ctx.fillText(t2, xb + 10, yb + 26);
-    } else if (ns === b.k && !busy) { const bob = Math.round(Math.sin(frame / 6) * 3); ctx.fillStyle = "#3a2a10"; ctx.fillRect(Math.round(x) - 6, by - 15 + bob, 13, 2); ctx.fillStyle = "#f2c14e"; for (let i = 0; i < 6; i++) ctx.fillRect(Math.round(x) - 6 + i, by - 14 + bob + i, 13 - i * 2, 1); }
+      const w2 = Math.round(Math.max(ctx.measureText(t1).width, ctx.measureText(t2).width) + 24), yb = by + bh + 7, xb = Math.round(x - w2 / 2);
+      ctx.fillStyle = INK; ctx.fillRect(xb + 3, yb + 3, w2, 38); ctx.fillStyle = "#ffffff"; ctx.fillRect(xb, yb, w2, 38);
+      ctx.fillStyle = INK; ctx.fillRect(xb, yb, w2, 2); ctx.fillRect(xb, yb + 36, w2, 2); ctx.fillRect(xb, yb, 2, 38); ctx.fillRect(xb + w2 - 2, yb, 2, 38);
+      ctx.fillStyle = b.c; ctx.fillRect(xb + 2, yb + 2, 4, 34);
+      ctx.fillStyle = "#6c5f7b"; ctx.fillText(t1, xb + 12, yb + 12); ctx.fillStyle = "#231a2e"; ctx.font = `700 12px "Figtree", sans-serif`; ctx.fillText(t2, xb + 12, yb + 27);
+    }
+    if (ns === b.k && !busy) {
+      // seta maior, piscando de leve
+      const bob = Math.round(Math.sin(frame / 6) * 4), al = .65 + .35 * Math.abs(Math.sin(frame / 9)), ax = Math.round(x), ay = by - 26 + bob;
+      ctx.globalAlpha = al;
+      ctx.fillStyle = INK; for (let i = 0; i < 12; i++) ctx.fillRect(ax - 11 + i, ay + i, 23 - i * 2, 1);
+      ctx.fillRect(ax - 5, ay - 9, 11, 10);
+      ctx.fillStyle = "#f2c14e"; for (let i = 0; i < 9; i++) ctx.fillRect(ax - 8 + i, ay + 1 + i, 17 - i * 2, 1);
+      ctx.fillRect(ax - 3, ay - 7, 7, 9);
+      ctx.globalAlpha = 1;
+    }
   });
 }
 const walkers = [];
