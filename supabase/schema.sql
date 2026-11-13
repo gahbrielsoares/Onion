@@ -23,6 +23,12 @@ create table if not exists public.usage_events (
 create table if not exists public.admins (email text primary key);
 insert into public.admins(email) values ('SEU-EMAIL@gmail.com') on conflict do nothing;
 
+-- acesso explícito (funciona mesmo com "Automatically expose new tables" desligado)
+grant usage on schema public to anon, authenticated;
+grant select, update on public.profiles to authenticated;
+grant select on public.usage_events to authenticated;
+grant select on public.admins to authenticated;
+
 alter table public.profiles enable row level security;
 alter table public.usage_events enable row level security;
 alter table public.admins enable row level security;
