@@ -3,7 +3,8 @@
 A produtora de vídeos para canais dark, em forma de parque.
 Cada prédio do **Onion Park** é uma etapa da produção: você clica, configura e manda o trabalho pro próximo prédio.
 
-**Site:** https://gahbrielsoares.github.io/Onion/
+**Site:** https://gahbrielsoares.github.io/Onion/ (página de vendas)
+**App:** https://gahbrielsoares.github.io/Onion/app/
 
 ## Fluxo
 
@@ -40,7 +41,9 @@ O site é estático e público. **Nenhuma chave fica no código.** Cada pessoa c
 ## Estrutura
 
 ```
-index.html          página do parque
+index.html          página de vendas (landing)
+app/index.html      o Onion Park (o app)
+assets/landing/     estilos, script e imagens da landing
 assets/onion.css    estilos
 assets/onion.js     parque, etapas e estado
 assets/ai.js        provedores de IA por etapa, chaves, modelos, textos e imagens

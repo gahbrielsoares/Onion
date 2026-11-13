@@ -3,59 +3,188 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Onion Park</title>
-<meta name="description" content="Onion: a produtora de vídeos para canais dark, em forma de parque.">
+<title>Onion Park · Sua produtora de vídeos em pixel art</title>
+<meta name="description" content="Do tema ao vídeo pronto: roteiro, imagens, narração e edição feitos por uma equipe em pixel art. Vídeos longos, Shorts, Reels e stories da sua loja. R$ 9,90/mês.">
+<meta property="og:title" content="Onion Park · Sua produtora de vídeos em pixel art">
+<meta property="og:description" content="Cada prédio é um departamento. Você escolhe o tema, a equipe trabalha ao vivo e o vídeo sai em MP4, pronto pra postar.">
+<meta property="og:image" content="assets/landing/hero-park.jpg">
+<meta name="theme-color" content="#1B1424">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧅</text></svg>">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Cinzel:wght@600;700&family=Space+Mono:wght@700&family=Figtree:wght@400;500;600;700&family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/onion.css?v=202611111709">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=Pixelify+Sans:wght@600;700&family=Anton&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/landing/landing.css?v=1">
 </head>
 <body>
-<canvas id="park" aria-label="Mapa do Onion Park. Clique em um prédio para abrir a etapa."></canvas>
+<header class="nav" id="nav"><div class="wrap"><div class="bar">
+  <a class="logo" href="#top" aria-label="Onion Park, início"><svg width="30" height="30" viewBox="0 0 34 34" aria-hidden="true"><path d="M17 3c1 3 1 4 0 6" stroke="#5aa83f" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M17 9c-7 3-12 8-12 14 0 5 5 8 12 8s12-3 12-8c0-6-5-11-12-14z" fill="#7A2E8E" stroke="#1B1424" stroke-width="1.5"/><path d="M17 10c-3 3-5 8-5 13s2 7 5 8M17 10c3 3 5 8 5 13s-2 7-5 8" stroke="#c66bb5" stroke-width="1.6" fill="none"/></svg>Onion<b>Park</b></a>
+  <nav aria-label="Seções"><a href="#como">Como funciona</a><a href="#estilos">Estilos</a><a href="#piloto">Piloto automático</a><a href="#stories">Stories</a><a href="#preco">Preço</a><a href="#faq">Dúvidas</a></nav>
+  <div class="act"><a class="btn small" href="app/">Entrar</a><a class="btn small primary" href="#preco">Assinar</a><button class="menu" id="menu" aria-label="Abrir menu" aria-expanded="false">☰</button></div>
+</div></div></header>
 
-<div class="hud">
-  <div class="brand">
-    <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
-      <path d="M17 3c1 3 1 4 0 6" stroke="#7cc95a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-      <path d="M17 9c-7 3-12 8-12 14 0 5 5 8 12 8s12-3 12-8c0-6-5-11-12-14z" fill="#8a2f7c"/>
-      <path d="M17 10c-3 3-5 8-5 13s2 7 5 8" stroke="#c66bb5" stroke-width="1.6" fill="none"/>
-      <path d="M17 10c3 3 5 8 5 13s-2 7-5 8" stroke="#c66bb5" stroke-width="1.6" fill="none"/>
-      <path d="M17 10v21" stroke="#e3a8d8" stroke-width="1.4"/>
-    </svg>
-    <div><h1>Onion Park</h1><small><span class="live"></span><span id="clock">00:00:00</span> · <span id="agents">0</span> agentes no campus</small></div>
+<main id="top">
+<section class="hero">
+  <i class="cloud c1"></i><i class="cloud c2"></i><i class="cloud c3"></i>
+  <div class="wrap">
+    <div class="badges"><span class="chip"><span class="tag">NOVO</span> Estúdio de Stories: edite o vídeo que você gravou</span><span class="chip">🧅 Sem aparecer · do tema ao MP4</span></div>
+    <h1>Seus vídeos <span class="tile" aria-hidden="true" style="background:#ff4b4b"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="#fff"/></svg></span> e Shorts <span class="tile" aria-hidden="true" style="background:#1B1424"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" fill="none" stroke="#F2A23A" stroke-width="2.4"/><circle cx="12" cy="18" r="1.3" fill="#F2A23A"/></svg></span> saem prontos de um <span class="px">parque.</span></h1>
+    <p class="sub">Cada prédio é um departamento: ideias, roteiro, imagens, narração e edição. Você escolhe o tema, uma equipe em pixel art trabalha ao vivo e o vídeo sai em MP4, pronto pra postar. Sem aparecer e sem saber editar.</p>
+    <div class="ctas"><a class="btn primary" href="#preco">Assinar por R$ 9,90/mês →</a><a class="btn" href="#como">Ver como funciona</a></div>
+    <div class="trust"><span>Cancele quando quiser</span><span>Vídeos e chaves ficam no seu navegador</span><span>YouTube, Shorts, Reels e stories</span></div>
   </div>
-  <div class="prod" id="prod"></div>
-  <div class="tools">
-    <button class="tbtn" id="autoBtn" title="Piloto automático" style="border-color:var(--gold)">🤖 <span class="lbl">Piloto automático</span></button>
-    <button class="tbtn" id="admBtn" title="Administração">⚙ <span class="lbl">Administração</span></button>
-    <button class="tbtn" id="libBtn" title="Biblioteca">📚 <span class="lbl">Biblioteca</span></button>
-    <button class="tbtn" id="zoomOut" aria-label="Afastar">−</button>
-    <button class="tbtn" id="zoomIn" aria-label="Aproximar">+</button>
+  <div class="stage" id="stage">
+    <div class="float f1"><span class="dot"></span><b>★ Gerente</b><small>indo pra Torre dos Títulos</small></div>
+    <div class="float f2">🎬 <b>Vídeo pronto</b><small>O mistério do Edifício Joelma · 1080p</small></div>
+    <div class="float f3">📊 <b>Hoje no parque</b><small>3 vídeos · 3 Shorts · 0 h editando</small></div>
+    <div class="browser" id="browser"><div class="top"><i></i><i></i><i></i><span class="url">onionpark · seu parque</span></div><img src="assets/landing/hero-park.jpg" alt="O Onion Park: prédios em pixel art com a equipe trabalhando e o gerente caminhando entre os departamentos" width="1600" height="900"></div>
   </div>
-</div>
+  <div class="marquee" aria-label="O que está acontecendo no parque"><div class="mq" id="mq"></div></div>
+</section>
 
-<div class="info" id="info"></div>
-<div class="scrim" id="scrim"></div>
-<aside class="panel" id="panel" aria-hidden="true" role="dialog" aria-labelledby="ptitle">
-  <div class="ph"><span class="sq" id="psq"></span><h2 id="ptitle"></h2><button class="x" id="pclose" aria-label="Fechar">×</button></div>
-  <div class="pb" id="pbody"></div>
-</aside>
-<div class="toast" id="toast" role="status"></div>
+<section id="antes">
+  <div class="wrap center rv">
+    <span class="eyebrow">O problema</span>
+    <h2>Fazer um vídeo leva horas.<br><span class="px gold">Agora leva um café.</span></h2>
+    <p class="sub">Roteiro num lugar, banco de imagens em outro, gravar a voz, editar a timeline, legendar, exportar… Arraste pra ver a diferença.</p>
+  </div>
+  <div class="wrap rv">
+    <div class="ba" id="ba">
+      <div class="side before" aria-hidden="true">
+        <div class="term" style="--r:-2deg"><b>roteiro_v7_final2.docx</b><br>✍️ escrevendo há <span class="w">2 h 40 min</span><br><span class="x">✗ bloqueio criativo</span></div>
+        <div class="term" style="--r:1.5deg"><b>banco de imagens</b><br>🔎 "cangaço 1938"<br><span class="x">✗ 0 resultados grátis</span></div>
+        <div class="term" style="--r:-1deg"><b>gravação.wav</b><br>🎙 take 14<br><span class="x">✗ vizinho furando a parede</span></div>
+        <div class="term" style="--r:2deg"><b>timeline.prproj</b><br>✂️ 187 cortes<br><span class="w">⏳ render 3 h 12 min</span></div>
+        <div class="term" style="--r:-2deg"><b>legendas.srt</b><br>⌨️ digitando palavra por palavra<br><span class="x">✗ fora de sincronia</span></div>
+        <div class="term" style="--r:1deg"><b>capa.psd</b><br>🎨 versão 9<br><span class="w">… e o Short?</span></div>
+      </div>
+      <div class="side after"><img src="assets/landing/hero-park.jpg" alt="" loading="lazy"></div>
+      <div class="handle"></div><span class="lbl l1">Antes</span><span class="lbl l2">Com o Onion</span>
+      <input type="range" min="0" max="100" value="50" aria-label="Comparar antes e depois">
+    </div>
+  </div>
+</section>
 
-<script src="assets/vendor/jszip.min.js?v=202611090125"></script>
-<script src="assets/vendor/mp4-muxer.js?v=202611090125"></script>
-<script src="assets/store.js?v=202611111709"></script>
-<script src="assets/ai.js?v=202611111709"></script>
-<script src="assets/voice.js?v=202611111709"></script>
-<script src="assets/trends.js?v=202611111709"></script>
-<script src="assets/collage.js?v=202611111709"></script>
-<script src="assets/doc.js?v=202611111709"></script>
-<script src="assets/sound.js?v=202611111709"></script>
-<script src="assets/cut.js?v=202611111709"></script>
-<script src="assets/story.js?v=202611111709"></script>
-<script src="assets/onion.js?v=202611111709"></script>
-<script src="assets/park.js?v=202611111709"></script>
-<script src="assets/auto.js?v=202611111709"></script>
+<section id="como" class="alt">
+  <div class="wrap">
+    <div class="center rv"><span class="eyebrow">Como funciona</span><h2>Clique no prédio.<br><span class="px">A equipe trabalha.</span></h2>
+      <p class="sub">Cada departamento faz uma parte. Você aprova, ajusta o que quiser e segue pro próximo. Ou deixa tudo no automático.</p></div>
+    <div class="show rv">
+      <div class="steps" role="tablist" id="steps">
+        <button class="step" role="tab" aria-selected="true"><span class="n">01</span><div><h3>Laboratório de Ideias</h3><p>Escolha o tema ou deixe a equipe ler o que está bombando agora: Google Trends, X, Reddit, notícias e Wikipedia do país que você quiser. Diga o que quer passar no começo, no meio e no fim.</p><div class="bar"><i></i></div></div></button>
+        <button class="step" role="tab" aria-selected="false"><span class="n">02</span><div><h3>Prédio dos Roteiros</h3><p>Roteiro com gancho, capítulos e chamada pra ação, no tamanho certo. Edite qualquer bloco ou peça pra IA reescrever só aquele pedaço.</p><div class="bar"><i></i></div></div></button>
+        <button class="step" role="tab" aria-selected="false"><span class="n">03</span><div><h3>Estúdio de Narração</h3><p>Dezenas de vozes realistas em vários idiomas. Ouça a amostra, escolha a voz e a narração sai inteira, conferida trecho por trecho.</p><div class="bar"><i></i></div></div></button>
+        <button class="step" role="tab" aria-selected="false"><span class="n">04</span><div><h3>OnionCut</h3><p>O editor automático: corta nas pausas da voz, anima as imagens, coloca legendas, trilha sem direitos autorais e efeitos de transição. Sai em MP4 1080p.</p><div class="bar"><i></i></div></div></button>
+        <button class="step" role="tab" aria-selected="false"><span class="n">05</span><div><h3>Piloto automático</h3><p>Diga quantos vídeos quer e o gerente faz tudo sozinho, do tema ao MP4, deixando no diário o motivo de cada decisão.</p><div class="bar"><i></i></div></div></button>
+      </div>
+      <div class="phone" id="phone">
+        <img class="on" src="assets/landing/p-ideias.jpg" alt="Painel do Laboratório de Ideias com temas em alta">
+        <img src="assets/landing/p-roteiro.jpg" alt="Painel do Prédio dos Roteiros com os blocos editáveis" loading="lazy">
+        <img src="assets/landing/p-narracao.jpg" alt="Painel do Estúdio de Narração com as vozes" loading="lazy">
+        <img src="assets/landing/p-montagem.jpg" alt="Painel do OnionCut com template, trilha e legendas" loading="lazy">
+        <img src="assets/landing/p-auto.jpg" alt="Painel do Piloto automático" loading="lazy">
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="estilos">
+  <div class="wrap">
+    <div class="center rv"><span class="eyebrow">Estilos visuais</span><h2>Seis jeitos de contar.<br><span class="px gold">Um clique pra trocar.</span></h2>
+      <p class="sub">Do documentário com fotos de arquivo ao vídeo de oferta da sua loja. Fotos históricas reais vêm de acervos livres, com créditos automáticos.</p></div>
+    <div class="grid3">
+      <article class="scard rv"><img src="assets/landing/style-documentario.jpg" alt="Estilo Documentário: nome em dourado sobre foto de arquivo" loading="lazy"><div><h3>Documentário</h3><p>Fotos de arquivo, nomes em dourado, capítulos e diagramas.</p></div></article>
+      <article class="scard rv"><img src="assets/landing/style-moderno.jpg" alt="Estilo Moderno" loading="lazy"><div><h3>Moderno</h3><p>Limpo e atual, com tipografia de revista.</p></div></article>
+      <article class="scard rv"><img src="assets/landing/style-promocional.jpg" alt="Estilo Promocional com selo de oferta" loading="lazy"><div><h3>Promocional</h3><p>Pra vender: oferta em destaque e chamada pra ação.</p></div></article>
+      <article class="scard rv"><img src="assets/landing/style-cinetico.jpg" alt="Estilo Texto em destaque" loading="lazy"><div><h3>Texto em destaque</h3><p>Palavras grandes no ritmo da fala. O mais barato.</p></div></article>
+      <article class="scard rv"><img src="assets/landing/style-colagem.jpg" alt="Estilo Colagem animada" loading="lazy"><div><h3>Colagem animada</h3><p>Personagens desenhados entrando na hora certa.</p></div></article>
+      <article class="scard rv"><img src="assets/landing/style-cinema.jpg" alt="Estilo Cenas por IA com legenda palavra por palavra" loading="lazy"><div><h3>Cenas por IA</h3><p>Imagens cinematográficas com legenda animada.</p></div></article>
+    </div>
+  </div>
+</section>
+
+<section id="piloto" class="alt">
+  <div class="wrap split">
+    <div class="rv"><span class="eyebrow">Piloto automático</span><h2>Clique uma vez.<br><span class="px">O gerente faz o resto.</span></h2>
+      <p class="sub gap">Ele caminha de prédio em prédio e decide cada etapa pensando em views e retenção. Você acompanha ao vivo ou vai tomar um café.</p>
+      <ul class="list"><li>Pesquisa o tema em alta e escolhe o melhor pro seu canal</li><li>Escolhe título, estilo, voz e template, e explica o porquê</li><li>Faz o vídeo longo e o Short que leva pra ele, juntos</li><li>Salva tudo organizado: vídeo, capa, descrição e roteiro</li></ul></div>
+    <div class="shot rv"><img src="assets/landing/hero-park.jpg" alt="O gerente caminhando no parque" loading="lazy" class="crop43">
+      <div class="bubble" style="left:8%;top:10%"><b>★ Gerente</b><br>🤔 escolhi “O mistério das 13 almas”: +480% de buscas</div>
+      <div class="bubble" style="right:6%;bottom:12%;animation-delay:-2s">✓ Short derivado pronto</div></div>
+  </div>
+</section>
+
+<section id="stories">
+  <div class="wrap split rev">
+    <div class="rv"><span class="eyebrow">Estúdio de Stories</span><h2>Gravou no celular?<br><span class="px gold">A gente edita.</span></h2>
+      <p class="sub gap">Envie o seu vídeo, as fotos do produto e diga o que quer passar. A IA assiste e o Onion edita: corta as pausas, mostra o produto na hora em que você fala dele e coloca legenda, textos de oferta e trilha.</p>
+      <ul class="list"><li>Pra loja, serviço, restaurante ou criador de conteúdo</li><li>Vertical pra Stories, Reels e TikTok, ou horizontal pro YouTube</li><li>Legenda do post pronta, com hashtags</li></ul></div>
+    <div class="phones rv">
+      <div class="mini"><img src="assets/landing/style-promocional.jpg" alt="" loading="lazy"><div class="cap">CHAMA NO <em>WHATSAPP</em></div></div>
+      <div class="mini"><img src="assets/landing/style-cinetico.jpg" alt="" loading="lazy"><div class="cap">SÓ <em>HOJE</em></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="mural" class="alt">
+  <div class="wrap split">
+    <div class="rv"><span class="eyebrow">Mural de inscritos</span><h2>Seu público<br><span class="px">aparece no vídeo.</span></h2>
+      <p class="sub gap">No final, o narrador agradece os nomes que você colou e convida quem assiste a se inscrever e deixar o nome nos comentários. Mais comentários, mais inscritos, mais alcance.</p></div>
+    <div class="shot rv"><img src="assets/landing/mural.jpg" alt="Tela final com agradecimento especial e nomes de inscritos" loading="lazy"></div>
+  </div>
+</section>
+
+<section class="dark" id="privacidade">
+  <div class="wrap split">
+    <div class="rv"><span class="eyebrow">Privacidade</span><h2>Suas chaves, seus vídeos,<br><span class="px">seu navegador.</span></h2>
+      <p class="sub gap">O Onion roda no seu navegador. Roteiros, imagens, narrações e vídeos ficam guardados no seu computador, e as chaves de IA vão direto pro provedor, sem passar por nós.</p></div>
+    <div class="rv">
+      <div class="code"><span class="k">onion@parque</span>:~$ onde ficam meus dados?<br><span class="m">✓</span> chaves de IA → só no seu navegador<br><span class="m">✓</span> vídeos e imagens → só no seu navegador<br><span class="m">✓</span> pedidos de IA → direto pro provedor<br><span class="m">✓</span> o nosso servidor → só sabe se a sua assinatura está ativa</div>
+      <div class="pgrid"><div class="pbox"><b>Use as IAs que quiser</b><span>Gemini, Claude, OpenAI e ElevenLabs.</span></div><div class="pbox"><b>Você paga a IA direto</b><span>Centavos por vídeo, na sua conta do provedor.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="preco">
+  <div class="wrap center">
+    <div class="rv"><span class="eyebrow">Preço</span><h2>Uma produtora inteira<br><span class="px gold">por menos que um lanche.</span></h2></div>
+    <div class="price rv">
+      <span class="ribbon">Plano único</span>
+      <div class="v">R$ 9,90<small>/mês</small></div>
+      <ul><li>Todos os departamentos do parque</li><li>Vídeos longos, Shorts, Reels e stories, sem limite</li><li>6 estilos visuais, trilhas e efeitos</li><li>Piloto automático e produção casada (longo + Short)</li><li>Estúdio de Stories pra editar os seus vídeos</li><li>Atualizações incluídas</li></ul>
+      <a class="btn primary wide" href="app/">Começar agora →</a>
+      <p class="note">Cancele quando quiser. As chamadas de IA (Gemini, Claude, OpenAI, ElevenLabs) são cobradas pelo próprio provedor na sua conta: em geral, centavos por vídeo.</p>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="alt">
+  <div class="wrap"><div class="center rv"><span class="eyebrow">Dúvidas</span><h2>Perguntou,<br><span class="px">a gente responde.</span></h2></div>
+    <div class="faq">
+      <details class="rv"><summary>Preciso saber editar vídeo?</summary><p>Não. Você escolhe o tema e aprova cada etapa, ou liga o piloto automático. O OnionCut faz os cortes, as legendas, a trilha e exporta o MP4.</p></details>
+      <details class="rv"><summary>Preciso de chave de IA?</summary><p>Sim. O Onion usa a sua chave (a do Gemini já faz roteiro, imagens e narração). Ela fica só no seu navegador, e o custo vai direto pra sua conta no provedor, em geral centavos por vídeo.</p></details>
+      <details class="rv"><summary>Que tipo de vídeo dá pra fazer?</summary><p>Vídeos longos pro YouTube, Shorts, Reels, stories e vídeos promocionais da sua loja ou serviço, em vários idiomas.</p></details>
+      <details class="rv"><summary>Funciona no celular?</summary><p>Dá pra acompanhar e enviar vídeos da galeria pelo celular, mas a montagem do vídeo funciona melhor no Chrome ou no Edge do computador.</p></details>
+      <details class="rv"><summary>Os vídeos são meus?</summary><p>Sim. Ficam no seu navegador e você baixa em MP4 com capa, descrição e roteiro organizados em pastas.</p></details>
+      <details class="rv"><summary>Posso monetizar no YouTube?</summary><p>Pode, desde que o conteúdo tenha valor de verdade. O YouTube não paga canais de produção em massa repetitiva, por isso o Onion varia estilos, roteiros e imagens, e deixa você revisar tudo antes de publicar.</p></details>
+      <details class="rv"><summary>Como cancelo?</summary><p>Na sua conta, a qualquer momento. O acesso continua até o fim do mês já pago.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="dark final">
+  <div id="stars" aria-hidden="true"></div>
+  <div class="wrap rv"><h2>Sua produtora já está<br><span class="px">abrindo as portas.</span></h2>
+    <p class="sub" style="margin:22px auto 0">Assine, configure seu canal em 2 minutos e veja a equipe trabalhar no primeiro vídeo.</p>
+    <div class="ctas"><a class="btn gold" href="#preco">Assinar por R$ 9,90/mês →</a></div></div>
+  <div class="shot wrap"><img src="assets/landing/hero-park.jpg" alt="" loading="lazy" class="crop167"></div>
+</section>
+</main>
+
+<footer><div class="wrap cols">
+  <div><a class="logo" href="#top">🧅 Onion<b>Park</b></a><p>Sua produtora de vídeos em pixel art. Do tema ao MP4.</p></div>
+  <div><b>Produto</b><a href="#como">Como funciona</a><a href="#estilos">Estilos</a><a href="#stories">Estúdio de Stories</a><a href="#preco">Preço</a></div>
+  <div><b>Conta</b><a href="app/">Entrar</a><a href="#preco">Assinar</a><a href="#faq">Dúvidas</a></div>
+  <div class="copy">© 2026 Onion Park</div>
+</div></footer>
+<script src="assets/landing/landing.js?v=1"></script>
 </body>
 </html>
