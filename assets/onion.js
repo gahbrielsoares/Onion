@@ -127,8 +127,48 @@ async function ask(prompt,{json=false,tier="default",onText,maxTokens}={}){
   const opts={tier,signal:busy&&busy.ctl.signal}; if(onText) opts.onText=onText; if(maxTokens) opts.maxTokens=maxTokens;
   return json ? AI.json(prompt,opts) : AI.call(prompt,opts);
 }
+// janela "pegar chave de IA grátis": passo a passo + colar e já configurar tudo com o Gemini
+function freeKeyModal(){
+  const m=document.createElement("div"); m.className="modal"; m.setAttribute("role","dialog"); m.setAttribute("aria-modal","true"); m.setAttribute("aria-labelledby","fkTitle");
+  m.innerHTML=`<div class="box">
+    <h3 id="fkTitle">🔑 Pegar chave de IA grátis</h3>
+    <p class="m" style="margin:0">Leva uns 2 minutos e não pede cartão.</p>
+    <ol>
+      <li>Clique no botão abaixo: abre a <b>página oficial do Google AI Studio</b> (o Gemini pra desenvolvedores).</li>
+      <li>Entre com a sua conta Google (ou crie uma).</li>
+      <li>Na página <b>Chaves de API</b> (API Keys), clique em <b>Criar chave de API</b> (Create API key).</li>
+      <li>Copie a chave (ela começa com <b>AIza</b>), volte aqui, cole no campo abaixo e clique em <b>Salvar e usar</b>.</li>
+    </ol>
+    <a class="btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex">🌐 Abrir o Google AI Studio</a>
+    <div class="field" style="margin-top:14px"><label for="fkKey">Cole a sua chave aqui</label><input id="fkKey" placeholder="AIza…" autocomplete="off" spellcheck="false"></div>
+    <div id="fkMsg"></div>
+    <div class="btns"><button class="btn" id="fkSave">Salvar e usar</button><button class="btn ghost small" id="fkClose">Fechar</button></div>
+    <div class="warn">⚠ Lembrando: as chaves gratuitas têm limites diários de uso. Na cota grátis, o Google pode usar os pedidos pra melhorar os modelos, e alguns recursos (como gerar imagens) podem não estar liberados.</div>
+  </div>`;
+  document.body.appendChild(m);
+  const close=()=>{ m.remove(); document.removeEventListener("keydown",esc); }, esc=e=>{ if(e.key==="Escape") close(); };
+  document.addEventListener("keydown",esc); m.onclick=e=>{ if(e.target===m) close(); };
+  m.querySelector("#fkClose").onclick=close; setTimeout(()=>m.querySelector("#fkKey").focus(),50);
+  m.querySelector("#fkSave").onclick=async()=>{
+    const k=m.querySelector("#fkKey").value.trim(), msg=m.querySelector("#fkMsg"), b=m.querySelector("#fkSave");
+    if(!/^AIza[\w-]{20,}$/.test(k)){ msg.innerHTML=`<div class="err">Isso não parece uma chave do Gemini. Ela começa com AIza e tem uns 39 caracteres.</div>`; return; }
+    b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando a chave…`;
+    try{
+      AI.setKey("google",k);
+      const done=[];
+      for(const st of ["text","image","voice"]){
+        const cur=AI.get()[st]; if(cur.provider!=="google"&&AI.get().keys[cur.provider]) continue;
+        try{ const ids=await AI.listModels("google",st); if(ids.length){ const sel={provider:"google",model:AI.pickDefault(st,ids)}; if(st==="text") sel.quick=AI.pickQuick(ids); AI.setStage(st,sel); done.push(AI.STAGES[st].name); } }catch(e){ if(e.code==="auth") throw e; }
+      }
+      msg.innerHTML=`<div class="note" style="border:1px solid var(--ok,#3fa35b)">✓ Chave salva! Configurei: ${esc2(done.join(", ")||"textos")}. Já dá pra criar o primeiro vídeo.</div>`;
+      b.innerHTML="Pronto ✓"; toast("Chave do Gemini configurada"); if(panelKey) renderPanel(); setTimeout(close,1600);
+    }catch(e){ msg.innerHTML=`<div class="err">${esc2(e.message||"A chave foi recusada.")}</div>`; b.disabled=false; b.textContent="Salvar e usar"; }
+  };
+}
+const esc2=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+window.freeKeyModal=freeKeyModal;
 function aiNote(){
-  if(!AI.ready()) return `<div class="note">A equipe de textos ainda não tem chave e modelo configurados. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
+  if(!AI.ready()) return `<div class="note">A equipe ainda não tem chave de IA configurada. <div class="btns" style="margin-top:6px"><button class="btn small" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button><button class="btn ghost small" onclick="openPanel('admin')">Abrir Administração</button></div></div>`;
   return "";
 }
 
@@ -1444,6 +1484,7 @@ function modelField(st,field,label){
   return `<div class="field"><label for="${id}">${label}</label><select id="${id}" data-model="${st}:${field}">${field==="quick"?`<option value="">Mesmo do principal</option>`:""}${opts.map(m=>`<option ${m===cur?"selected":""}>${esc(m)}</option>`).join("")}</select></div>`;
 }
 VIEWS.admin=()=>{ const c=AI.get(); return `
+  <div class="btns" style="margin:0 0 12px"><button class="btn" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button></div>
   <p class="lead">Pra cada etapa, escolha quem faz o trabalho e cole a chave. A mesma chave vale pra todas as etapas do mesmo provedor. Tudo fica guardado só neste navegador.</p>
   ${Object.entries(AI.STAGES).map(([st,S2])=>{
     const p=c[st].provider, P2=AI.PROVIDERS[p];

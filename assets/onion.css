@@ -168,3 +168,18 @@ button,input,select,textarea{font:inherit;color:inherit}
 .row>.field{min-width:0}
 .field select,.field input{max-width:100%}
 @media (max-width:520px){.brand small{display:none}.brand h1{white-space:nowrap}}
+/* topo no celular: botões compactos e o zoom flutuando no canto */
+@media (max-width:720px){
+  .tools{gap:6px;flex-wrap:nowrap}
+  .tbtn{width:42px;height:42px;padding:0;display:grid;place-items:center;font-size:18px;border-radius:12px}
+  #zoomIn,#zoomOut{position:fixed;right:12px;width:40px;height:40px;font-size:20px;z-index:6;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+  #zoomIn{bottom:calc(env(safe-area-inset-bottom,0px) + 178px)}#zoomOut{bottom:calc(env(safe-area-inset-bottom,0px) + 130px)}
+  .brand{padding:6px 12px 6px 8px;gap:8px}.brand h1{font-size:18px}.brand svg{width:26px;height:26px}
+}
+/* janela da chave grátis */
+.modal{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:rgba(18,10,26,.55);padding:16px}
+.modal .box{background:var(--surface,#fff);color:var(--text,#231a2e);border:2px solid #2b2340;box-shadow:6px 6px 0 #2b2340;border-radius:18px;max-width:480px;width:100%;max-height:90vh;overflow:auto;padding:20px}
+.modal h3{margin:0 0 6px;font-size:20px}
+.modal ol{padding-left:20px;margin:12px 0;display:grid;gap:8px;font-size:15px;line-height:1.45}
+.modal .warn{font-size:13px;background:#fff6dd;color:#5c4510;border:1px solid #f0d58a;border-radius:10px;padding:8px 10px;margin-top:10px}
+@media (prefers-color-scheme:dark){.modal .warn{background:#3a3020;color:#f4e2b4;border-color:#6b5a30}}
