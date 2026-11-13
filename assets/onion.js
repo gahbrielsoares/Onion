@@ -434,6 +434,7 @@ BIND.ideias=el=>{
   el.querySelector("#start").onclick=()=>{
     sync(); if(!D.tema.trim()) return;
     const idea=toIdea(); if(D.fromId) S.ideias=S.ideias.filter(i=>i.id!==D.fromId);
+    window.onionTrack&&onionTrack("projeto");
     S.project=newProject(idea,ui.kind==="combo"?"long":ui.kind); if((ui.kind||"combo")==="combo") S.project.combo=true;
     clearDraft(); save();
     courier("ideias","titulos"); toast("Ideia enviada pra Torre dos Títulos"); renderProd(); openPanel("titulos");
@@ -1058,7 +1059,7 @@ async function runStoryRender(){
   try{
     const file=await Store.get(`st${T.id}:src`); const media=[]; for(const m of T.media){ const b=await Store.get(`st${T.id}:${m.id}`); if(b) media.push({...m,blob:b}); }
     const out=await Story.render({id:T.id,file,media,st:T.study,opts:{...R},signal:busy.ctl.signal,onProgress:p=>{ T.prog=p; setAction(`montando ${Math.round(p*100)}%`); const bar=document.querySelector("#pbody .bar>i"); if(bar) bar.style.width=(p*100)+"%"; }});
-    await Store.put(mkey(T.id,"video",0),out.blob); T.result={stored:true,secs:out.secs,W:out.W,H:out.H,formato:R.formato}; save(); window.parkJingle&&parkJingle();
+    await Store.put(mkey(T.id,"video",0),out.blob); T.result={stored:true,secs:out.secs,W:out.W,H:out.H,formato:R.formato}; save(); window.parkJingle&&parkJingle(); window.onionTrack&&onionTrack("story"); window.onionTrack&&onionTrack("video");
     toast("Vídeo pronto!");
   }catch(e){ if(e.code!=="cancelled") ui.stErr=e.message||"A montagem falhou."; }
   T.prog=null; clearBusy(); renderPanel();
@@ -1298,7 +1299,7 @@ async function runRender(){
     }});
     const vb=await keepVideo(P,out,null);
     P.render={name,res:P.res||"1080p",mb:vb?(vb.size/1048576).toFixed(0):null,secs:R.dur,at:Date.now(),stored:!!vb}; save();
-    toast(vb?"Vídeo renderizado! Assista ou baixe quando quiser.":"Renderizado, mas não coube no armazenamento do navegador."); window.parkJingle&&parkJingle();
+    toast(vb?"Vídeo renderizado! Assista ou baixe quando quiser.":"Renderizado, mas não coube no armazenamento do navegador."); window.parkJingle&&parkJingle(); window.onionTrack&&onionTrack("video");
     if(!vb&&out.blob) saveBlob(out.blob,name);
   }catch(e){ if(e.code!=="cancelled") ui.cutErr=e.message||"O render falhou."; }
   P.renderProg=null; clearBusy(); renderPanel();
@@ -1484,7 +1485,7 @@ function modelField(st,field,label){
   return `<div class="field"><label for="${id}">${label}</label><select id="${id}" data-model="${st}:${field}">${field==="quick"?`<option value="">Mesmo do principal</option>`:""}${opts.map(m=>`<option ${m===cur?"selected":""}>${esc(m)}</option>`).join("")}</select></div>`;
 }
 VIEWS.admin=()=>{ const c=AI.get(); return `
-  <div class="btns" style="margin:0 0 12px"><button class="btn" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button></div>
+  <div class="btns" style="margin:0 0 12px"><button class="btn" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button>${window.Auth&&Auth.enabled?`<button class="btn ghost small" id="admOut">Sair da conta</button>`:""}</div>
   <p class="lead">Pra cada etapa, escolha quem faz o trabalho e cole a chave. A mesma chave vale pra todas as etapas do mesmo provedor. Tudo fica guardado só neste navegador.</p>
   ${Object.entries(AI.STAGES).map(([st,S2])=>{
     const p=c[st].provider, P2=AI.PROVIDERS[p];
@@ -1558,6 +1559,7 @@ BIND.admin=el=>{
   el.querySelector("#yttest").onclick=async e=>{ const b=e.currentTarget; AI.setKey("youtube",el.querySelector("#k-yt").value); b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando…`;
     try{ await Trends.testYouTube(); admMsg.yt={ok:true,text:"✓ O YouTube respondeu. O Laboratório de Virais já pode ler o que está em alta."}; }
     catch(err){ admMsg.yt={ok:false,text:err.message||"Não deu certo"}; } renderPanel(); };
+  const ao=el.querySelector("#admOut"); if(ao) ao.onclick=async()=>{ await Auth.signOut(); location.href="../"; };
   const pk=()=>{ if(!S.park) S.park={time:"auto",amb:true,alert:true}; return S.park; };
   el.querySelector("#ptime").onchange=e=>{ pk().time=e.target.value; save(); if(typeof updateDaylight==="function") updateDaylight(); };
   el.querySelector("#pamb").onchange=e=>{ pk().amb=e.target.checked; save(); };

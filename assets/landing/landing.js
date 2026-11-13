@@ -23,3 +23,6 @@ const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.ta
 document.querySelectorAll(".rv").forEach(el=>io.observe(el));
 // estrelas no final
 const st=document.getElementById("stars"); for(let i=0;i<60;i++){ const s=document.createElement("i"); s.className="star"; s.style.left=Math.random()*100+"%"; s.style.top=Math.random()*55+"%"; s.style.animationDelay=(-Math.random()*3)+"s"; st.appendChild(s); }
+
+// cadastro: os botões de entrar abrem a janela de cadastro/login (quando o cadastro estiver ligado)
+if (window.Auth) Auth.wireEnterButtons();

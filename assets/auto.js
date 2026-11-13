@@ -170,7 +170,7 @@ async function apRender(P) {
       if (panelKey === "auto") renderAutoHead();
     } });
     const vb = await keepVideo(P, out, fh);
-    P.render = { name, res: P.res, mb: vb ? (vb.size / 1048576).toFixed(0) : null, secs: R.dur, at: Date.now(), stored: !!vb }; window.parkJingle && parkJingle();
+    P.render = { name, res: P.res, mb: vb ? (vb.size / 1048576).toFixed(0) : null, secs: R.dur, at: Date.now(), stored: !!vb }; window.parkJingle && parkJingle(); window.onionTrack && onionTrack("video");
     // capa e descrição junto do vídeo
     const thumb = await Store.get(mkey(P.id, "thumb", P.thumbSel));
     const desc = new Blob([`${P.title}\n\n${P.description || ""}\n\n${(P.hashtags || []).join(" ")}${creditsText(P)}\n`], { type: "text/plain;charset=utf-8" });

@@ -83,5 +83,6 @@ assets/vendor/      JSZip e mp4-muxer (MIT)
 - [x] Dia e noite pelo horário de Brasília, prédios acendendo, sons de natureza e aviso 8-bit
 - [x] Bairro em volta do campus: ruas com carros, calçadas, pedestres e árvores
 - [x] Prédios com portas e toldos, contornos cartoon e etiquetas no estilo dos botões do site
+- [x] Cadastro e login (e-mail validado ou Google, telefone e termos) com painel de contas e uso: veja docs/CONFIGURAR-CADASTRO.md
 - [x] Piloto automático: gera N vídeos sozinho, o gerente decide cada etapa e caminha entre os prédios
 - [x] Render em MP4 (H.264) direto no navegador, com WebCodecs (Chrome ou Edge no computador)
