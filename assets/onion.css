@@ -167,3 +167,4 @@ button,input,select,textarea{font:inherit;color:inherit}
 @media (max-width:520px){.stylecards{grid-template-columns:repeat(2,1fr)}}
 .row>.field{min-width:0}
 .field select,.field input{max-width:100%}
+@media (max-width:520px){.brand small{display:none}.brand h1{white-space:nowrap}}

@@ -188,7 +188,7 @@ async function comboAfter(stage){
 }
 /* ============ PANEL ============ */
 let panelKey=null;
-function openPanel(k){
+function openPanel(k){ window._panelAt=Date.now();
   panelKey=k; const b=BK[k]||PSEUDO[k];
   document.getElementById("ptitle").innerHTML=esc(b.n)+(b.step?`<span class="step">Etapa ${b.step} de 6 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Configurações":(k==="auto"?"O gerente decide tudo":(k==="stories"?"Edite o vídeo que você gravou":"Sempre aberto")))}</span>`);
   document.getElementById("psq").style.background=b.c;
@@ -203,7 +203,8 @@ function closePanel(){
   document.getElementById("scrim").classList.remove("open"); renderProd();
 }
 document.getElementById("pclose").onclick=closePanel;
-document.getElementById("scrim").onclick=closePanel;
+// o toque que abre o painel não pode "vazar" e fechar o painel em seguida (clique fantasma do celular)
+document.getElementById("scrim").onclick=()=>{ if(Date.now()-(window._panelAt||0)<500) return; closePanel(); };
 function renderPanel(){
   if(!panelKey) return;
   const el=document.getElementById("pbody");

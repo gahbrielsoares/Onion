@@ -734,7 +734,7 @@ const groundFinal = canvas(WORLD_W, WORLD_H);
 function bakeGround() { paintGround(); const g = groundFinal.getContext("2d"); g.drawImage(ground, 0, 0); B.forEach(b => { if (b.poly) buildingShadow(g, b); }); trees.forEach(t => treeShadow(g, t)); }
 bakeGround();
 function resize() { dpr = Math.min(window.devicePixelRatio || 1, 2); vw = window.innerWidth; vh = window.innerHeight; cv.width = Math.round(vw * dpr); cv.height = Math.round(vh * dpr); low.width = Math.ceil(vw / zoom) + 2; low.height = Math.ceil(vh / zoom) + 2; clampCam(); }
-function center() { zoom = vw > 2200 ? 2 : 1; low.width = Math.ceil(vw / zoom) + 2; low.height = Math.ceil(vh / zoom) + 2; const [cx, cy] = W(C0[0], C0[1]); camX = cx - vw / zoom / 2; camY = cy - vh / zoom / 2 + 10; clampCam(); }
+function center() { zoom = vw > 2200 ? 2 : vw < 700 ? .5 : 1; low.width = Math.ceil(vw / zoom) + 2; low.height = Math.ceil(vh / zoom) + 2; const [cx, cy] = W(C0[0], C0[1]); camX = cx - vw / zoom / 2; camY = cy - vh / zoom / 2 + 10; clampCam(); }
 function clampCam() { const mw = vw / zoom, mh = vh / zoom; camX = Math.max(-mw * .35, Math.min(WORLD_W - mw * .65, camX)); camY = Math.max(-mh * .35, Math.min(WORLD_H - mh * .65, camY)); }
 function drawDesk(g, dk, b, locked, isBusy, i, sitter) {
   const [x0, y0] = W(dk.x, dk.y), x = Math.round(x0), y = Math.round(y0) - SLAB;
@@ -794,7 +794,7 @@ function render() {
     g.restore();
   }
   ParkAudio.tick();
-  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = zoom < 1;
   ctx.drawImage(low, 0, 0, low.width, low.height, -(camX - cx) * zoom * dpr, -(camY - cy) * zoom * dpr, low.width * zoom * dpr, low.height * zoom * dpr);
   drawLabels(); drawManagerLabel();
   const ag = document.getElementById("agents"); if (ag && frame % 20 === 0) ag.textContent = present;
@@ -875,21 +875,35 @@ function hitBuilding(sx, sy) {
   for (const b of B) { if (!b.poly) continue; const [lx, ly] = labelAnchor(b); const [x, y] = toScreen(lx, ly); if (Math.abs(sx - x) < 90 && sy > y - 14 && sy < y + 12) return b; }
   return null;
 }
-cv.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY, cx: camX, cy: camY, moved: false }; cv.setPointerCapture(e.pointerId); });
+// toque: dedo tem uma tolerância maior pra não virar "arrastar"; dois dedos dão zoom
+const touches = new Map(); let pinch = null;
+cv.addEventListener("pointerdown", e => {
+  touches.set(e.pointerId, [e.clientX, e.clientY]);
+  if (touches.size === 2) { const [a, b] = [...touches.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) }; drag = null; return; }
+  drag = { x: e.clientX, y: e.clientY, cx: camX, cy: camY, moved: false, tol: e.pointerType === "touch" ? 12 : 5 }; try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+});
+cv.addEventListener("pointercancel", e => { touches.delete(e.pointerId); pinch = null; drag = null; cv.classList.remove("drag"); });
+cv.addEventListener("touchend", e => e.preventDefault(), { passive: false });
 cv.addEventListener("pointermove", e => {
-  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 5) { drag.moved = true; cv.classList.add("drag"); } if (drag.moved) { camX = drag.cx - dx / zoom; camY = drag.cy - dy / zoom; clampCam(); } return; }
+  if (touches.has(e.pointerId)) touches.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pinch && touches.size === 2) { const [a, b] = [...touches.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    if (d / pinch.d > 1.35) { stepZoom(1, mx, my); pinch.d = d; } else if (d / pinch.d < .74) { stepZoom(-1, mx, my); pinch.d = d; } return; }
+  if (drag) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > drag.tol) { drag.moved = true; cv.classList.add("drag"); } if (drag.moved) { camX = drag.cx - dx / zoom; camY = drag.cy - dy / zoom; clampCam(); } return; }
   const b = hitBuilding(e.clientX, e.clientY); const k = b ? b.k : null;
   if (k !== hoverK) { hoverK = k; cv.classList.toggle("hover", !!b); showInfo(b || BK[nextStage()] || null); }
 });
-cv.addEventListener("pointerup", e => { cv.classList.remove("drag"); if (drag && !drag.moved) { const b = hitBuilding(e.clientX, e.clientY); if (b) openPanel(b.k); } drag = null; });
-cv.addEventListener("wheel", e => { e.preventDefault(); setZoom(zoom + (e.deltaY < 0 ? 1 : -1), e.clientX, e.clientY); }, { passive: false });
+cv.addEventListener("pointerup", e => { touches.delete(e.pointerId); if (pinch) { if (touches.size < 2) pinch = null; drag = null; return; } cv.classList.remove("drag"); if (drag && !drag.moved) { const b = hitBuilding(e.clientX, e.clientY); if (b) openPanel(b.k); } drag = null; });
+cv.addEventListener("wheel", e => { e.preventDefault(); stepZoom(e.deltaY < 0 ? 1 : -1, e.clientX, e.clientY); }, { passive: false });
+// níveis de zoom: no celular dá pra afastar (0,5) e ver o campus inteiro
+const ZL = [.5, 1, 2, 3, 4];
+function stepZoom(dir, sx, sy) { const i = ZL.indexOf(zoom); setZoom(ZL[Math.max(0, Math.min(ZL.length - 1, (i < 0 ? 1 : i) + dir))], sx, sy); }
 function setZoom(z, sx = vw / 2, sy = vh / 2) {
-  z = Math.max(1, Math.min(4, z)); if (z === zoom) return;
+  z = Math.max(.5, Math.min(4, z)); if (z === zoom) return;
   const [wx, wy] = worldAt(sx, sy); zoom = z; camX = wx - sx / zoom; camY = wy - sy / zoom;
   low.width = Math.ceil(vw / zoom) + 2; low.height = Math.ceil(vh / zoom) + 2; clampCam();
 }
-document.getElementById("zoomIn").onclick = () => setZoom(zoom + 1);
-document.getElementById("zoomOut").onclick = () => setZoom(zoom - 1);
+document.getElementById("zoomIn").onclick = () => stepZoom(1);
+document.getElementById("zoomOut").onclick = () => stepZoom(-1);
 document.getElementById("libBtn").onclick = () => openPanel("arquivo");
 document.getElementById("autoBtn").onclick = () => openPanel("auto");
 document.getElementById("admBtn").onclick = () => openPanel("admin");
