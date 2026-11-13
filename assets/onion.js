@@ -1017,7 +1017,7 @@ async function runStoryRender(){
   try{
     const file=await Store.get(`st${T.id}:src`); const media=[]; for(const m of T.media){ const b=await Store.get(`st${T.id}:${m.id}`); if(b) media.push({...m,blob:b}); }
     const out=await Story.render({id:T.id,file,media,st:T.study,opts:{...R},signal:busy.ctl.signal,onProgress:p=>{ T.prog=p; setAction(`montando ${Math.round(p*100)}%`); const bar=document.querySelector("#pbody .bar>i"); if(bar) bar.style.width=(p*100)+"%"; }});
-    await Store.put(mkey(T.id,"video",0),out.blob); T.result={stored:true,secs:out.secs,W:out.W,H:out.H,formato:R.formato}; save();
+    await Store.put(mkey(T.id,"video",0),out.blob); T.result={stored:true,secs:out.secs,W:out.W,H:out.H,formato:R.formato}; save(); window.parkJingle&&parkJingle();
     toast("Vídeo pronto!");
   }catch(e){ if(e.code!=="cancelled") ui.stErr=e.message||"A montagem falhou."; }
   T.prog=null; clearBusy(); renderPanel();
@@ -1257,7 +1257,7 @@ async function runRender(){
     }});
     const vb=await keepVideo(P,out,null);
     P.render={name,res:P.res||"1080p",mb:vb?(vb.size/1048576).toFixed(0):null,secs:R.dur,at:Date.now(),stored:!!vb}; save();
-    toast(vb?"Vídeo renderizado! Assista ou baixe quando quiser.":"Renderizado, mas não coube no armazenamento do navegador.");
+    toast(vb?"Vídeo renderizado! Assista ou baixe quando quiser.":"Renderizado, mas não coube no armazenamento do navegador."); window.parkJingle&&parkJingle();
     if(!vb&&out.blob) saveBlob(out.blob,name);
   }catch(e){ if(e.code!=="cancelled") ui.cutErr=e.message||"O render falhou."; }
   P.renderProg=null; clearBusy(); renderPanel();
@@ -1473,6 +1473,13 @@ VIEWS.admin=()=>{ const c=AI.get(); return `
     <div class="btns" style="margin-top:4px"><button class="btn small" id="yttest">Salvar e testar o YouTube</button></div>
     ${admMsg.yt?`<div class="${admMsg.yt.ok?"status":"err"}" style="${admMsg.yt.ok?"color:var(--ok)":""}">${esc(admMsg.yt.text)}</div>`:""}
   </section>
+  <section class="card" style="padding:14px;margin-bottom:12px">
+    <h3 style="margin:0">🌗 Parque</h3>
+    <div class="row" style="margin-top:10px"><div class="field"><label for="ptime">Dia e noite</label><select id="ptime">${[["auto","Automático (horário de Brasília)"],["dia","Sempre de dia"],["noite","Sempre de noite"]].map(([v,t])=>`<option value="${v}" ${((S.park||{}).time||"auto")===v?"selected":""}>${t}</option>`).join("")}</select></div></div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="pamb" ${(S.park||{}).amb!==false?"checked":""}> Sons de natureza bem baixinho (passarinhos de dia, grilos à noite)</label>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="palert" ${(S.park||{}).alert!==false?"checked":""}> Som 8-bit quando um vídeo fica pronto</label>
+    <div class="btns" style="margin-top:6px"><button class="btn ghost small" id="ptest">🔊 Testar o som de pronto</button></div>
+  </section>
   <div class="note">Defina um limite mensal de gasto no painel de cada provedor. Nunca cole chaves no código nem no repositório: o site é público, as chaves não.</div>
   <div class="btns"><button class="btn ghost small" id="aclear">Apagar todas as chaves deste navegador</button></div>`; };
 BIND.admin=el=>{
@@ -1509,6 +1516,11 @@ BIND.admin=el=>{
   el.querySelector("#yttest").onclick=async e=>{ const b=e.currentTarget; AI.setKey("youtube",el.querySelector("#k-yt").value); b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando…`;
     try{ await Trends.testYouTube(); admMsg.yt={ok:true,text:"✓ O YouTube respondeu. O Laboratório de Virais já pode ler o que está em alta."}; }
     catch(err){ admMsg.yt={ok:false,text:err.message||"Não deu certo"}; } renderPanel(); };
+  const pk=()=>{ if(!S.park) S.park={time:"auto",amb:true,alert:true}; return S.park; };
+  el.querySelector("#ptime").onchange=e=>{ pk().time=e.target.value; save(); if(typeof updateDaylight==="function") updateDaylight(); };
+  el.querySelector("#pamb").onchange=e=>{ pk().amb=e.target.checked; save(); };
+  el.querySelector("#palert").onchange=e=>{ pk().alert=e.target.checked; save(); };
+  el.querySelector("#ptest").onclick=()=>{ if(typeof ParkAudio!=="undefined") ParkAudio.jingle(); };
   el.querySelector("#aclear").onclick=()=>{ AI.clearAll(); admMsg={}; toast("Chaves apagadas deste navegador"); renderPanel(); };
 };
 

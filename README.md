@@ -78,5 +78,8 @@ assets/vendor/      JSZip e mp4-muxer (MIT)
 - [x] Biblioteca: gerar o par que falta (vídeo longo a partir de um Short, ou Short a partir de um vídeo longo)
 - [x] .zip organizado em pastas VIDEO LONGO e SHORT
 - [x] 6 estilos visuais com prévia (Documentário, Moderno, Promocional, Texto em destaque, Colagem, Cenas por IA) e conteúdo de marca/loja
+- [x] Campus orgânico inspirado no Apple Park: ruas curvas, jardim com lago, prédios com formas variadas
+- [x] Equipe enxuta com rotina (mesa, pausa no café e nos bancos, vai embora à noite)
+- [x] Dia e noite pelo horário de Brasília, prédios acendendo, sons de natureza e aviso 8-bit
 - [x] Piloto automático: gera N vídeos sozinho, o gerente decide cada etapa e caminha entre os prédios
 - [x] Render em MP4 (H.264) direto no navegador, com WebCodecs (Chrome ou Edge no computador)
