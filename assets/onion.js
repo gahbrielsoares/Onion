@@ -69,7 +69,7 @@ const B=[
  {k:"ideias",n:"Laboratório de Ideias",gx:3,gy:3,w:12,d:7,c:"#e0b14a",role:"Produtor",idle:"organizando a fila",desc:"Configure o canal ou a marca, busque temas em alta (opcional) e comece um vídeo novo."},
  {k:"titulos",n:"Torre dos Títulos",gx:29,gy:3,w:7,d:7,c:"#5fbf95",role:"Copywriter",step:1,h:24,desc:"Cria 10 títulos com ângulos e gatilhos diferentes. O roteiro inteiro é escrito pro título que você escolher."},
  {k:"arquivo",n:"Arquivo e Datacenter",gx:39,gy:2,w:6,d:9,c:"#6f93d6",desc:"Onde ficam guardados os vídeos prontos. Abra pra ver e baixar tudo o que já foi produzido."},
- {k:"roteiro",n:"Prédio dos Roteiros",gx:3,gy:15,w:10,d:7,c:"#9b84e0",role:"Roteirista",step:2,desc:"Escreve o roteiro em blocos, com gancho, contexto e desenvolvimento, conectando as partes pra segurar a atenção."},
+ {k:"roteiro",n:"Escritório de Roteiros",gx:3,gy:15,w:10,d:7,c:"#9b84e0",role:"Roteirista",step:2,desc:"Escreve o roteiro em blocos, com gancho, contexto e desenvolvimento, conectando as partes pra segurar a atenção."},
  {k:"descricao",n:"Redação",gx:17,gy:16,w:7,d:5,c:"#56b7c9",role:"Redator",step:3,desc:"Lê o roteiro inteiro e escreve a descrição, com convite pra se inscrever, uma pergunta e hashtags."},
  {k:"imagens",n:"Imagens e Marketing",gx:3,gy:27,w:10,d:7,c:"#c46fc9",role:"Ilustrador",step:4,desc:"Lista as imagens que o vídeo precisa e ajuda a preencher (Google, Gemini, arquivo ou IA). A capa do vídeo também fica aqui."},
  {k:"narracao",n:"Estúdio de Narração",gx:17,gy:27,w:7,d:6,c:"#e09a52",role:"Narrador",step:5,dark:true,desc:"Grava o roteiro com a voz escolhida, no ritmo certo pro seu público."},
@@ -83,9 +83,9 @@ const t0=Date.now();
 setInterval(()=>{ const s=(Date.now()-t0)/1000|0; document.getElementById("clock").textContent=[s/3600|0,(s/60|0)%60,s%60].map(n=>String(n).padStart(2,"0")).join(":"); },1000);
 function showInfo(b){
   const el=document.getElementById("info");
-  if(!b){ el.innerHTML=`<h2>Você no comando</h2><p>Cada prédio é uma etapa. Clique num prédio pra abrir as opções e mande o trabalho pro próximo.</p>`; return; }
+  if(!b){ el.innerHTML=`<h2>Você no comando</h2><p>Cada escritório é uma etapa. Clique num escritório pra abrir as opções e mande o trabalho pro próximo.</p>`; return; }
   const locked=!isUnlocked(b.k);
-  el.innerHTML=`<h2><span class="sq" style="background:${b.c}"></span>${esc(b.n)}</h2><p>${esc(b.desc)}</p><div class="hint">${b.step?`Etapa ${b.step} de 6 · `:""}${locked?"Bloqueado até a etapa anterior terminar":"Clique no prédio pra abrir"}</div>`;
+  el.innerHTML=`<h2><span class="sq" style="background:${b.c}"></span>${esc(b.n)}</h2><p>${esc(b.desc)}</p><div class="hint">${b.step?`Etapa ${b.step} de 6 · `:""}${locked?"Bloqueado até a etapa anterior terminar":"Clique no escritório pra abrir"}</div>`;
 }
 function renderProd(){
   const el=document.getElementById("prod"); const P=S.project;
@@ -255,9 +255,9 @@ function renderPanel(){
   (BIND[panelKey]||(()=>{}))(el);
 }
 function lockedView(k){
-  if(!S.project) return `<div class="lock"><div class="big">🔒</div><h3>Nenhum vídeo em produção</h3><p class="lead">Escolha uma ideia no Laboratório de Ideias e clique em Começar produção. Aí os prédios vão abrindo um por um.</p><button class="btn" onclick="openPanel('ideias')">Abrir Laboratório de Ideias</button></div>`;
+  if(!S.project) return `<div class="lock"><div class="big">🔒</div><h3>Nenhum vídeo em produção</h3><p class="lead">Escolha uma ideia no Laboratório de Ideias e clique em Começar produção. Aí os escritórios vão abrindo um por um.</p><button class="btn" onclick="openPanel('ideias')">Abrir Laboratório de Ideias</button></div>`;
   const i=STAGES.indexOf(k); let prev=STAGES[0]; for(let j=0;j<i;j++) if(!S.project.done[STAGES[j]]){ prev=STAGES[j]; break; }
-  return `<div class="lock"><div class="big">🔒</div><h3>Ainda não é a vez deste prédio</h3><p class="lead">Ele abre quando a etapa de ${STAGE_LABEL[prev].toLowerCase()} for concluída em ${esc(BK[prev].n)}.</p><button class="btn" onclick="openPanel('${prev}')">Ir pra ${esc(BK[prev].n)}</button></div>`;
+  return `<div class="lock"><div class="big">🔒</div><h3>Ainda não é a vez deste escritório</h3><p class="lead">Ele abre quando a etapa de ${STAGE_LABEL[prev].toLowerCase()} for concluída em ${esc(BK[prev].n)}.</p><button class="btn" onclick="openPanel('${prev}')">Ir pra ${esc(BK[prev].n)}</button></div>`;
 }
 function pills(name,list,cur){ return `<div class="pills" data-group="${name}">${list.map(v=>`<button type="button" class="pill" aria-pressed="${v===cur}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>`; }
 function bindPills(el,name,cb){ el.querySelectorAll(`[data-group="${name}"] .pill`).forEach(p=>p.onclick=()=>{ el.querySelectorAll(`[data-group="${name}"] .pill`).forEach(q=>q.setAttribute("aria-pressed","false")); p.setAttribute("aria-pressed","true"); cb(p.dataset.v); }); }
@@ -456,7 +456,7 @@ BIND.titulos=el=>{
   const P=S.project; const go=el.querySelector("#tgo"); if(go) go.onclick=runTitulos;
   el.querySelectorAll("[data-t]").forEach(c=>c.onclick=()=>{ if(P.done.roteiro) return toast("O roteiro já foi escrito pra este título"); P.title=P.titles[+c.dataset.t].titulo; P.done.titulos=false; save(); renderPanel(); renderProd(); });
   const own=el.querySelector("#own"); own.oninput=()=>{ if(P.done.roteiro) return; P.title=own.value.trim()||null; P.done.titulos=false; save(); el.querySelector("#tok").disabled=!P.title; el.querySelectorAll(".card.sel").forEach(c=>c.classList.remove("sel")); };
-  el.querySelector("#tok").onclick=()=>{ if(!P.title) return; if(!P.done.titulos){ P.done.titulos=true; save(); courier("titulos","roteiro"); toast("Título enviado pro Prédio dos Roteiros"); renderProd(); openPanel("roteiro"); comboAfter("titulos"); } };
+  el.querySelector("#tok").onclick=()=>{ if(!P.title) return; if(!P.done.titulos){ P.done.titulos=true; save(); courier("titulos","roteiro"); toast("Título enviado pro Escritório de Roteiros"); renderProd(); openPanel("roteiro"); comboAfter("titulos"); } };
 };
 async function runTitulos(){
   const P=S.project; ui.titErr=null; setBusy("titulos","testando ângulos"); renderPanel();
@@ -651,7 +651,7 @@ function imgNote(){
 
 /* ---- Capa ---- */
 const THUMB_BG=["linear-gradient(120deg,#2b1d3a 0%,#8a2f7c 55%,#f2c14e 120%)","linear-gradient(120deg,#0f2a3d 0%,#3a7ae1 60%,#9ec5d8 120%)","linear-gradient(120deg,#3a1a14 0%,#d1502f 60%,#ffd58a 120%)","linear-gradient(120deg,#1a2a1e 0%,#2e8b57 55%,#f2e2b0 120%)"];
-VIEWS.capa=()=>{ const P=S.project; if(P.kind==="short") return `<p class="lead">Shorts não usam capa: o YouTube mostra um quadro do próprio vídeo. Pode seguir pro Prédio das Imagens.</p><div class="btns"><button class="btn" onclick="openPanel('imagens')">Ir pro Prédio das Imagens</button></div>`; const working=busy&&busy.k==="imagens"&&/capa/.test(busy.action||""); const th=P.thumbs||[]; const st=P.thumbImg||[]; return `
+VIEWS.capa=()=>{ const P=S.project; if(P.kind==="short") return `<p class="lead">Shorts não usam capa: o YouTube mostra um quadro do próprio vídeo. Pode seguir pro escritório de Imagens e Marketing.</p><div class="btns"><button class="btn" onclick="openPanel('imagens')">Ir pra Imagens e Marketing</button></div>`; const working=busy&&busy.k==="imagens"&&/capa/.test(busy.action||""); const th=P.thumbs||[]; const st=P.thumbImg||[]; return `
   <p class="lead">A equipe escreve 4 frases de impacto e desenha uma capa pra cada. Marque a que vai pro vídeo.</p>
   <div class="field"><label for="cvis">Ideia visual (opcional)</label><textarea id="cvis" rows="2" placeholder="Ex.: mulher de cabelo branco orando perto da janela, luz da manhã, tons de azul">${esc(P.thumbVisual||"")}</textarea></div>
   <div class="field"><label for="ctxt">Texto da capa (opcional)</label><input id="ctxt" value="${esc(P.thumbOwn||"")}" placeholder="Deixe vazio e a equipe escreve. 4 a 6 palavras funcionam melhor"></div>
@@ -1413,7 +1413,7 @@ async function playLibrary(box,P){
 }
 /* ---- Arquivo / Biblioteca ---- */
 VIEWS.arquivo=()=>`<div class="lib">
-  <p class="lead">Vídeos que já passaram por todo o campus. ${S.library.length?`${S.library.length} no total.`:""}</p>
+  <p class="lead">Vídeos que já passaram por todos os escritórios. ${S.library.length?`${S.library.length} no total.`:""}</p>
   ${S.library.length?S.library.map((P,i)=>`<details><summary>${esc(P.title)}</summary>
     <div class="player" data-play="${i}" role="button" tabindex="0" aria-label="Assistir ${esc(P.title)}">
       <div class="big" ${P.thumbSel!=null&&(P.thumbImg||[])[P.thumbSel]==="ok"?`data-img="${mkey(P.id,"thumb",P.thumbSel)}"`:""} style="margin:8px 0 0;background-color:#1a1424"></div>
@@ -1421,7 +1421,7 @@ VIEWS.arquivo=()=>`<div class="lib">
     <p class="m" style="font-size:12.5px;color:var(--muted)">${new Date(P.savedAt).toLocaleDateString("pt-BR")} · ${esc(P.config.nicho)} · ${esc(P.config.idioma)} · ${P.narration?P.narration.mins+" min":""} · ${P.scenes.filter(s=>s.img==="ok").length} imagens</p>
     <p style="white-space:pre-wrap;font-size:13.5px">${esc(P.description||"")}</p>
     ${P.sub?`<div class="m" style="font-size:12.5px;margin:6px 0">📱 Short junto: <b>${esc(P.sub.title||"")}</b>${P.sub.render&&P.sub.render.stored?` · <a href="#" data-splay="${i}" style="color:var(--accent)">assistir</a> · <a href="#" data-svid="${i}" style="color:var(--accent)">baixar .mp4</a>`:" · ainda sem vídeo renderizado"}</div><div data-sbox="${i}"></div>`:""}
-    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}${!P.sub&&!AP.on&&P.kind!=="story"?`<button class="btn small" data-pair="${i}">${P.kind==="short"?"🎬 Gerar o vídeo longo deste Short":"📱 Gerar o Short deste vídeo"}</button>`:""}${P.kind==="story"?"":`<button class="btn ghost small" data-recut="${i}" title="Volta pro OnionCut pra mudar template, trilha ou mural e renderizar de novo, sem gastar nada">🎬 Reabrir no OnionCut</button>`}${P.kind==="story"?"":`<button class="btn ghost small" data-reopen="${i}" title="Volta pro campus a partir da narração">🎙 Refazer a narração</button>`}<button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
+    <div class="btns">${P.render&&P.render.stored?`<button class="btn small" data-vid="${i}">🎬 Baixar vídeo (.mp4)</button>`:""}<button class="btn ${P.render&&P.render.stored?"ghost ":""}small" data-dl="${i}">⬇ Baixar pacote (.zip)</button>${P.narr&&P.narr.v!==2&&/Gemini/.test(P.narr.provider||"")?`<button class="btn small" data-fix="${i}" title="Corta a instrução que a voz leu por engano no começo dos trechos">✂ Tirar a instrução lida (centavos)</button>`:""}${!P.sub&&!AP.on&&P.kind!=="story"?`<button class="btn small" data-pair="${i}">${P.kind==="short"?"🎬 Gerar o vídeo longo deste Short":"📱 Gerar o Short deste vídeo"}</button>`:""}${P.kind==="story"?"":`<button class="btn ghost small" data-recut="${i}" title="Volta pro OnionCut pra mudar template, trilha ou mural e renderizar de novo, sem gastar nada">🎬 Reabrir no OnionCut</button>`}${P.kind==="story"?"":`<button class="btn ghost small" data-reopen="${i}" title="Volta pros escritórios a partir da narração">🎙 Refazer a narração</button>`}<button class="btn ghost small" data-rm="${i}">Remover</button></div></details>`).join(""):`<div class="empty">Ainda não tem vídeo pronto. Quando o OnionCut terminar um, ele aparece aqui.</div>`}
   <p class="m" id="usage" style="font-size:12px;color:var(--muted)"></p>
 </div>`;
 BIND.arquivo=el=>{
@@ -1449,7 +1449,7 @@ BIND.arquivo=el=>{
   el.querySelectorAll("[data-reopen]").forEach(b=>b.onclick=async()=>{
     if(S.project) return toast("Termine ou descarte o vídeo em produção antes");
     const P=S.library[+b.dataset.reopen];
-    if(!confirm(`Reabrir “${P.title}” no campus? O vídeo volta pro Estúdio de Narração; roteiro, capa e imagens são mantidos.`)) return;
+    if(!confirm(`Reabrir “${P.title}” nos escritórios? O vídeo volta pro Estúdio de Narração; roteiro, capa e imagens são mantidos.`)) return;
     S.library.splice(+b.dataset.reopen,1);
     await Store.delPrefix(`p${P.id}:audio:`); await Store.delPrefix(`p${P.id}:video:`);
     Object.assign(P,{narr:null,narration:null,render:null,cut:false}); P.done.narracao=false; P.done.montagem=false; delete P.savedAt;
@@ -1518,7 +1518,7 @@ VIEWS.admin=()=>{ const c=AI.get(); return `
     ${admMsg.yt?`<div class="${admMsg.yt.ok?"status":"err"}" style="${admMsg.yt.ok?"color:var(--ok)":""}">${esc(admMsg.yt.text)}</div>`:""}
   </section>
   <section class="card" style="padding:14px;margin-bottom:12px">
-    <h3 style="margin:0">🌗 Parque</h3>
+    <h3 style="margin:0">🌗 Escritórios</h3>
     <div class="row" style="margin-top:10px"><div class="field"><label for="ptime">Dia e noite</label><select id="ptime">${[["auto","Automático (horário de Brasília)"],["dia","Sempre de dia"],["noite","Sempre de noite"]].map(([v,t])=>`<option value="${v}" ${((S.park||{}).time||"auto")===v?"selected":""}>${t}</option>`).join("")}</select></div></div>
     <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="pamb" ${(S.park||{}).amb!==false?"checked":""}> Sons de natureza bem baixinho (passarinhos de dia, grilos à noite)</label>
     <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="palert" ${(S.park||{}).alert!==false?"checked":""}> Som 8-bit quando um vídeo fica pronto</label>

@@ -79,7 +79,7 @@ async function apTitulos() {
 }
 async function apRoteiro() {
   const P = S.project; if (P.done.roteiro) return;
-  await walk("roteiro", "indo pro Prédio dos Roteiros");
+  await walk("roteiro", "indo pro Escritório de Roteiros");
   await attempt("Roteiro", () => runRoteiro(), () => P.script.length >= nBlocks() && !ui.rotErr, 3);
   P.done.roteiro = true; save(); renderProd();
   apLog("Roteiro", `${P.script.length} blocos, ${wc(scriptText())} palavras`, "ok"); courier("roteiro", "descricao");
@@ -102,7 +102,7 @@ async function apCapa() {
 }
 async function apImagens() {
   const P = S.project; if (P.done.imagens) return;
-  await walk("imagens", "indo pro Prédio das Imagens");
+  await walk("imagens", "indo pra Imagens e Marketing");
   if (isColagem(P)) {
     if (!P.board) { await attempt("Storyboard", () => runColagem(), () => !!P.board); apLog("Imagens", `storyboard com ${P.board.beats.length} batidas e elenco de ${P.board.assets.length}`, "ok"); }
     for (let t = 0; t < 2 && P.board.assets.some(a => a.img !== "ok"); t++) { apCheck(); await drawAssets(P.board.assets.filter(a => a.img !== "ok").map(a => a.id), "auto"); }
@@ -243,7 +243,7 @@ function apReady() {
 VIEWS.auto = () => {
   const miss = apReady();
   return `
-  <p class="lead">O gerente cuida de tudo: escolhe o tema, o título, a capa, o estilo das imagens, a voz e o template, e caminha de prédio em prédio até o vídeo sair renderizado.</p>
+  <p class="lead">O gerente cuida de tudo: escolhe o tema, o título, a capa, o estilo das imagens, a voz e o template, e passa de escritório em escritório até o vídeo sair renderizado.</p>
   <div id="aphead"></div>
   ${AP.on ? "" : `
   ${S.config ? `<div class="card"><div class="t">Canal: ${esc(S.config.nicho)} · vídeos em <span style="color:var(--accent)">${esc(S.config.idioma)}</span></div><div class="m">${esc(S.config.publico)} · ${esc(S.config.formato)} · ${S.config.duracao} min · voz ${esc((S.config.voz || "").toLowerCase())} <a href="#" onclick="openPanel('ideias');return false" style="color:var(--accent)">alterar</a></div></div>` : ""}
