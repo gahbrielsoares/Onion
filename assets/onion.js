@@ -1486,6 +1486,7 @@ function modelField(st,field,label){
 }
 VIEWS.admin=()=>{ const c=AI.get(); return `
   <div class="btns" style="margin:0 0 12px"><button class="btn" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button>${window.Auth&&Auth.enabled?`<button class="btn ghost small" id="admOut">Sair da conta</button>`:""}</div>
+  ${window.Auth&&Auth.enabled?`<div class="card" id="subBox" style="padding:12px 14px;margin-bottom:12px"><span class="spin"></span> verificando a assinatura…</div>`:""}
   <p class="lead">Pra cada etapa, escolha quem faz o trabalho e cole a chave. A mesma chave vale pra todas as etapas do mesmo provedor. Tudo fica guardado só neste navegador.</p>
   ${Object.entries(AI.STAGES).map(([st,S2])=>{
     const p=c[st].provider, P2=AI.PROVIDERS[p];
@@ -1559,6 +1560,12 @@ BIND.admin=el=>{
   el.querySelector("#yttest").onclick=async e=>{ const b=e.currentTarget; AI.setKey("youtube",el.querySelector("#k-yt").value); b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando…`;
     try{ await Trends.testYouTube(); admMsg.yt={ok:true,text:"✓ O YouTube respondeu. O Laboratório de Virais já pode ler o que está em alta."}; }
     catch(err){ admMsg.yt={ok:false,text:err.message||"Não deu certo"}; } renderPanel(); };
+  const sb2=el.querySelector("#subBox"); if(sb2) (async()=>{ const {data:{user}}=await Auth.sb.auth.getUser(); if(!user){ sb2.remove(); return; } const sub=await Auth.subscription(user.id);
+    const d=x=>x?new Date(x).toLocaleDateString("pt-BR"):"";
+    const txt=sub.status==="authorized"?`✓ Assinatura <b>ativa</b> · R$ ${Auth.price}/mês${sub.next_payment_date?` · próxima cobrança em ${d(sub.next_payment_date)}`:""}`:sub.active?`Assinatura cancelada · acesso liberado até ${d(sub.access_until)}`:sub.status==="pending"?"Pagamento pendente no Mercado Pago":Auth.requirePayment?"Sem assinatura":"Acesso gratuito (período de testes)";
+    sb2.innerHTML=`<div class="t" style="font-size:14.5px">${txt}</div>${sub.status==="authorized"?`<div class="btns" style="margin-top:8px"><button class="btn ghost small" id="subCancel">Cancelar assinatura</button></div>`:""}`;
+    const sc=sb2.querySelector("#subCancel"); if(sc) sc.onclick=async()=>{ if(!confirm("Cancelar a assinatura? O acesso continua até o fim do mês já pago.")) return; sc.disabled=true; sc.innerHTML=`<span class="spin"></span>`; try{ const r=await Auth.cancelSub(); toast("Assinatura cancelada"+(r.access_until?` · acesso até ${d(r.access_until)}`:"")); }catch(e){ toast(e.message); } renderPanel(); };
+  })();
   const ao=el.querySelector("#admOut"); if(ao) ao.onclick=async()=>{ await Auth.signOut(); location.href="../"; };
   const pk=()=>{ if(!S.park) S.park={time:"auto",amb:true,alert:true}; return S.park; };
   el.querySelector("#ptime").onchange=e=>{ pk().time=e.target.value; save(); if(typeof updateDaylight==="function") updateDaylight(); };

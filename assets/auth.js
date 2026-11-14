@@ -21,7 +21,27 @@ const Auth = (() => {
     const { data: p } = await sb.from("profiles").select("*").eq("id", user.id).maybeSingle();
     if (!user.email_confirmed_at) return { ok: false, step: "confirm", user };
     if (!p || !p.phone || !p.accepted_terms_at) return { ok: false, step: "complete", user, p };
-    return { ok: true, user, p };
+    const sub = await subscription(user.id);
+    if (C.requirePayment && !sub.active) return { ok: false, step: "plan", user, p, sub };
+    return { ok: true, user, p, sub };
+  }
+  async function subscription(uid) {
+    const { data } = await sb.from("subscriptions").select("*").eq("user_id", uid).maybeSingle();
+    const s = data || { status: "none" }, now = Date.now();
+    s.active = s.status === "authorized" || (!!s.access_until && new Date(s.access_until).getTime() > now);
+    return s;
+  }
+  async function checkout(payerEmail) {
+    const { data, error } = await sb.functions.invoke("mp-checkout", { body: { payer_email: payerEmail } });
+    if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (e) {} throw new Error(m); }
+    if (data && data.error) throw new Error(data.error);
+    return data.init_point;
+  }
+  async function cancelSub() {
+    const { data, error } = await sb.functions.invoke("mp-checkout", { body: { action: "cancel" } });
+    if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (e) {} throw new Error(m); }
+    if (data && data.error) throw new Error(data.error);
+    return data;
   }
   function track(kind) { if (!enabled) return; sb.rpc("track", { kind }).then(() => {}, () => {}); }
 
@@ -50,13 +70,13 @@ const Auth = (() => {
   function ensureCss() { if (document.getElementById("oa-css")) return; const s = document.createElement("style"); s.id = "oa-css"; s.textContent = CSS; document.head.appendChild(s); }
   const G = `<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.9 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 
-  function open({ step = "signup", blocking = false, onDone } = {}) {
+  function open({ step = "signup", blocking = false, onDone, userEmail = "" } = {}) {
     if (!enabled) { onDone && onDone(); return; }
     ensureCss();
     document.querySelectorAll(".oa-modal").forEach(m => m.remove());
     const m = document.createElement("div"); m.className = "oa-modal"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true"); m.setAttribute("aria-labelledby", "oaTitle");
     document.body.appendChild(m);
-    let cur = step, email = "", msg = null;
+    let cur = step, email = userEmail, msg = null;
     const close = () => { if (!blocking) m.remove(); };
     m.addEventListener("click", e => { if (e.target === m) close(); });
     const head = (t, s) => `${blocking ? "" : `<button class="oa-x" aria-label="Fechar" data-x>×</button>`}<div style="font-size:30px">🧅</div><h2 id="oaTitle">${t}</h2><p class="oa-sub">${s}</p>${msg ? `<div class="oa-msg ${msg.ok ? "ok" : "err"}">${esc(msg.t)}</div>` : ""}`;
@@ -73,6 +93,17 @@ const Auth = (() => {
         <button class="oa-btn pri" data-go>${cur === "signup" ? "Criar conta" : "Entrar"}</button>`;
       else if (cur === "confirm") h = head("Confira o seu e-mail 📬", `Enviamos um link de confirmação para <b>${esc(email)}</b>. Abra o e-mail e clique no link: você volta direto pro parque.`) +
         `<button class="oa-btn" data-resend>Reenviar o e-mail</button><div style="text-align:center;margin-top:10px"><button class="oa-link" data-tab="login">Já confirmei: entrar</button></div><p class="oa-sub" style="margin-top:10px;font-size:13px">Não chegou? Olhe a caixa de spam ou promoções.</p>`;
+      else if (cur === "plan") h = head(`Assine o <span class="oa-px">Onion Park</span>`, "Tudo liberado, sem limite de vídeos. Cancele quando quiser.") +
+        `<div style="border:2.5px solid #1B1424;border-radius:16px;box-shadow:4px 4px 0 #1B1424;padding:16px;background:#fff;margin-bottom:12px">
+          <div style="font:800 38px 'Bricolage Grotesque',Figtree,sans-serif">R$ ${esc(C.price || "9,90")}<small style="font-size:16px;color:#5d5268">/mês</small></div>
+          <ul style="list-style:none;padding:0;margin:10px 0 0;display:grid;gap:5px;font-size:14.5px">${["Todos os departamentos do parque", "Vídeos longos, Shorts, Reels e stories", "Piloto automático e Estúdio de Stories", "Cancele quando quiser"].map(t => `<li>✓ ${t}</li>`).join("")}</ul></div>
+        <div class="oa-f"><label for="oaPayer">E-mail da sua conta do Mercado Pago</label><input id="oaPayer" type="email" value="${esc(email)}"></div>
+        <p class="oa-sub" style="font-size:12.5px;margin-top:-4px">O Mercado Pago só aprova se for o mesmo e-mail da conta que vai pagar.</p>
+        <button class="oa-btn pri" data-pay>Assinar com Mercado Pago →</button>
+        <div style="text-align:center;margin-top:10px"><button class="oa-link" data-logout>Usar outra conta</button></div>`;
+      else if (cur === "waiting") h = head("Confirmando o pagamento…", "Assim que o Mercado Pago confirmar, o parque abre sozinho. Costuma levar alguns segundos.") +
+        `<div style="display:flex;justify-content:center;padding:10px"><span class="oa-spin" style="width:32px;height:32px;border-color:#e3d9cc;border-top-color:#7A2E8E"></span></div>
+        <button class="oa-btn" data-tab="plan">Ainda não paguei: voltar</button>`;
       else if (cur === "complete") h = head("Falta só um detalhe", "Pra terminar o cadastro, informe o seu telefone e aceite os termos.") +
         `<div class="oa-f"><label for="oaPhone">Telefone (WhatsApp)</label><input id="oaPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 91234-5678"></div>${terms}<button class="oa-btn pri" data-finish>Concluir e entrar</button>
         <div style="text-align:center;margin-top:10px"><button class="oa-link" data-logout>Usar outra conta</button></div>`;
@@ -116,6 +147,11 @@ const Auth = (() => {
         const { error } = await sb.from("profiles").update({ phone: phoneStore(phone), accepted_terms_at: new Date().toISOString() }).eq("id", user.id);
         if (error) return fail("Não deu pra salvar: " + error.message); done();
       };
+      const pay = q("[data-pay]"); if (pay) pay.onclick = async () => {
+        const pe = q("#oaPayer").value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pe)) return fail("Digite o e-mail da sua conta do Mercado Pago.");
+        busy(pay, true); try { location.href = await checkout(pe); } catch (e) { fail(e.message || "Não deu pra abrir o pagamento."); }
+      };
+      if (cur === "waiting") { let n = 0; const tick = async () => { if (!document.body.contains(m) || cur !== "waiting") return; const { data: { user } } = await sb.auth.getUser(); const s = user && await subscription(user.id); if (s && s.active) return done(); if (++n < 40) setTimeout(tick, 3000); else { msg = { t: "Ainda não recebemos a confirmação. Se você já pagou, aguarde um minuto e recarregue a página." }; cur = "plan"; render(); } }; setTimeout(tick, 1500); }
       const lo = q("[data-logout]"); if (lo) lo.onclick = async () => { await sb.auth.signOut(); cur = "signup"; msg = null; render(); };
       setTimeout(() => { const f = m.querySelector("input"); if (f && matchMedia("(pointer:fine)").matches) f.focus(); }, 30);
     }
@@ -127,7 +163,9 @@ const Auth = (() => {
     if (!enabled) return true;
     const s = await state();
     if (s.ok) { track("abriu"); return true; }
-    return new Promise(res => open({ step: s.step === "confirm" ? "login" : s.step, blocking: true, onDone: () => { track("abriu"); res(true); } }));
+    const fromMP = /preapproval_id|collection_status|status=/.test(location.search);
+    const step = s.step === "confirm" ? "login" : (s.step === "plan" && fromMP ? "waiting" : s.step);
+    return new Promise(res => open({ step, blocking: true, userEmail: s.user && s.user.email, onDone: () => { track("abriu"); if (fromMP) history.replaceState(null, "", location.pathname); res(true); } }));
   }
   // na página inicial: os botões de entrar abrem a janela (ou vão direto, se já estiver tudo certo)
   function wireEnterButtons(sel = "a[href='app/'],a[href='./app/']") {
@@ -135,11 +173,11 @@ const Auth = (() => {
     document.querySelectorAll(sel).forEach(a => a.addEventListener("click", async e => {
       e.preventDefault(); const s = await state();
       if (s.ok) { location.href = appUrl; return; }
-      open({ step: s.step === "confirm" ? "login" : s.step, onDone: () => { location.href = appUrl; } });
+      open({ step: s.step === "confirm" ? "login" : s.step, userEmail: s.user && s.user.email, onDone: () => { location.href = appUrl; } });
     }));
   }
   async function signOut() { if (enabled) await sb.auth.signOut(); }
-  return { enabled, sb, state, open, gate, track, wireEnterButtons, signOut };
+  return { enabled, sb, state, open, gate, track, wireEnterButtons, signOut, subscription, cancelSub, requirePayment: !!C.requirePayment, price: C.price || "9,90" };
 })();
 window.Auth = Auth;
 window.onionTrack = k => Auth.track(k);
