@@ -1,6 +1,6 @@
 // Onion Park · cria a assinatura no Mercado Pago e devolve o link do checkout.
 // Também cancela (body: {action:"cancel"}).
-// Segredos: MP_ACCESS_TOKEN, APP_URL (ex.: https://gahbrielsoares.github.io/Onion/app/), PRICE (opcional, padrão 9.90)
+// Segredos: MP_ACCESS_TOKEN, APP_URL (ex.: https://gahbrielsoares.github.io/Onion/app/), PRICE (opcional, padrão 29.90)
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
 
     if (sub?.status === "authorized") return json({ error: "Sua assinatura já está ativa." }, 400);
     const payer = String(body.payer_email || user.email || "").trim();
-    const price = Number(Deno.env.get("PRICE") || "9.90");
+    const price = Number(Deno.env.get("PRICE") || "29.90");
     const r = await fetch("https://api.mercadopago.com/preapproval", {
       method: "POST", headers: { Authorization: `Bearer ${MP}`, "content-type": "application/json" },
       body: JSON.stringify({

@@ -95,7 +95,7 @@ const Auth = (() => {
         `<button class="oa-btn" data-resend>Reenviar o e-mail</button><div style="text-align:center;margin-top:10px"><button class="oa-link" data-tab="login">Já confirmei: entrar</button></div><p class="oa-sub" style="margin-top:10px;font-size:13px">Não chegou? Olhe a caixa de spam ou promoções.</p>`;
       else if (cur === "plan") h = head(`Assine o <span class="oa-px">Onion Park</span>`, "Tudo liberado, sem limite de vídeos. Cancele quando quiser.") +
         `<div style="border:2.5px solid #1B1424;border-radius:16px;box-shadow:4px 4px 0 #1B1424;padding:16px;background:#fff;margin-bottom:12px">
-          <div style="font:800 38px 'Bricolage Grotesque',Figtree,sans-serif">R$ ${esc(C.price || "9,90")}<small style="font-size:16px;color:#5d5268">/mês</small></div>
+          <div style="font:800 38px 'Bricolage Grotesque',Figtree,sans-serif">${C.priceWas ? `<div style="font:700 15px Figtree,sans-serif;color:#5d5268">Black November: de <s>R$ ${esc(C.priceWas)}</s> por</div>` : ""}R$ ${esc(C.price || "29,90")}<small style="font-size:16px;color:#5d5268">/mês</small></div>
           <ul style="list-style:none;padding:0;margin:10px 0 0;display:grid;gap:5px;font-size:14.5px">${["Todos os escritórios da sua empresa", "Vídeos longos, Shorts, Reels e stories", "Piloto automático e Estúdio de Stories", "Cancele quando quiser"].map(t => `<li>✓ ${t}</li>`).join("")}</ul></div>
         <div class="oa-f"><label for="oaPayer">E-mail da sua conta do Mercado Pago</label><input id="oaPayer" type="email" value="${esc(email)}"></div>
         <p class="oa-sub" style="font-size:12.5px;margin-top:-4px">O Mercado Pago só aprova se for o mesmo e-mail da conta que vai pagar.</p>
@@ -177,7 +177,7 @@ const Auth = (() => {
     }));
   }
   async function signOut() { if (enabled) await sb.auth.signOut(); }
-  return { enabled, sb, state, open, gate, track, wireEnterButtons, signOut, subscription, cancelSub, requirePayment: !!C.requirePayment, price: C.price || "9,90" };
+  return { enabled, sb, state, open, gate, track, wireEnterButtons, signOut, subscription, cancelSub, requirePayment: !!C.requirePayment, price: C.price || "29,90" };
 })();
 window.Auth = Auth;
 window.onionTrack = k => Auth.track(k);

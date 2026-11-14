@@ -207,3 +207,31 @@ footer .copy{width:100%;border-top:1.5px solid var(--line);padding-top:16px}
 .acard li::before{content:"";flex:none;width:10px;height:10px;margin-top:7px;background:var(--purple);box-shadow:2px 2px 0 var(--ink)}
 .acard.gold li::before{background:var(--gold)}
 @media (max-width:900px){.aud{grid-template-columns:1fr}}
+
+/* dinheiro nos cards dos públicos */
+.acard h3{font-size:clamp(21px,2.2vw,25px)}
+.money{background:#1B1424;color:#efe8f6;border-radius:14px;padding:12px 14px;margin:0 0 16px;display:grid;gap:6px;box-shadow:4px 4px 0 var(--gold)}
+.mrow{display:flex;justify-content:space-between;gap:12px;font-size:15px;align-items:baseline}
+.mrow span{color:#cfc4dc}
+.mrow b{font-family:"Bricolage Grotesque",Figtree,sans-serif;font-weight:800;font-size:17px;white-space:nowrap}
+.mrow b.bad{color:#ff8f86;text-decoration:line-through;text-decoration-thickness:2px}
+.mrow b.good{color:#3BE07A}
+.mrow.total{border-top:1px dashed #4a3f5c;padding-top:6px}
+.mrow.total b{font-size:21px}
+.acard ul li span b{color:var(--ink)}
+.acard .src{font-size:12.5px;color:#8a7f96;margin:14px 0 0}
+/* estilos só em texto */
+.stl{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:44px}
+.sitem{background:#fff;border:2px solid var(--ink);border-radius:14px;box-shadow:3px 3px 0 var(--ink);padding:16px 18px;display:grid;gap:4px}
+.sitem b{font-family:"Bricolage Grotesque",Figtree,sans-serif;font-size:19px}
+.sitem span{color:var(--muted);font-size:15px}
+@media (max-width:900px){.stl{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.stl{grid-template-columns:1fr}}
+/* Black November */
+.chip.bn{text-decoration:none;border-color:var(--ink);background:#1B1424;color:#fff}
+.chip.bn .tag{background:var(--gold);color:var(--ink)}
+.chip.bn s{opacity:.6}
+.price .was{font-size:17px;color:var(--muted);font-weight:700;margin-top:6px}
+.price .was s{text-decoration-thickness:2px}
+.price .save{display:inline-block;margin-top:10px;background:#e7f6ec;color:#1d5b33;border:1.5px solid #b5e0c3;border-radius:10px;padding:6px 10px;font-size:14px;font-weight:700}
+.price .ribbon{background:#1B1424;color:#fff}

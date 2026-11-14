@@ -10,7 +10,7 @@ Supabase › **SQL Editor** › New query › cole `supabase/pagamento.sql` › 
 ## 3. Segredos (Supabase › Edge Functions › Secrets)
 - `MP_ACCESS_TOKEN` = o Access Token do passo 1
 - `APP_URL` = `https://gahbrielsoares.github.io/Onion/app/`
-- `PRICE` = `9.90`
+- `PRICE` = `29.90` (Black November; quem assinar fica com esse valor travado)
 - `MP_WEBHOOK_SECRET` = (preencha depois do passo 5)
 
 ## 4. Funções (Supabase › Edge Functions › Deploy a new function › Via Editor)
