@@ -1,6 +1,8 @@
 // Onion Park · cria a assinatura no Mercado Pago e devolve o link do checkout.
 // Também cancela (body: {action:"cancel"}).
 // Segredos: MP_ACCESS_TOKEN, APP_URL (ex.: https://gahbrielsoares.github.io/Onion/app/), PRICE (opcional, padrão 29.90)
+// COUPONS (opcional, JSON com o preço mensal de cada cupom), ex.: {"BLACK19":19.90,"NOVEM9":9.90}
+// Os cupons ficam só no Supabase (o código do site é público).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -27,23 +29,37 @@ Deno.serve(async (req) => {
       return json({ ok: true, access_until: until });
     }
 
+    // cupom: o preço vem só do servidor
+    let coupons: Record<string, number> = {};
+    try { coupons = JSON.parse(Deno.env.get("COUPONS") || "{}"); } catch (_) { coupons = {}; }
+    const code = String(body.coupon || "").trim().toUpperCase();
+    const base = Number(Deno.env.get("PRICE") || "29.90");
+    if (code && !(code in coupons)) return json({ error: "Cupom inválido." }, 400);
+    const price = code ? Number(coupons[code]) : base;
+    if (body.action === "quote") return json({ price, coupon: code || null });
+
     if (sub?.status === "authorized") return json({ error: "Sua assinatura já está ativa." }, 400);
     const payer = String(body.payer_email || user.email || "").trim();
-    const price = Number(Deno.env.get("PRICE") || "29.90");
-    const r = await fetch("https://api.mercadopago.com/preapproval", {
-      method: "POST", headers: { Authorization: `Bearer ${MP}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        reason: "Onion Park · assinatura mensal",
-        external_reference: user.id,
-        payer_email: payer,
-        back_url: Deno.env.get("APP_URL") || "https://gahbrielsoares.github.io/Onion/app/",
-        status: "pending",
-        auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: price, currency_id: "BRL" }
-      })
-    });
-    const p = await r.json();
-    if (!r.ok || !p.init_point) return json({ error: "O Mercado Pago recusou: " + (p.message || JSON.stringify(p).slice(0, 200)) }, 502);
+    // valores muito baixos podem ser recusados: tenta o valor do cupom e, se não der, o mínimo aceito
+    const tries = [...new Set([price, ...(price < 1 ? [1, 2, 5] : [])])];
+    let p: any = null, ok = false, used = price;
+    for (const amount of tries) {
+      const r = await fetch("https://api.mercadopago.com/preapproval", {
+        method: "POST", headers: { Authorization: `Bearer ${MP}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          reason: code ? `Onion Park · assinatura mensal (cupom ${code})` : "Onion Park · assinatura mensal",
+          external_reference: user.id,
+          payer_email: payer,
+          back_url: Deno.env.get("APP_URL") || "https://gahbrielsoares.github.io/Onion/app/",
+          status: "pending",
+          auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: amount, currency_id: "BRL" }
+        })
+      });
+      p = await r.json(); ok = r.ok && !!p.init_point; used = amount;
+      if (ok) break;
+    }
+    if (!ok) return json({ error: "O Mercado Pago recusou: " + (p?.message || JSON.stringify(p).slice(0, 200)) }, 502);
     await admin.from("subscriptions").upsert({ user_id: user.id, preapproval_id: p.id, status: "pending", payer_email: payer, updated_at: new Date().toISOString() });
-    return json({ init_point: p.init_point });
+    return json({ init_point: p.init_point, price: used });
   } catch (e) { return json({ error: String(e?.message || e) }, 500); }
 });

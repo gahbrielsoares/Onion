@@ -34,8 +34,14 @@ const Auth = (() => {
     s.active = s.status === "authorized" || (!!s.access_until && new Date(s.access_until).getTime() > now);
     return s;
   }
-  async function checkout(payerEmail) {
-    const { data, error } = await sb.functions.invoke("mp-checkout", { body: { payer_email: payerEmail } });
+  async function quote(coupon) {
+    const { data, error } = await sb.functions.invoke("mp-checkout", { body: { action: "quote", coupon } });
+    if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (e) {} throw new Error(m); }
+    if (data && data.error) throw new Error(data.error);
+    return data.price;
+  }
+  async function checkout(payerEmail, coupon) {
+    const { data, error } = await sb.functions.invoke("mp-checkout", { body: { payer_email: payerEmail, coupon } });
     if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (e) {} throw new Error(m); }
     if (data && data.error) throw new Error(data.error);
     return data.init_point;
@@ -79,7 +85,7 @@ const Auth = (() => {
     document.querySelectorAll(".oa-modal").forEach(m => m.remove());
     const m = document.createElement("div"); m.className = "oa-modal"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true"); m.setAttribute("aria-labelledby", "oaTitle");
     document.body.appendChild(m);
-    let cur = step, email = userEmail, msg = null;
+    let cur = step, email = userEmail, msg = null, coupon = "", couponPrice = null;
     const close = () => { if (!blocking) m.remove(); };
     m.addEventListener("click", e => { if (e.target === m) close(); });
     const head = (t, s) => `${blocking ? "" : `<button class="oa-x" aria-label="Fechar" data-x>×</button>`}<div style="font-size:30px">🧅</div><h2 id="oaTitle">${t}</h2><p class="oa-sub">${s}</p>${msg ? `<div class="oa-msg ${msg.ok ? "ok" : "err"}">${esc(msg.t)}</div>` : ""}`;
@@ -103,9 +109,12 @@ const Auth = (() => {
           <div style="font:800 40px/1.05 'Bricolage Grotesque',Figtree,sans-serif">R$ ${esc(C.price || "29,90")}<small style="font-size:16px;color:#5d5268">/mês</small></div>
           ${C.priceWas ? `<div style="display:inline-block;margin-top:8px;background:#e7f6ec;color:#1d5b33;border:1.5px solid #b5e0c3;border-radius:9px;padding:5px 9px;font:700 13px Figtree,sans-serif">Economia de R$ 40 por mês, com o preço travado enquanto for assinante</div>` : ""}
           <ul style="list-style:none;padding:0;margin:12px 0 0;display:grid;gap:5px;font-size:14.5px">${["Todos os escritórios da sua empresa", "Vídeos longos, Shorts, Reels e stories, sem limite", "Piloto automático e Estúdio de Stories", "Use pra sua marca ou venda pros seus clientes", "Cancele quando quiser"].map(t => `<li>✓ ${t}</li>`).join("")}</ul></div>
+        <details style="margin:0 0 10px" ${coupon ? "open" : ""}><summary style="cursor:pointer;font:700 14px Figtree,sans-serif;color:#7A2E8E">🎟 Tem um cupom?</summary>
+          <div style="display:flex;gap:8px;margin-top:8px"><input id="oaCoupon" value="${esc(coupon)}" placeholder="Digite o cupom" style="flex:1;font:16px Figtree,sans-serif;padding:10px 12px;border:2px solid #d9cfc2;border-radius:11px;text-transform:uppercase" autocapitalize="characters"><button class="oa-btn" style="width:auto;padding:10px 14px" data-coupon>Aplicar</button></div>
+          ${couponPrice != null ? `<div class="oa-msg ok" style="margin-top:8px">🎉 Cupom ${esc(coupon)} aplicado: você paga <b>R$ ${couponPrice.toFixed(2).replace(".", ",")}/mês</b></div>` : ""}</details>
         <div class="oa-f"><label for="oaPayer">E-mail da sua conta do Mercado Pago</label><input id="oaPayer" type="email" value="${esc(email)}"></div>
         <p class="oa-sub" style="font-size:12.5px;margin-top:-4px">O Mercado Pago só aprova se for o mesmo e-mail da conta que vai pagar.</p>
-        <button class="oa-btn pri" data-pay>Garantir R$ ${esc(C.price || "29,90")}/mês com Mercado Pago →</button>
+        <button class="oa-btn pri" data-pay>Garantir R$ ${couponPrice != null ? couponPrice.toFixed(2).replace(".", ",") : esc(C.price || "29,90")}/mês com Mercado Pago →</button>
         <div style="text-align:center;margin-top:10px"><button class="oa-link" data-logout>Usar outra conta</button></div>`;
       else if (cur === "waiting") h = head("Confirmando o pagamento…", "Assim que o Mercado Pago confirmar, a sua empresa abre sozinha. Costuma levar alguns segundos.") +
         `<div style="display:flex;justify-content:center;padding:10px"><span class="oa-spin" style="width:32px;height:32px;border-color:#e3d9cc;border-top-color:#7A2E8E"></span></div>
@@ -155,7 +164,13 @@ const Auth = (() => {
       };
       const pay = q("[data-pay]"); if (pay) pay.onclick = async () => {
         const pe = q("#oaPayer").value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pe)) return fail("Digite o e-mail da sua conta do Mercado Pago.");
-        busy(pay, true); try { location.href = await checkout(pe); } catch (e) { fail(e.message || "Não deu pra abrir o pagamento."); }
+        email = pe; busy(pay, true); try { location.href = await checkout(pe, couponPrice != null ? coupon : ""); } catch (e) { fail(e.message || "Não deu pra abrir o pagamento."); }
+      };
+      const cb = q("[data-coupon]"); if (cb) cb.onclick = async () => {
+        const c = q("#oaCoupon").value.trim().toUpperCase(), pe = q("#oaPayer"); if (pe) email = pe.value.trim();
+        if (!c) return; busy(cb, true);
+        try { couponPrice = await quote(c); coupon = c; msg = null; } catch (e) { couponPrice = null; coupon = c; msg = { t: e.message || "Cupom inválido." }; }
+        render();
       };
       if (cur === "waiting") { let n = 0; const tick = async () => { if (!document.body.contains(m) || cur !== "waiting") return; const { data: { user } } = await sb.auth.getUser(); const s = user && await subscription(user.id); if (s && s.active) return done(); if (++n < 40) setTimeout(tick, 3000); else { msg = { t: "Ainda não recebemos a confirmação. Se você já pagou, aguarde um minuto e recarregue a página." }; cur = "plan"; render(); } }; setTimeout(tick, 1500); }
       const lo = q("[data-logout]"); if (lo) lo.onclick = async () => { await sb.auth.signOut(); cur = "signup"; msg = null; render(); };

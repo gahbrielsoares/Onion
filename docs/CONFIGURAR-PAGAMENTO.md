@@ -26,3 +26,12 @@ No painel da aplicação › **Webhooks** › Configurar notificações:
 ## 6. Testar e ligar a cobrança
 1. Com `requirePayment: false`, assine pela Administração do parque com o seu cartão e confira no painel `admin.html` se a assinatura aparece **ativa**. Depois, cancele pelo botão **Cancelar assinatura**.
 2. Funcionou? Em `assets/config.js`, troque para `requirePayment: true`. A partir daí, só entra quem tem assinatura ativa.
+
+## Cupons
+Os cupons ficam guardados só no Supabase (o código do site é público), no segredo `COUPONS`, com o preço mensal de cada um:
+
+```
+{"GAB2027":0.01,"BLACK19":19.90,"NOVEM9":9.90}
+```
+
+Se o Mercado Pago recusar um valor muito baixo, a função tenta R$ 1,00, depois R$ 2,00 e R$ 5,00. O valor do cupom fica travado na assinatura de quem usou.
