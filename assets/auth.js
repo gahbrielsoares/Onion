@@ -74,6 +74,19 @@ const Auth = (() => {
   .oa-msg{font-size:14px;border-radius:11px;padding:9px 11px;margin:0 0 10px}.oa-msg.err{background:#fde8e6;color:#8a2116;border:1px solid #f3b9b1}.oa-msg.ok{background:#e7f6ec;color:#1d5b33;border:1px solid #b5e0c3}
   .oa-link{background:none;border:0;color:#7A2E8E;font:700 14px Figtree,sans-serif;cursor:pointer;padding:4px 0;text-decoration:underline}
   .oa-x{float:right;background:none;border:0;font-size:22px;cursor:pointer;color:#5d5268;line-height:1}
+  .oa-logo{display:flex;align-items:center;gap:8px;font:700 18px "Pixelify Sans",monospace;color:#1B1424;margin-bottom:6px}.oa-logo b{color:#7A2E8E}
+  .oa-plan{position:relative;border:2px solid #1B1424;border-radius:16px;box-shadow:4px 4px 0 #1B1424;padding:20px 16px 14px;background:#fff;margin:16px 0 14px}
+  .oa-badge{position:absolute;top:-12px;left:14px;background:#1B1424;color:#fff;font:800 11.5px Figtree,sans-serif;letter-spacing:.06em;border-radius:999px;padding:4px 11px}
+  .oa-was{font:600 14px Figtree,sans-serif;color:#5d5268}.oa-was s{text-decoration-thickness:1.5px}
+  .oa-price{font:800 40px/1.05 "Bricolage Grotesque",Figtree,sans-serif;letter-spacing:-.02em}.oa-price small{font:600 15px Figtree,sans-serif;color:#5d5268;letter-spacing:0}
+  .oa-save{margin-top:8px;background:#e7f6ec;color:#1d5b33;border-radius:9px;padding:6px 10px;font:600 13px/1.4 Figtree,sans-serif}
+  .oa-list{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:8px;font-size:14.5px;line-height:1.4}.oa-list li{display:flex;gap:9px}
+  .oa-hint{font-size:12.5px;color:#6d6377;margin:-4px 0 12px}
+  .oa-coupon{margin:0 0 14px}.oa-coupon summary{cursor:pointer;font:700 14px Figtree,sans-serif;color:#7A2E8E}
+  .oa-coupon input{flex:1;min-width:0;font:16px Figtree,sans-serif;padding:10px 12px;border:2px solid #d9cfc2;border-radius:11px;text-transform:uppercase;background:#fff;color:#1B1424}
+  .oa-secure{margin-top:14px;border:1.5px solid #cfe8d6;background:#f4fbf6;border-radius:12px;padding:11px 12px}
+  .oa-secure-h{display:flex;align-items:center;gap:7px;font-size:14px;color:#1d5b33}.oa-mp{margin-left:auto;font:800 11px Figtree,sans-serif;color:#009ee3;border:1.5px solid #009ee3;border-radius:6px;padding:1px 6px}
+  .oa-secure p{margin:6px 0 0;font-size:12.5px;line-height:1.45;color:#3d5a46}
   .oa-spin{width:15px;height:15px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:oaspin .8s linear infinite}
   @keyframes oaspin{to{transform:rotate(360deg)}}`;
   function ensureCss() { if (document.getElementById("oa-css")) return; const s = document.createElement("style"); s.id = "oa-css"; s.textContent = CSS; document.head.appendChild(s); }
@@ -88,7 +101,7 @@ const Auth = (() => {
     let cur = step, email = userEmail, msg = null, coupon = "", couponPrice = null;
     const close = () => { if (!blocking) m.remove(); };
     m.addEventListener("click", e => { if (e.target === m) close(); });
-    const head = (t, s) => `${blocking ? "" : `<button class="oa-x" aria-label="Fechar" data-x>×</button>`}<div style="font-size:30px">🧅</div><h2 id="oaTitle">${t}</h2><p class="oa-sub">${s}</p>${msg ? `<div class="oa-msg ${msg.ok ? "ok" : "err"}">${esc(msg.t)}</div>` : ""}`;
+    const head = (t, s) => `${blocking ? "" : `<button class="oa-x" aria-label="Fechar" data-x>×</button>`}<div class="oa-logo"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><path d="M17 3c1 3 1 4 0 6" stroke="#5aa83f" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M17 9c-7 3-12 8-12 14 0 5 5 8 12 8s12-3 12-8c0-6-5-11-12-14z" fill="#7A2E8E" stroke="#1B1424" stroke-width="1.5"/><path d="M17 10c-3 3-5 8-5 13s2 7 5 8M17 10c3 3 5 8 5 13s-2 7-5 8" stroke="#c66bb5" stroke-width="1.6" fill="none"/></svg><span>Onion <b>Park</b></span></div><h2 id="oaTitle">${t}</h2><p class="oa-sub">${s}</p>${msg ? `<div class="oa-msg ${msg.ok ? "ok" : "err"}">${esc(msg.t)}</div>` : ""}`;
     const terms = `<label class="oa-terms"><input type="checkbox" id="oaTerms"> <span>Li e aceito os <a href="${termsUrl}" target="_blank" rel="noopener">Termos de uso e a Política de privacidade</a>.</span></label>`;
     function render() {
       let h = "";
@@ -102,23 +115,29 @@ const Auth = (() => {
         <button class="oa-btn pri" data-go>${cur === "signup" ? "Criar conta" : "Entrar"}</button>`;
       else if (cur === "confirm") h = head("Confira o seu e-mail 📬", `Enviamos um link de confirmação para <b>${esc(email)}</b>. Abra o e-mail e clique no link: você volta direto pra sua empresa.`) +
         `<button class="oa-btn" data-resend>Reenviar o e-mail</button><div style="text-align:center;margin-top:10px"><button class="oa-link" data-tab="login">Já confirmei: entrar</button></div><p class="oa-sub" style="margin-top:10px;font-size:13px">Não chegou? Olhe a caixa de spam ou promoções.</p>`;
-      else if (cur === "plan") h = head(`Sua empresa está pronta. <span class="oa-px">Falta abrir as portas.</span>`, "Assine pra liberar todos os escritórios. Cancele quando quiser.") +
-        `<div style="position:relative;border:2.5px solid #1B1424;border-radius:16px;box-shadow:5px 5px 0 #1B1424;padding:18px 16px 14px;background:#fff;margin:14px 0 12px">
-          ${C.priceWas ? `<span style="position:absolute;top:-14px;left:14px;background:#1B1424;color:#fff;font:800 12.5px Figtree,sans-serif;border-radius:999px;padding:4px 11px">🖤 BLACK NOVEMBER · SÓ ATÉ 30/11</span>` : ""}
-          ${C.priceWas ? `<div style="font:700 15px Figtree,sans-serif;color:#5d5268;margin-top:4px">de <s>R$ ${esc(C.priceWas)}</s> por</div>` : ""}
-          <div style="font:800 40px/1.05 'Bricolage Grotesque',Figtree,sans-serif">R$ ${esc(C.price || "29,90")}<small style="font-size:16px;color:#5d5268">/mês</small></div>
-          ${C.priceWas ? `<div style="display:inline-block;margin-top:8px;background:#e7f6ec;color:#1d5b33;border:1.5px solid #b5e0c3;border-radius:9px;padding:5px 9px;font:700 13px Figtree,sans-serif">Economia de R$ 40 por mês, com o preço travado enquanto for assinante</div>` : ""}
-          <ul style="list-style:none;padding:0;margin:12px 0 0;display:grid;gap:5px;font-size:14.5px">${["Todos os escritórios da sua empresa", "Vídeos longos, Shorts, Reels e stories, sem limite", "Piloto automático e Estúdio de Stories", "Use pra sua marca ou venda pros seus clientes", "Cancele quando quiser"].map(t => `<li>✓ ${t}</li>`).join("")}</ul></div>
-        <details style="margin:0 0 10px" ${coupon ? "open" : ""}><summary style="cursor:pointer;font:700 14px Figtree,sans-serif;color:#7A2E8E">🎟 Tem um cupom?</summary>
-          <div style="display:flex;gap:8px;margin-top:8px"><input id="oaCoupon" value="${esc(coupon)}" placeholder="Digite o cupom" style="flex:1;font:16px Figtree,sans-serif;padding:10px 12px;border:2px solid #d9cfc2;border-radius:11px;text-transform:uppercase" autocapitalize="characters"><button class="oa-btn" style="width:auto;padding:10px 14px" data-coupon>Aplicar</button></div>
-          ${couponPrice != null ? `<div class="oa-msg ok" style="margin-top:8px">🎉 Cupom ${esc(coupon)} aplicado: você paga <b>R$ ${couponPrice.toFixed(2).replace(".", ",")}/mês</b></div>` : ""}</details>
-        <div class="oa-f"><label for="oaPayer">E-mail da sua conta do Mercado Pago</label><input id="oaPayer" type="email" value="${esc(email)}"></div>
-        <p class="oa-sub" style="font-size:12.5px;margin-top:-4px">O Mercado Pago só aprova se for o mesmo e-mail da conta que vai pagar.</p>
-        <button class="oa-btn pri" data-pay>Garantir R$ ${couponPrice != null ? couponPrice.toFixed(2).replace(".", ",") : esc(C.price || "29,90")}/mês com Mercado Pago →</button>
-        <div style="text-align:center;margin-top:10px"><button class="oa-link" data-logout>Usar outra conta</button></div>`;
-      else if (cur === "waiting") h = head("Confirmando o pagamento…", "Assim que o Mercado Pago confirmar, a sua empresa abre sozinha. Costuma levar alguns segundos.") +
+      else if (cur === "plan") { const pr = couponPrice != null ? couponPrice.toFixed(2).replace(".", ",") : (C.price || "29,90");
+        h = head("Crie vídeos prontos em menos de 2 minutos", "Roteiro, narração, imagens e edição feitos pra você. Assine para liberar o acesso completo.") +
+        `<div class="oa-plan">
+          ${C.priceWas && couponPrice == null ? `<span class="oa-badge">BLACK NOVEMBER · ATÉ 30/11</span>` : ""}
+          ${couponPrice != null ? `<div class="oa-was">Cupom ${esc(coupon)} aplicado</div>` : C.priceWas ? `<div class="oa-was">de <s>R$ ${esc(C.priceWas)}</s> por</div>` : ""}
+          <div class="oa-price">R$ ${esc(pr)}<small>/mês</small></div>
+          ${C.priceWas && couponPrice == null ? `<div class="oa-save">Você economiza R$ 40 por mês. Preço garantido enquanto for assinante.</div>` : ""}
+          <ul class="oa-list">${["Vídeos, Shorts, Reels e stories prontos em menos de 2 minutos", "Roteiro, narração, imagens, legendas e edição automáticos", "Produção ilimitada, para a sua marca ou para seus clientes", "Sem fidelidade: cancele quando quiser"].map(t => `<li><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="11" fill="#7A2E8E"/><path d="M7 12.5l3.2 3.2L17 9" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${t}</span></li>`).join("")}</ul>
+        </div>
+        <div class="oa-f"><label for="oaPayer">E-mail da sua conta Mercado Pago</label><input id="oaPayer" type="email" autocomplete="email" value="${esc(email)}"></div>
+        <p class="oa-hint">Use o mesmo e-mail da conta Mercado Pago que fará o pagamento.</p>
+        <details class="oa-coupon" ${coupon ? "open" : ""}><summary>Tenho um cupom de desconto</summary>
+          <div style="display:flex;gap:8px;margin-top:8px"><input id="oaCoupon" value="${esc(coupon)}" placeholder="Código do cupom" autocapitalize="characters" spellcheck="false"><button class="oa-btn" style="width:auto;padding:10px 16px" data-coupon>Aplicar</button></div></details>
+        <button class="oa-btn pri" data-pay>Assinar por R$ ${esc(pr)}/mês</button>
+        <div class="oa-secure">
+          <div class="oa-secure-h"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10V8a6 6 0 1 1 12 0v2h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1zm2 0h8V8a4 4 0 1 0-8 0z" fill="#1d5b33"/></svg><b>Pagamento 100% seguro</b><span class="oa-mp">Mercado Pago</span></div>
+          <p>O pagamento é processado pelo Mercado Pago, com criptografia. Os dados do seu cartão não passam pelo Onion Park.</p>
+          <p>Cobrança mensal automática no cartão. Cancele a qualquer momento pela Administração, sem multa.</p>
+        </div>
+        <div style="text-align:center;margin-top:12px"><button class="oa-link" data-logout>Entrar com outra conta</button></div>`; }
+      else if (cur === "waiting") h = head("Confirmando o seu pagamento", "Assim que o Mercado Pago confirmar, o acesso é liberado automaticamente. Isso costuma levar poucos segundos.") +
         `<div style="display:flex;justify-content:center;padding:10px"><span class="oa-spin" style="width:32px;height:32px;border-color:#e3d9cc;border-top-color:#7A2E8E"></span></div>
-        <button class="oa-btn" data-tab="plan">Ainda não paguei: voltar</button>`;
+        <button class="oa-btn" data-tab="plan">Voltar para a assinatura</button>`;
       else if (cur === "complete") h = head("Falta só um detalhe", "Pra terminar o cadastro, informe o seu telefone e aceite os termos.") +
         `<div class="oa-f"><label for="oaPhone">Telefone (WhatsApp)</label><input id="oaPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 91234-5678"></div>${terms}<button class="oa-btn pri" data-finish>Concluir e entrar</button>
         <div style="text-align:center;margin-top:10px"><button class="oa-link" data-logout>Usar outra conta</button></div>`;
