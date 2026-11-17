@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" translate="no" class="notranslate"><head><meta charset="utf-8">
+<meta name="google" content="notranslate"><meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Onion Park · códigos das funções</title>
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:#FBF7F1;color:#1B1424;font:16px/1.5 system-ui,sans-serif}main{width:min(900px,100% - 32px);margin:0 auto;padding:24px 0 60px}
+h1{font-size:24px;margin:0 0 6px}h2{font-size:20px;margin:28px 0 8px}
+.b{display:block;width:100%;font:800 17px system-ui,sans-serif;padding:14px;border-radius:12px;border:2.5px solid #1B1424;box-shadow:3px 3px 0 #1B1424;background:#7A2E8E;color:#fff;cursor:pointer;margin:8px 0}
+pre{background:#14101d;color:#e8e1f0;border-radius:12px;padding:12px;overflow:auto;max-height:220px;font-size:12px}.ok{color:#1d5b33;font-weight:700;min-height:1.4em}</style></head>
+<body><main>
+<h1>Códigos das funções do pagamento</h1>
+<p>Toque em <b>Copiar</b>, vá no editor do Supabase, apague o exemplo e cole. Esta página não é traduzida, então o código vem certinho.</p>
+<h2>1. mp-checkout</h2><button class="b" data-c="ck">📋 Copiar o código do mp-checkout</button><div class="ok" id="ok-ck"></div><pre id="ck">// Onion Park · cria a assinatura no Mercado Pago e devolve o link do checkout.
+// Também cancela (body: {action:&quot;cancel&quot;}).
+// Segredos: MP_ACCESS_TOKEN, APP_URL (ex.: https://gahbrielsoares.github.io/Onion/app/), PRICE (opcional, padrão 29.90)
+import { createClient } from &quot;npm:@supabase/supabase-js@2.45.4&quot;;
+
+const CORS = { &quot;Access-Control-Allow-Origin&quot;: &quot;*&quot;, &quot;Access-Control-Allow-Headers&quot;: &quot;authorization, x-client-info, apikey, content-type&quot;, &quot;Access-Control-Allow-Methods&quot;: &quot;POST, OPTIONS&quot; };
+const json = (b: unknown, s = 200) =&gt; new Response(JSON.stringify(b), { status: s, headers: { ...CORS, &quot;content-type&quot;: &quot;application/json&quot; } });
+
+Deno.serve(async (req) =&gt; {
+  if (req.method === &quot;OPTIONS&quot;) return new Response(&quot;ok&quot;, { headers: CORS });
+  try {
+    const url = Deno.env.get(&quot;SUPABASE_URL&quot;)!, service = Deno.env.get(&quot;SUPABASE_SERVICE_ROLE_KEY&quot;)!;
+    const MP = Deno.env.get(&quot;MP_ACCESS_TOKEN&quot;); if (!MP) return json({ error: &quot;MP_ACCESS_TOKEN não configurado&quot; }, 500);
+    const admin = createClient(url, service);
+    const jwt = (req.headers.get(&quot;authorization&quot;) || &quot;&quot;).replace(&quot;Bearer &quot;, &quot;&quot;);
+    const { data: { user } } = await admin.auth.getUser(jwt);
+    if (!user) return json({ error: &quot;Faça login de novo.&quot; }, 401);
+    const body = await req.json().catch(() =&gt; ({}));
+    const { data: sub } = await admin.from(&quot;subscriptions&quot;).select(&quot;*&quot;).eq(&quot;user_id&quot;, user.id).maybeSingle();
+
+    if (body.action === &quot;cancel&quot;) {
+      if (!sub?.preapproval_id) return json({ error: &quot;Você não tem assinatura ativa.&quot; }, 400);
+      const r = await fetch(`https://api.mercadopago.com/preapproval/${sub.preapproval_id}`, { method: &quot;PUT&quot;, headers: { Authorization: `Bearer ${MP}`, &quot;content-type&quot;: &quot;application/json&quot; }, body: JSON.stringify({ status: &quot;cancelled&quot; }) });
+      if (!r.ok) return json({ error: &quot;O Mercado Pago não aceitou o cancelamento: &quot; + (await r.text()).slice(0, 200) }, 502);
+      const until = sub.next_payment_date &amp;&amp; new Date(sub.next_payment_date) &gt; new Date() ? sub.next_payment_date : sub.access_until;
+      await admin.from(&quot;subscriptions&quot;).update({ status: &quot;cancelled&quot;, access_until: until, updated_at: new Date().toISOString() }).eq(&quot;user_id&quot;, user.id);
+      return json({ ok: true, access_until: until });
+    }
+
+    if (sub?.status === &quot;authorized&quot;) return json({ error: &quot;Sua assinatura já está ativa.&quot; }, 400);
+    const payer = String(body.payer_email || user.email || &quot;&quot;).trim();
+    const price = Number(Deno.env.get(&quot;PRICE&quot;) || &quot;29.90&quot;);
+    const r = await fetch(&quot;https://api.mercadopago.com/preapproval&quot;, {
+      method: &quot;POST&quot;, headers: { Authorization: `Bearer ${MP}`, &quot;content-type&quot;: &quot;application/json&quot; },
+      body: JSON.stringify({
+        reason: &quot;Onion Park · assinatura mensal&quot;,
+        external_reference: user.id,
+        payer_email: payer,
+        back_url: Deno.env.get(&quot;APP_URL&quot;) || &quot;https://gahbrielsoares.github.io/Onion/app/&quot;,
+        status: &quot;pending&quot;,
+        auto_recurring: { frequency: 1, frequency_type: &quot;months&quot;, transaction_amount: price, currency_id: &quot;BRL&quot; }
+      })
+    });
+    const p = await r.json();
+    if (!r.ok || !p.init_point) return json({ error: &quot;O Mercado Pago recusou: &quot; + (p.message || JSON.stringify(p).slice(0, 200)) }, 502);
+    await admin.from(&quot;subscriptions&quot;).upsert({ user_id: user.id, preapproval_id: p.id, status: &quot;pending&quot;, payer_email: payer, updated_at: new Date().toISOString() });
+    return json({ init_point: p.init_point });
+  } catch (e) { return json({ error: String(e?.message || e) }, 500); }
+});
+</pre>
+<h2>2. mp-webhook</h2><button class="b" data-c="wh">📋 Copiar o código do mp-webhook</button><div class="ok" id="ok-wh"></div><pre id="wh">// Onion Park · recebe os avisos do Mercado Pago e atualiza a assinatura.
+// Publique com &quot;Verify JWT&quot; DESLIGADO (o Mercado Pago não manda login).
+// Segredos: MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET (assinatura secreta das notificações)
+import { createClient } from &quot;npm:@supabase/supabase-js@2.45.4&quot;;
+
+async function hmac(secret: string, msg: string) {
+  const k = await crypto.subtle.importKey(&quot;raw&quot;, new TextEncoder().encode(secret), { name: &quot;HMAC&quot;, hash: &quot;SHA-256&quot; }, false, [&quot;sign&quot;]);
+  return [...new Uint8Array(await crypto.subtle.sign(&quot;HMAC&quot;, k, new TextEncoder().encode(msg)))].map(b =&gt; b.toString(16).padStart(2, &quot;0&quot;)).join(&quot;&quot;);
+}
+
+Deno.serve(async (req) =&gt; {
+  const u = new URL(req.url);
+  const body = await req.json().catch(() =&gt; ({} as Record&lt;string, unknown&gt;));
+  const type = String((body as any).type || u.searchParams.get(&quot;type&quot;) || u.searchParams.get(&quot;topic&quot;) || &quot;&quot;);
+  const id = String((body as any)?.data?.id || u.searchParams.get(&quot;data.id&quot;) || u.searchParams.get(&quot;id&quot;) || &quot;&quot;);
+  if (!id) return new Response(&quot;ok&quot;);
+
+  // confere a assinatura secreta (x-signature) quando o segredo estiver configurado
+  const secret = Deno.env.get(&quot;MP_WEBHOOK_SECRET&quot;);
+  if (secret) {
+    const sig = req.headers.get(&quot;x-signature&quot;) || &quot;&quot;, reqId = req.headers.get(&quot;x-request-id&quot;) || &quot;&quot;;
+    const parts = Object.fromEntries(sig.split(&quot;,&quot;).map(s =&gt; s.trim().split(&quot;=&quot;)));
+    const manifest = `id:${(u.searchParams.get(&quot;data.id&quot;) || id).toLowerCase()};request-id:${reqId};ts:${parts.ts};`;
+    if (!parts.v1 || (await hmac(secret, manifest)) !== parts.v1) return new Response(&quot;assinatura inválida&quot;, { status: 401 });
+  }
+
+  const MP = Deno.env.get(&quot;MP_ACCESS_TOKEN&quot;)!;
+  const admin = createClient(Deno.env.get(&quot;SUPABASE_URL&quot;)!, Deno.env.get(&quot;SUPABASE_SERVICE_ROLE_KEY&quot;)!);
+  let pre: any = null;
+  if (/preapproval/.test(type)) {
+    const r = await fetch(`https://api.mercadopago.com/preapproval/${id}`, { headers: { Authorization: `Bearer ${MP}` } }); if (r.ok) pre = await r.json();
+  } else if (/authorized_payment/.test(type)) {
+    const r = await fetch(`https://api.mercadopago.com/authorized_payments/${id}`, { headers: { Authorization: `Bearer ${MP}` } });
+    if (r.ok) { const ap = await r.json(); if (ap.preapproval_id) { const r2 = await fetch(`https://api.mercadopago.com/preapproval/${ap.preapproval_id}`, { headers: { Authorization: `Bearer ${MP}` } }); if (r2.ok) pre = await r2.json(); } }
+  }
+  if (!pre || !pre.external_reference) return new Response(&quot;ok&quot;);
+
+  const next = pre.next_payment_date || null;
+  const row: Record&lt;string, unknown&gt; = { user_id: pre.external_reference, preapproval_id: pre.id, status: pre.status, payer_email: pre.payer_email || null, next_payment_date: next, updated_at: new Date().toISOString() };
+  if (pre.status === &quot;authorized&quot; &amp;&amp; next) row.access_until = next;   // pago até a próxima cobrança
+  await admin.from(&quot;subscriptions&quot;).upsert(row);
+  return new Response(&quot;ok&quot;);
+});
+</pre>
+</main>
+<script>
+document.querySelectorAll("[data-c]").forEach(b=>b.onclick=async()=>{const id=b.dataset.c,t=document.getElementById(id).textContent,ok=document.getElementById("ok-"+id);
+  try{await navigator.clipboard.writeText(t);ok.textContent="✓ Copiado! Agora cole no editor do Supabase.";}
+  catch(e){const r=document.createRange();r.selectNodeContents(document.getElementById(id));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand("copy");ok.textContent="✓ Copiado (se não colar, segure o dedo no código e use Copiar).";}});
+</script></body></html>
