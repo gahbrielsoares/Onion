@@ -22,7 +22,10 @@ const Auth = (() => {
     if (!user.email_confirmed_at) return { ok: false, step: "confirm", user };
     if (!p || !p.phone || !p.accepted_terms_at) return { ok: false, step: "complete", user, p };
     const sub = await subscription(user.id);
-    if (C.requirePayment && !sub.active) return { ok: false, step: "plan", user, p, sub };
+    if (C.requirePayment && !sub.active) {
+      const { data: adm } = await sb.from("admins").select("email").eq("email", user.email).maybeSingle();
+      if (!adm) return { ok: false, step: "plan", user, p, sub };
+    }
     return { ok: true, user, p, sub };
   }
   async function subscription(uid) {
@@ -93,13 +96,16 @@ const Auth = (() => {
         <button class="oa-btn pri" data-go>${cur === "signup" ? "Criar conta" : "Entrar"}</button>`;
       else if (cur === "confirm") h = head("Confira o seu e-mail 📬", `Enviamos um link de confirmação para <b>${esc(email)}</b>. Abra o e-mail e clique no link: você volta direto pra sua empresa.`) +
         `<button class="oa-btn" data-resend>Reenviar o e-mail</button><div style="text-align:center;margin-top:10px"><button class="oa-link" data-tab="login">Já confirmei: entrar</button></div><p class="oa-sub" style="margin-top:10px;font-size:13px">Não chegou? Olhe a caixa de spam ou promoções.</p>`;
-      else if (cur === "plan") h = head(`Assine o <span class="oa-px">Onion Park</span>`, "Tudo liberado, sem limite de vídeos. Cancele quando quiser.") +
-        `<div style="border:2.5px solid #1B1424;border-radius:16px;box-shadow:4px 4px 0 #1B1424;padding:16px;background:#fff;margin-bottom:12px">
-          <div style="font:800 38px 'Bricolage Grotesque',Figtree,sans-serif">${C.priceWas ? `<div style="font:700 15px Figtree,sans-serif;color:#5d5268">Black November: de <s>R$ ${esc(C.priceWas)}</s> por</div>` : ""}R$ ${esc(C.price || "29,90")}<small style="font-size:16px;color:#5d5268">/mês</small></div>
-          <ul style="list-style:none;padding:0;margin:10px 0 0;display:grid;gap:5px;font-size:14.5px">${["Todos os escritórios da sua empresa", "Vídeos longos, Shorts, Reels e stories", "Piloto automático e Estúdio de Stories", "Cancele quando quiser"].map(t => `<li>✓ ${t}</li>`).join("")}</ul></div>
+      else if (cur === "plan") h = head(`Sua empresa está pronta. <span class="oa-px">Falta abrir as portas.</span>`, "Assine pra liberar todos os escritórios. Cancele quando quiser.") +
+        `<div style="position:relative;border:2.5px solid #1B1424;border-radius:16px;box-shadow:5px 5px 0 #1B1424;padding:18px 16px 14px;background:#fff;margin:14px 0 12px">
+          ${C.priceWas ? `<span style="position:absolute;top:-14px;left:14px;background:#1B1424;color:#fff;font:800 12.5px Figtree,sans-serif;border-radius:999px;padding:4px 11px">🖤 BLACK NOVEMBER · SÓ ATÉ 30/11</span>` : ""}
+          ${C.priceWas ? `<div style="font:700 15px Figtree,sans-serif;color:#5d5268;margin-top:4px">de <s>R$ ${esc(C.priceWas)}</s> por</div>` : ""}
+          <div style="font:800 40px/1.05 'Bricolage Grotesque',Figtree,sans-serif">R$ ${esc(C.price || "29,90")}<small style="font-size:16px;color:#5d5268">/mês</small></div>
+          ${C.priceWas ? `<div style="display:inline-block;margin-top:8px;background:#e7f6ec;color:#1d5b33;border:1.5px solid #b5e0c3;border-radius:9px;padding:5px 9px;font:700 13px Figtree,sans-serif">Economia de R$ 40 por mês, com o preço travado enquanto for assinante</div>` : ""}
+          <ul style="list-style:none;padding:0;margin:12px 0 0;display:grid;gap:5px;font-size:14.5px">${["Todos os escritórios da sua empresa", "Vídeos longos, Shorts, Reels e stories, sem limite", "Piloto automático e Estúdio de Stories", "Use pra sua marca ou venda pros seus clientes", "Cancele quando quiser"].map(t => `<li>✓ ${t}</li>`).join("")}</ul></div>
         <div class="oa-f"><label for="oaPayer">E-mail da sua conta do Mercado Pago</label><input id="oaPayer" type="email" value="${esc(email)}"></div>
         <p class="oa-sub" style="font-size:12.5px;margin-top:-4px">O Mercado Pago só aprova se for o mesmo e-mail da conta que vai pagar.</p>
-        <button class="oa-btn pri" data-pay>Assinar com Mercado Pago →</button>
+        <button class="oa-btn pri" data-pay>Garantir R$ ${esc(C.price || "29,90")}/mês com Mercado Pago →</button>
         <div style="text-align:center;margin-top:10px"><button class="oa-link" data-logout>Usar outra conta</button></div>`;
       else if (cur === "waiting") h = head("Confirmando o pagamento…", "Assim que o Mercado Pago confirmar, a sua empresa abre sozinha. Costuma levar alguns segundos.") +
         `<div style="display:flex;justify-content:center;padding:10px"><span class="oa-spin" style="width:32px;height:32px;border-color:#e3d9cc;border-top-color:#7A2E8E"></span></div>
