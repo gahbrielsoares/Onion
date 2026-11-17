@@ -1563,7 +1563,8 @@ BIND.admin=el=>{
   const sb2=el.querySelector("#subBox"); if(sb2) (async()=>{ const {data:{user}}=await Auth.sb.auth.getUser(); if(!user){ sb2.remove(); return; } const sub=await Auth.subscription(user.id);
     const d=x=>x?new Date(x).toLocaleDateString("pt-BR"):"";
     const txt=sub.status==="authorized"?`✓ Assinatura <b>ativa</b> · R$ ${Auth.price}/mês${sub.next_payment_date?` · próxima cobrança em ${d(sub.next_payment_date)}`:""}`:sub.active?`Assinatura cancelada · acesso liberado até ${d(sub.access_until)}`:sub.status==="pending"?"Pagamento pendente no Mercado Pago":Auth.requirePayment?"Sem assinatura":"Acesso gratuito (período de testes)";
-    sb2.innerHTML=`<div class="t" style="font-size:14.5px">${txt}</div>${sub.status==="authorized"?`<div class="btns" style="margin-top:8px"><button class="btn ghost small" id="subCancel">Cancelar assinatura</button></div>`:""}`;
+    sb2.innerHTML=`<div class="t" style="font-size:14.5px">${txt}</div>${sub.status==="authorized"?`<div class="btns" style="margin-top:8px"><button class="btn ghost small" id="subCancel">Cancelar assinatura</button></div>`:!sub.active?`<div class="btns" style="margin-top:8px"><button class="btn small" id="subBuy">Assinar agora · R$ ${Auth.price}/mês</button></div>`:""}`;
+    const bb=sb2.querySelector("#subBuy"); if(bb) bb.onclick=()=>Auth.open({step:"plan",userEmail:user.email,onDone:()=>renderPanel()});
     const sc=sb2.querySelector("#subCancel"); if(sc) sc.onclick=async()=>{ if(!confirm("Cancelar a assinatura? O acesso continua até o fim do mês já pago.")) return; sc.disabled=true; sc.innerHTML=`<span class="spin"></span>`; try{ const r=await Auth.cancelSub(); toast("Assinatura cancelada"+(r.access_until?` · acesso até ${d(r.access_until)}`:"")); }catch(e){ toast(e.message); } renderPanel(); };
   })();
   const ao=el.querySelector("#admOut"); if(ao) ao.onclick=async()=>{ await Auth.signOut(); location.href="../"; };

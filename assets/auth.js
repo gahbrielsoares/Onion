@@ -162,7 +162,11 @@ const Auth = (() => {
   async function gate() {
     if (!enabled) return true;
     const s = await state();
-    if (s.ok) { track("abriu"); return true; }
+    if (s.ok) {
+      track("abriu");
+      if (/preapproval_id/.test(location.search)) { history.replaceState(null, "", location.pathname); setTimeout(() => { if (window.openPanel) openPanel("admin"); if (window.toast) toast("Pagamento enviado! A confirmação do Mercado Pago aparece aqui em alguns segundos."); }, 1200); }
+      return true;
+    }
     const fromMP = /preapproval_id|collection_status|status=/.test(location.search);
     const step = s.step === "confirm" ? "login" : (s.step === "plan" && fromMP ? "waiting" : s.step);
     return new Promise(res => open({ step, blocking: true, userEmail: s.user && s.user.email, onDone: () => { track("abriu"); if (fromMP) history.replaceState(null, "", location.pathname); res(true); } }));
