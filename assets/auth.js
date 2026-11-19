@@ -3,13 +3,28 @@
 const Auth = (() => {
   const C = window.ONION_CFG || {};
   const enabled = !!(C.supabaseUrl && C.supabaseAnonKey && window.supabase);
+  const H = new URLSearchParams((location.hash || "").replace(/^#/, "")), Q = new URLSearchParams(location.search);
+  let recovering = H.get("type") === "recovery" || Q.get("type") === "recovery";
+  const linkError = H.get("error_code") || Q.get("error_code") || "";
   const sb = enabled ? window.supabase.createClient(C.supabaseUrl, C.supabaseAnonKey, { auth: { persistSession: true, detectSessionInUrl: true, flowType: "implicit" } }) : null;
+  if (sb) sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") recovering = true; });
   const inApp = /\/app\/?(index\.html)?$/.test(location.pathname);
   const appUrl = inApp ? location.origin + location.pathname : new URL(C.appPath || "app/", location.href).href;
   const termsUrl = new URL(inApp ? "../termos.html" : "termos.html", location.href).href;
   const esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const digits = t => String(t || "").replace(/\D/g, "");
   function fmtPhone(v) { const d = digits(v).slice(0, 13); if (d.length <= 2) return d.length ? `(${d}` : ""; if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`; if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`; return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7, 11)}`; }
+  function ptErr(m) {
+    m = String(m || "");
+    if (/rate limit|too many|security purposes/i.test(m)) return "Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.";
+    if (/not authorized/i.test(m)) return "Não conseguimos enviar o e-mail agora. Tente entrar com o Google ou fale com o suporte.";
+    if (/same.*password|different from the old/i.test(m)) return "A nova senha precisa ser diferente da anterior.";
+    if (/weak|at least|characters/i.test(m)) return "Senha fraca: use pelo menos 8 caracteres.";
+    if (/expired|invalid.*(token|link)|otp/i.test(m)) return "Este link expirou ou já foi usado. Peça um novo em Esqueci a senha.";
+    if (/invalid login|credentials/i.test(m)) return "E-mail ou senha incorretos.";
+    if (/registered|already/i.test(m)) return "Esse e-mail já tem conta. Use a aba Já tenho conta.";
+    return m || "Algo deu errado. Tente de novo.";
+  }
   const phoneOk = v => { const d = digits(v); return d.length >= 10 && d.length <= 13; };
   const phoneStore = v => { const d = digits(v); return d.length <= 11 ? "+55" + d : "+" + d; };
 
@@ -92,13 +107,13 @@ const Auth = (() => {
   function ensureCss() { if (document.getElementById("oa-css")) return; const s = document.createElement("style"); s.id = "oa-css"; s.textContent = CSS; document.head.appendChild(s); }
   const G = `<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.9 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 
-  function open({ step = "signup", blocking = false, onDone, userEmail = "" } = {}) {
+  function open({ step = "signup", blocking = false, onDone, userEmail = "", flash = "" } = {}) {
     if (!enabled) { onDone && onDone(); return; }
     ensureCss();
     document.querySelectorAll(".oa-modal").forEach(m => m.remove());
     const m = document.createElement("div"); m.className = "oa-modal"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true"); m.setAttribute("aria-labelledby", "oaTitle");
     document.body.appendChild(m);
-    let cur = step, email = userEmail, msg = null, coupon = "", couponPrice = null;
+    let cur = step, email = userEmail, msg = flash ? { t: flash } : null, coupon = "", couponPrice = null;
     const close = () => { if (!blocking) m.remove(); };
     m.addEventListener("click", e => { if (e.target === m) close(); });
     const head = (t, s) => `${blocking ? "" : `<button class="oa-x" aria-label="Fechar" data-x>×</button>`}<div class="oa-logo"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><path d="M17 3c1 3 1 4 0 6" stroke="#5aa83f" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M17 9c-7 3-12 8-12 14 0 5 5 8 12 8s12-3 12-8c0-6-5-11-12-14z" fill="#7A2E8E" stroke="#1B1424" stroke-width="1.5"/><path d="M17 10c-3 3-5 8-5 13s2 7 5 8M17 10c3 3 5 8 5 13s-2 7-5 8" stroke="#c66bb5" stroke-width="1.6" fill="none"/></svg><span>Onion <b>Park</b></span></div><h2 id="oaTitle">${t}</h2><p class="oa-sub">${s}</p>${msg ? `<div class="oa-msg ${msg.ok ? "ok" : "err"}">${esc(msg.t)}</div>` : ""}`;
@@ -138,6 +153,18 @@ const Auth = (() => {
       else if (cur === "waiting") h = head("Confirmando o seu pagamento", "Assim que o Mercado Pago confirmar, o acesso é liberado automaticamente. Isso costuma levar poucos segundos.") +
         `<div style="display:flex;justify-content:center;padding:10px"><span class="oa-spin" style="width:32px;height:32px;border-color:#e3d9cc;border-top-color:#7A2E8E"></span></div>
         <button class="oa-btn" data-tab="plan">Voltar para a assinatura</button>`;
+      else if (cur === "forgot") h = head("Recuperar a senha", "Informe o e-mail da sua conta. Vamos enviar um link para você criar uma senha nova.") +
+        `<div class="oa-f"><label for="oaEmail">E-mail</label><input id="oaEmail" type="email" autocomplete="email" value="${esc(email)}" placeholder="voce@gmail.com"></div>
+        <button class="oa-btn pri" data-sendreset>Enviar link de recuperação</button>
+        <div style="text-align:center;margin-top:12px"><button class="oa-link" data-tab="login">Voltar para o login</button></div>`;
+      else if (cur === "forgotSent") h = head("Confira o seu e-mail", `Se existir uma conta com <b>${esc(email)}</b>, enviamos um link para criar uma senha nova. O link vale por 1 hora.`) +
+        `<p class="oa-sub" style="font-size:13.5px">Não chegou em alguns minutos? Veja a caixa de spam e a aba Promoções. Se você criou a conta com o Google, use o botão Continuar com o Google, que não precisa de senha.</p>
+        <button class="oa-btn" data-tab="login">Voltar para o login</button>
+        <div style="text-align:center;margin-top:12px"><button class="oa-link" data-forgot>Enviar de novo</button></div>`;
+      else if (cur === "newpass") h = head("Crie uma senha nova", "Escolha uma senha com pelo menos 8 caracteres.") +
+        `<div class="oa-f"><label for="oaNew">Nova senha</label><div style="display:flex;gap:6px"><input id="oaNew" type="password" autocomplete="new-password" style="flex:1;min-width:0"><button class="oa-btn" style="width:auto;padding:8px 12px;font-size:13px" data-eye="oaNew">Mostrar</button></div></div>
+        <div class="oa-f"><label for="oaNew2">Repita a nova senha</label><input id="oaNew2" type="password" autocomplete="new-password"></div>
+        <button class="oa-btn pri" data-newpass>Salvar nova senha</button>`;
       else if (cur === "complete") h = head("Falta só um detalhe", "Pra terminar o cadastro, informe o seu telefone e aceite os termos.") +
         `<div class="oa-f"><label for="oaPhone">Telefone (WhatsApp)</label><input id="oaPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 91234-5678"></div>${terms}<button class="oa-btn pri" data-finish>Concluir e entrar</button>
         <div style="text-align:center;margin-top:10px"><button class="oa-link" data-logout>Usar outra conta</button></div>`;
@@ -162,18 +189,34 @@ const Auth = (() => {
           if (!q("#oaTerms").checked) return fail("Pra criar a conta, aceite os termos de uso.");
           busy(go, true);
           const { data, error } = await sb.auth.signUp({ email, password: pass, options: { emailRedirectTo: appUrl, data: { phone: phoneStore(phone), accepted_terms: true } } });
-          if (error) return fail(/registered|already/i.test(error.message) ? "Esse e-mail já tem conta. Use a aba Já tenho conta." : error.message);
+          if (error) return fail(ptErr(error.message));
           if (data.session && data.user && data.user.email_confirmed_at) return done();
           cur = "confirm"; msg = null; render();
         } else {
           if (!pass) return fail("Digite a senha.");
           busy(go, true);
           const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-          if (error) return fail(/confirm/i.test(error.message) ? "Confirme o seu e-mail primeiro (veja a caixa de entrada)." : "E-mail ou senha incorretos.");
+          if (error) return fail(/confirm/i.test(error.message) ? "Confirme o seu e-mail primeiro (veja a caixa de entrada)." : ptErr(error.message));
           const s = await state(); if (s.ok) return done(); cur = s.step; msg = null; render();
         }
       };
-      const fg = q("[data-forgot]"); if (fg) fg.onclick = async () => { email = q("#oaEmail").value.trim(); if (!email) return fail("Digite o seu e-mail acima e clique de novo."); await sb.auth.resetPasswordForEmail(email, { redirectTo: appUrl }); msg = { ok: true, t: "Se esse e-mail tiver conta, enviamos um link pra criar uma senha nova." }; render(); };
+      const fg = q("[data-forgot]"); if (fg) fg.onclick = () => { const e = q("#oaEmail"); if (e) email = e.value.trim(); cur = "forgot"; msg = null; render(); };
+      const sr = q("[data-sendreset]"); if (sr) sr.onclick = async () => {
+        email = q("#oaEmail").value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("Digite um e-mail válido.");
+        busy(sr, true); const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: appUrl });
+        if (error) return fail(ptErr(error.message));
+        cur = "forgotSent"; msg = null; render();
+      };
+      const np = q("[data-newpass]"); if (np) np.onclick = async () => {
+        const a = q("#oaNew").value, b = q("#oaNew2").value;
+        if (a.length < 8) return fail("A senha precisa ter pelo menos 8 caracteres."); if (a !== b) return fail("As duas senhas não são iguais.");
+        busy(np, true); const { error } = await sb.auth.updateUser({ password: a });
+        if (error) return fail(ptErr(error.message));
+        recovering = false; history.replaceState(null, "", location.pathname);
+        const s = await state(); if (s.ok) { if (window.toast) setTimeout(() => toast("Senha alterada com sucesso"), 300); return done(); }
+        cur = s.step; msg = { ok: true, t: "Senha alterada com sucesso." }; render();
+      };
+      m.querySelectorAll("[data-eye]").forEach(b => b.onclick = () => { const i = q("#" + b.dataset.eye); i.type = i.type === "password" ? "text" : "password"; b.textContent = i.type === "password" ? "Mostrar" : "Ocultar"; });
       const rs = q("[data-resend]"); if (rs) rs.onclick = async () => { busy(rs, true); await sb.auth.resend({ type: "signup", email, options: { emailRedirectTo: appUrl } }); msg = { ok: true, t: "E-mail reenviado." }; render(); };
       const fin = q("[data-finish]"); if (fin) fin.onclick = async () => {
         const phone = q("#oaPhone").value; if (!phoneOk(phone)) return fail("Digite o telefone com DDD."); if (!q("#oaTerms").checked) return fail("Aceite os termos de uso pra continuar.");
@@ -201,6 +244,10 @@ const Auth = (() => {
   // no parque: sem cadastro completo, a janela abre e não fecha
   async function gate() {
     if (!enabled) return true;
+    await new Promise(r => setTimeout(r, 300)); // dá tempo do Supabase ler o link
+    const { data: { session } } = await sb.auth.getSession();
+    if (recovering && session) return new Promise(res => open({ step: "newpass", blocking: true, onDone: () => { track("abriu"); res(true); } }));
+    if (linkError) { history.replaceState(null, "", location.pathname); return new Promise(res => open({ step: "login", blocking: true, flash: /expired/i.test(linkError) ? "Este link expirou ou já foi usado. Peça um novo em Esqueci a senha." : "Não foi possível usar este link. Tente de novo.", onDone: () => { track("abriu"); res(true); } })); }
     const s = await state();
     if (s.ok) {
       track("abriu");
