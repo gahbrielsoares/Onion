@@ -120,14 +120,9 @@ const Auth = (() => {
     const terms = `<label class="oa-terms"><input type="checkbox" id="oaTerms"> <span>Li e aceito os <a href="${termsUrl}" target="_blank" rel="noopener">Termos de uso e a Política de privacidade</a>.</span></label>`;
     function render() {
       let h = "";
-      if (cur === "signup" || cur === "login") h = head(cur === "signup" ? `Crie sua conta no <span class="oa-px">Onion Park</span>` : `Entre no <span class="oa-px">Onion Park</span>`, cur === "signup" ? "Grátis por enquanto. Leva 1 minuto." : "Bom te ver de volta!") +
-        `<button class="oa-btn" data-google>${G} Continuar com o Google</button><div class="oa-or">ou com e-mail</div>
-        <div class="oa-tabs" role="tablist"><button role="tab" aria-selected="${cur === "signup"}" data-tab="signup">Criar conta</button><button role="tab" aria-selected="${cur === "login"}" data-tab="login">Já tenho conta</button></div>
-        <div class="oa-f"><label for="oaEmail">E-mail</label><input id="oaEmail" type="email" autocomplete="email" value="${esc(email)}" placeholder="voce@gmail.com"></div>
-        ${cur === "signup" ? `<div class="oa-f"><label for="oaPhone">Telefone (WhatsApp)</label><input id="oaPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="(11) 91234-5678"></div>` : ""}
-        <div class="oa-f"><label for="oaPass">Senha</label><input id="oaPass" type="password" autocomplete="${cur === "signup" ? "new-password" : "current-password"}" placeholder="${cur === "signup" ? "mínimo 8 caracteres" : ""}"></div>
-        ${cur === "signup" ? terms : `<div style="text-align:right;margin:-4px 0 8px"><button class="oa-link" data-forgot>Esqueci a senha</button></div>`}
-        <button class="oa-btn pri" data-go>${cur === "signup" ? "Criar conta" : "Entrar"}</button>`;
+      if (cur === "signup" || cur === "login") h = head(cur === "signup" ? `Crie sua conta no <span class="oa-px">Onion Park</span>` : `Entre no <span class="oa-px">Onion Park</span>`, "Use a sua conta Google (Gmail). Sem senha nova pra decorar: leva poucos segundos.") +
+        `<button class="oa-btn pri" data-google style="background:#fff;color:#1B1424;padding:14px 16px;font-size:17px">${G} Continuar com o Google</button>
+        <p class="oa-sub" style="font-size:12.5px;margin:12px 0 0;text-align:center">Ao continuar, você concorda com os <a href="${termsUrl}" target="_blank" rel="noopener" style="color:#7A2E8E;font-weight:700">Termos de uso e a Política de privacidade</a>.</p>`;
       else if (cur === "confirm") h = head("Confira o seu e-mail 📬", `Enviamos um link de confirmação para <b>${esc(email)}</b>. Abra o e-mail e clique no link: você volta direto pra sua empresa.`) +
         `<button class="oa-btn" data-resend>Reenviar o e-mail</button><div style="text-align:center;margin-top:10px"><button class="oa-link" data-tab="login">Já confirmei: entrar</button></div><p class="oa-sub" style="margin-top:10px;font-size:13px">Não chegou? Olhe a caixa de spam ou promoções.</p>`;
       else if (cur === "plan") { const pr = couponPrice != null ? couponPrice.toFixed(2).replace(".", ",") : (C.price || "29,90");
