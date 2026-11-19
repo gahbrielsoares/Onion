@@ -153,10 +153,13 @@ const Auth = (() => {
       else if (cur === "waiting") h = head("Confirmando o seu pagamento", "Assim que o Mercado Pago confirmar, o acesso é liberado automaticamente. Isso costuma levar poucos segundos.") +
         `<div style="display:flex;justify-content:center;padding:10px"><span class="oa-spin" style="width:32px;height:32px;border-color:#e3d9cc;border-top-color:#7A2E8E"></span></div>
         <button class="oa-btn" data-tab="plan">Voltar para a assinatura</button>`;
-      else if (cur === "forgot") h = head("Recuperar a senha", "Informe o e-mail da sua conta. Vamos enviar um link para você criar uma senha nova.") +
-        `<div class="oa-f"><label for="oaEmail">E-mail</label><input id="oaEmail" type="email" autocomplete="email" value="${esc(email)}" placeholder="voce@gmail.com"></div>
-        <button class="oa-btn pri" data-sendreset>Enviar link de recuperação</button>
-        <div style="text-align:center;margin-top:12px"><button class="oa-link" data-tab="login">Voltar para o login</button></div>`;
+      else if (cur === "forgot") h = head("Esqueceu a senha?", "Entre com a sua conta Google: é mais rápido e você não precisa de outra senha.") +
+        `<button class="oa-btn pri" data-google style="background:#fff;color:#1B1424">${G} Entrar com o Google</button>
+        <p class="oa-sub" style="font-size:13.5px;margin:12px 0 0">Se o seu e-mail for do Gmail, você entra direto na mesma conta, com tudo o que já tinha. A senha passa a ser a do próprio Google.</p>
+        <details class="oa-coupon" style="margin:14px 0 0"><summary>Não uso Gmail: receber um link por e-mail</summary>
+          <div class="oa-f" style="margin-top:10px"><label for="oaEmail">E-mail da sua conta</label><input id="oaEmail" type="email" autocomplete="email" value="${esc(email)}" placeholder="voce@exemplo.com"></div>
+          <button class="oa-btn" data-sendreset>Enviar link de recuperação</button></details>
+        <div style="text-align:center;margin-top:14px"><button class="oa-link" data-tab="login">Voltar para o login</button></div>`;
       else if (cur === "forgotSent") h = head("Confira o seu e-mail", `Se existir uma conta com <b>${esc(email)}</b>, enviamos um link para criar uma senha nova. O link vale por 1 hora.`) +
         `<p class="oa-sub" style="font-size:13.5px">Não chegou em alguns minutos? Veja a caixa de spam e a aba Promoções. Se você criou a conta com o Google, use o botão Continuar com o Google, que não precisa de senha.</p>
         <button class="oa-btn" data-tab="login">Voltar para o login</button>
