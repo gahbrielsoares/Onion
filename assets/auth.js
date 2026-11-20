@@ -39,7 +39,11 @@ const Auth = (() => {
     const sub = await subscription(user.id);
     if (C.requirePayment && !sub.active) {
       const { data: adm } = await sb.from("admins").select("email").eq("email", user.email).maybeSingle();
-      if (!adm) return { ok: false, step: "plan", user, p, sub };
+      if (!adm) {
+        // pagou e o aviso do Mercado Pago não chegou? confere direto lá antes de pedir pagamento
+        if (sub.status !== "none" && await syncSub()) { const s2 = await subscription(user.id); if (s2.active) return { ok: true, user, p, sub: s2 }; }
+        return { ok: false, step: "plan", user, p, sub };
+      }
     }
     return { ok: true, user, p, sub };
   }
@@ -49,6 +53,7 @@ const Auth = (() => {
     s.active = s.status === "authorized" || (!!s.access_until && new Date(s.access_until).getTime() > now);
     return s;
   }
+  async function syncSub() { try { await callMp({ action: "sync" }, 15000); return true; } catch (e) { return false; } }
   // chama a função do pagamento com limite de tempo: o botão nunca fica girando pra sempre
   async function callMp(body, ms = 30000) {
     let timer;
@@ -252,7 +257,7 @@ const Auth = (() => {
         try { couponPrice = await quote(c); coupon = c; msg = null; } catch (e) { couponPrice = null; coupon = c; msg = { t: e.message || "Cupom inválido." }; }
         render();
       };
-      if (cur === "waiting") { let n = 0; const tick = async () => { if (!document.body.contains(m) || cur !== "waiting") return; const { data: { user } } = await sb.auth.getUser(); const s = user && await subscription(user.id); if (s && s.active) return done(); if (++n < 40) setTimeout(tick, 3000); else { msg = { t: "Ainda não recebemos a confirmação. Se você já pagou, aguarde um minuto e recarregue a página." }; cur = "plan"; render(); } }; setTimeout(tick, 1500); }
+      if (cur === "waiting") { let n = 0; const tick = async () => { if (!document.body.contains(m) || cur !== "waiting") return; const { data: { user } } = await sb.auth.getUser(); if (user && n % 2 === 0) await syncSub(); const s = user && await subscription(user.id); if (s && s.active) return done(); if (++n < 40) setTimeout(tick, 3000); else { msg = { t: "Ainda não recebemos a confirmação. Se você já pagou, aguarde um minuto e recarregue a página." }; cur = "plan"; render(); } }; setTimeout(tick, 1500); }
       const lo = q("[data-logout]"); if (lo) lo.onclick = async () => { await sb.auth.signOut(); cur = "signup"; msg = null; render(); };
       setTimeout(() => { const f = m.querySelector("input"); if (f && matchMedia("(pointer:fine)").matches) f.focus(); }, 30);
     }

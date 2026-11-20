@@ -1,5 +1,5 @@
 // Onion Park · cria a assinatura no Mercado Pago e devolve o link do checkout.
-// Também cancela (body: {action:"cancel"}).
+// Também cancela (body: {action:"cancel"}) e confere o pagamento direto no Mercado Pago (body: {action:"sync"}).
 // Segredos: MP_ACCESS_TOKEN, APP_URL (ex.: https://gahbrielsoares.github.io/Onion/app/), PRICE (opcional, padrão 29.90)
 // COUPONS (opcional, JSON com o preço mensal de cada cupom), ex.: {"BLACK19":19.90,"NOVEM9":9.90}
 // Os cupons ficam só no Supabase (o código do site é público).
@@ -29,6 +29,24 @@ Deno.serve(async (req) => {
       const until = sub.next_payment_date && new Date(sub.next_payment_date) > new Date() ? sub.next_payment_date : sub.access_until;
       await admin.from("subscriptions").update({ status: "cancelled", access_until: until, updated_at: new Date().toISOString() }).eq("user_id", user.id);
       return json({ ok: true, access_until: until });
+    }
+
+    // confere direto no Mercado Pago (não depende do aviso automático chegar)
+    if (body.action === "sync") {
+      const H = { headers: { Authorization: `Bearer ${MP}` } };
+      let list: any[] = [];
+      const r = await mpFetch(`https://api.mercadopago.com/preapproval/search?external_reference=${user.id}&limit=50`, H);
+      if (r.ok) list = ((await r.json()).results || []).filter((x: any) => x.external_reference === user.id);
+      if (sub?.preapproval_id && !list.some((x: any) => x.id === sub.preapproval_id)) {
+        const r2 = await mpFetch(`https://api.mercadopago.com/preapproval/${sub.preapproval_id}`, H); if (r2.ok) list.push(await r2.json());
+      }
+      const pre = list.find((x: any) => x.status === "authorized") || list.find((x: any) => x.id === sub?.preapproval_id);
+      if (!pre) return json({ status: sub?.status || "none" });
+      const next = pre.next_payment_date || null;
+      const row: Record<string, unknown> = { user_id: user.id, preapproval_id: pre.id, status: pre.status, payer_email: pre.payer_email || sub?.payer_email || null, next_payment_date: next, updated_at: new Date().toISOString() };
+      if (pre.status === "authorized" && next) row.access_until = next;
+      await admin.from("subscriptions").upsert(row);
+      return json({ status: pre.status });
     }
 
     // cupom: o preço vem só do servidor
