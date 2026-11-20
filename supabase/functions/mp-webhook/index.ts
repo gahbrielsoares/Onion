@@ -35,6 +35,10 @@ Deno.serve(async (req) => {
   }
   if (!pre || !pre.external_reference) return new Response("ok");
 
+  // um aviso de uma assinatura antiga (abandonada ou trocada) não pode derrubar a assinatura atual
+  const { data: cur } = await admin.from("subscriptions").select("preapproval_id,status").eq("user_id", pre.external_reference).maybeSingle();
+  if (cur && cur.preapproval_id && cur.preapproval_id !== pre.id && pre.status !== "authorized") return new Response("ok");
+
   const next = pre.next_payment_date || null;
   const row: Record<string, unknown> = { user_id: pre.external_reference, preapproval_id: pre.id, status: pre.status, payer_email: pre.payer_email || null, next_payment_date: next, updated_at: new Date().toISOString() };
   if (pre.status === "authorized" && next) row.access_until = next;   // pago até a próxima cobrança

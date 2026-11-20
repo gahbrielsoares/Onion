@@ -83,7 +83,7 @@ Deno.serve(async (req) =&gt; {
   }
 });
 </pre>
-<h2>2. mp-webhook</h2><button class="b" data-c="wh">📋 Copiar o código do mp-webhook</button><div class="ok" id="ok-wh"></div><pre id="wh">// Onion Park · recebe os avisos do Mercado Pago e atualiza a assinatura.
+<h2>2. mp-webhook <small style="font-size:13px;color:#7A2E8E">(atualizado em 20/11)</small></h2><button class="b" data-c="wh">📋 Copiar o código do mp-webhook</button><div class="ok" id="ok-wh"></div><pre id="wh">// Onion Park · recebe os avisos do Mercado Pago e atualiza a assinatura.
 // Publique com &quot;Verify JWT&quot; DESLIGADO (o Mercado Pago não manda login).
 // Segredos: MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET (assinatura secreta das notificações)
 import { createClient } from &quot;npm:@supabase/supabase-js@2.45.4&quot;;
@@ -119,6 +119,10 @@ Deno.serve(async (req) =&gt; {
     if (r.ok) { const ap = await r.json(); if (ap.preapproval_id) { const r2 = await fetch(`https://api.mercadopago.com/preapproval/${ap.preapproval_id}`, { headers: { Authorization: `Bearer ${MP}` } }); if (r2.ok) pre = await r2.json(); } }
   }
   if (!pre || !pre.external_reference) return new Response(&quot;ok&quot;);
+
+  // um aviso de uma assinatura antiga (abandonada ou trocada) não pode derrubar a assinatura atual
+  const { data: cur } = await admin.from(&quot;subscriptions&quot;).select(&quot;preapproval_id,status&quot;).eq(&quot;user_id&quot;, pre.external_reference).maybeSingle();
+  if (cur &amp;&amp; cur.preapproval_id &amp;&amp; cur.preapproval_id !== pre.id &amp;&amp; pre.status !== &quot;authorized&quot;) return new Response(&quot;ok&quot;);
 
   const next = pre.next_payment_date || null;
   const row: Record&lt;string, unknown&gt; = { user_id: pre.external_reference, preapproval_id: pre.id, status: pre.status, payer_email: pre.payer_email || null, next_payment_date: next, updated_at: new Date().toISOString() };
