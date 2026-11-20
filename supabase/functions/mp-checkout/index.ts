@@ -6,6 +6,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+// nenhuma chamada ao Mercado Pago pode travar o botão do cliente
+const mpFetch = (u: string, init: RequestInit = {}) => fetch(u, { ...init, signal: AbortSignal.timeout(12000) });
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, "content-type": "application/json" } });
 
 Deno.serve(async (req) => {
@@ -22,7 +24,7 @@ Deno.serve(async (req) => {
 
     if (body.action === "cancel") {
       if (!sub?.preapproval_id) return json({ error: "Você não tem assinatura ativa." }, 400);
-      const r = await fetch(`https://api.mercadopago.com/preapproval/${sub.preapproval_id}`, { method: "PUT", headers: { Authorization: `Bearer ${MP}`, "content-type": "application/json" }, body: JSON.stringify({ status: "cancelled" }) });
+      const r = await mpFetch(`https://api.mercadopago.com/preapproval/${sub.preapproval_id}`, { method: "PUT", headers: { Authorization: `Bearer ${MP}`, "content-type": "application/json" }, body: JSON.stringify({ status: "cancelled" }) });
       if (!r.ok) return json({ error: "O Mercado Pago não aceitou o cancelamento: " + (await r.text()).slice(0, 200) }, 502);
       const until = sub.next_payment_date && new Date(sub.next_payment_date) > new Date() ? sub.next_payment_date : sub.access_until;
       await admin.from("subscriptions").update({ status: "cancelled", access_until: until, updated_at: new Date().toISOString() }).eq("user_id", user.id);
@@ -44,7 +46,7 @@ Deno.serve(async (req) => {
     const tries = [...new Set([price, ...(price < 1 ? [1, 2, 5] : [])])];
     let p: any = null, ok = false, used = price;
     for (const amount of tries) {
-      const r = await fetch("https://api.mercadopago.com/preapproval", {
+      const r = await mpFetch("https://api.mercadopago.com/preapproval", {
         method: "POST", headers: { Authorization: `Bearer ${MP}`, "content-type": "application/json" },
         body: JSON.stringify({
           reason: code ? `Onion Park · assinatura mensal (cupom ${code})` : "Onion Park · assinatura mensal",
@@ -55,11 +57,15 @@ Deno.serve(async (req) => {
           auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: amount, currency_id: "BRL" }
         })
       });
-      p = await r.json(); ok = r.ok && !!p.init_point; used = amount;
+      p = await r.json().catch(() => ({ message: `resposta inválida (${r.status})` })); ok = r.ok && !!p.init_point; used = amount;
       if (ok) break;
     }
     if (!ok) return json({ error: "O Mercado Pago recusou: " + (p?.message || JSON.stringify(p).slice(0, 200)) }, 502);
     await admin.from("subscriptions").upsert({ user_id: user.id, preapproval_id: p.id, status: "pending", payer_email: payer, updated_at: new Date().toISOString() });
     return json({ init_point: p.init_point, price: used });
-  } catch (e) { return json({ error: String(e?.message || e) }, 500); }
+  } catch (e) {
+    const m = String(e?.message || e);
+    if (/timed? ?out|abort/i.test(m)) return json({ error: "O Mercado Pago demorou para responder. Tente de novo em instantes." }, 504);
+    return json({ error: m }, 500);
+  }
 });

@@ -49,24 +49,31 @@ const Auth = (() => {
     s.active = s.status === "authorized" || (!!s.access_until && new Date(s.access_until).getTime() > now);
     return s;
   }
-  async function quote(coupon) {
-    const { data, error } = await sb.functions.invoke("mp-checkout", { body: { action: "quote", coupon } });
-    if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (e) {} throw new Error(m); }
-    if (data && data.error) throw new Error(data.error);
-    return data.price;
+  // chama a função do pagamento com limite de tempo: o botão nunca fica girando pra sempre
+  async function callMp(body, ms = 30000) {
+    let timer;
+    const timeout = new Promise((_, rej) => { timer = setTimeout(() => rej(new Error("O Mercado Pago está demorando para responder. Verifique a sua internet e toque de novo.")), ms); });
+    try {
+      const { data, error } = await Promise.race([sb.functions.invoke("mp-checkout", { body }), timeout]);
+      if (error) {
+        let m = error.message;
+        try { m = (await error.context.json()).error || m; } catch (e) {}
+        if (/failed to fetch|network|load failed/i.test(m)) m = "Sem conexão com o servidor. Verifique a sua internet e tente de novo.";
+        if (/401|jwt|login/i.test(m)) m = "Sua sessão expirou. Toque em \"Entrar com outra conta\" e entre de novo.";
+        throw new Error(m);
+      }
+      if (!data) throw new Error("Resposta vazia do servidor. Tente de novo.");
+      if (data.error) throw new Error(data.error);
+      return data;
+    } finally { clearTimeout(timer); }
   }
+  async function quote(coupon) { return (await callMp({ action: "quote", coupon }, 20000)).price; }
   async function checkout(payerEmail, coupon) {
-    const { data, error } = await sb.functions.invoke("mp-checkout", { body: { payer_email: payerEmail, coupon } });
-    if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (e) {} throw new Error(m); }
-    if (data && data.error) throw new Error(data.error);
+    const data = await callMp({ payer_email: payerEmail, coupon });
+    if (!data.init_point || !/^https:\/\//.test(data.init_point)) throw new Error("O Mercado Pago não devolveu o link de pagamento. Tente de novo em instantes.");
     return data.init_point;
   }
-  async function cancelSub() {
-    const { data, error } = await sb.functions.invoke("mp-checkout", { body: { action: "cancel" } });
-    if (error) { let m = error.message; try { m = (await error.context.json()).error || m; } catch (e) {} throw new Error(m); }
-    if (data && data.error) throw new Error(data.error);
-    return data;
-  }
+  async function cancelSub() { return callMp({ action: "cancel" }); }
   function track(kind) { if (!enabled) return; sb.rpc("track", { kind }).then(() => {}, () => {}); }
 
   /* ---------- janela ---------- */
@@ -103,6 +110,8 @@ const Auth = (() => {
   .oa-secure-h{display:flex;align-items:center;gap:7px;font-size:14px;color:#1d5b33}.oa-mp{margin-left:auto;font:800 11px Figtree,sans-serif;color:#009ee3;border:1.5px solid #009ee3;border-radius:6px;padding:1px 6px}
   .oa-secure p{margin:6px 0 0;font-size:12.5px;line-height:1.45;color:#3d5a46}
   .oa-spin{width:15px;height:15px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:oaspin .8s linear infinite}
+  .oa-btn:not(.pri) .oa-spin{border-color:rgba(27,20,36,.25);border-top-color:#1B1424}
+  .oa-paylink{text-decoration:none}
   @keyframes oaspin{to{transform:rotate(360deg)}}`;
   function ensureCss() { if (document.getElementById("oa-css")) return; const s = document.createElement("style"); s.id = "oa-css"; s.textContent = CSS; document.head.appendChild(s); }
   const G = `<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.9 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
@@ -113,7 +122,7 @@ const Auth = (() => {
     document.querySelectorAll(".oa-modal").forEach(m => m.remove());
     const m = document.createElement("div"); m.className = "oa-modal"; m.setAttribute("role", "dialog"); m.setAttribute("aria-modal", "true"); m.setAttribute("aria-labelledby", "oaTitle");
     document.body.appendChild(m);
-    let cur = step, email = userEmail, msg = flash ? { t: flash } : null, coupon = "", couponPrice = null;
+    let cur = step, email = userEmail, msg = flash ? { t: flash } : null, coupon = "", couponPrice = null, payUrl = "", paying = false;
     const close = () => { if (!blocking) m.remove(); };
     m.addEventListener("click", e => { if (e.target === m) close(); });
     const head = (t, s) => `${blocking ? "" : `<button class="oa-x" aria-label="Fechar" data-x>×</button>`}<div class="oa-logo"><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><path d="M17 3c1 3 1 4 0 6" stroke="#5aa83f" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M17 9c-7 3-12 8-12 14 0 5 5 8 12 8s12-3 12-8c0-6-5-11-12-14z" fill="#7A2E8E" stroke="#1B1424" stroke-width="1.5"/><path d="M17 10c-3 3-5 8-5 13s2 7 5 8M17 10c3 3 5 8 5 13s-2 7-5 8" stroke="#c66bb5" stroke-width="1.6" fill="none"/></svg><span>Onion <b>Park</b></span></div><h2 id="oaTitle">${t}</h2><p class="oa-sub">${s}</p>${msg ? `<div class="oa-msg ${msg.ok ? "ok" : "err"}">${esc(msg.t)}</div>` : ""}`;
@@ -145,6 +154,10 @@ const Auth = (() => {
           <p>Cobrança mensal automática no cartão. Cancele a qualquer momento pela Administração, sem multa.</p>
         </div>
         <div style="text-align:center;margin-top:12px"><button class="oa-link" data-logout>Entrar com outra conta</button></div>`; }
+      else if (cur === "redirect") h = head("Abrindo o Mercado Pago…", "Se a página do pagamento não abrir sozinha em alguns segundos, toque no botão abaixo.") +
+        `<a class="oa-btn pri oa-paylink" href="${esc(payUrl)}" rel="noopener">Abrir o pagamento no Mercado Pago</a>
+        <button class="oa-btn" style="margin-top:10px" data-tab="waiting">Já paguei</button>
+        <div style="text-align:center;margin-top:12px"><button class="oa-link" data-tab="plan">Voltar para a assinatura</button></div>`;
       else if (cur === "waiting") h = head("Confirmando o seu pagamento", "Assim que o Mercado Pago confirmar, o acesso é liberado automaticamente. Isso costuma levar poucos segundos.") +
         `<div style="display:flex;justify-content:center;padding:10px"><span class="oa-spin" style="width:32px;height:32px;border-color:#e3d9cc;border-top-color:#7A2E8E"></span></div>
         <button class="oa-btn" data-tab="plan">Voltar para a assinatura</button>`;
@@ -219,8 +232,19 @@ const Auth = (() => {
         if (error) return fail("Não deu pra salvar: " + error.message); done();
       };
       const pay = q("[data-pay]"); if (pay) pay.onclick = async () => {
+        if (paying) return;
         const pe = q("#oaPayer").value.trim(); if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(pe)) return fail("Digite o e-mail da sua conta do Mercado Pago.");
-        email = pe; busy(pay, true); try { location.href = await checkout(pe, couponPrice != null ? coupon : ""); } catch (e) { fail(e.message || "Não deu pra abrir o pagamento."); }
+        email = pe;
+        const ci = q("#oaCoupon"), typed = ci ? ci.value.trim().toUpperCase() : "";
+        paying = true; busy(pay, true);
+        try {
+          // cupom digitado mas não aplicado: confere antes de cobrar
+          if (typed && typed !== coupon) { coupon = typed; couponPrice = null; couponPrice = await quote(typed); }
+          if (!typed) { coupon = ""; couponPrice = null; }
+          payUrl = await checkout(pe, couponPrice != null ? coupon : "");
+          paying = false; cur = "redirect"; msg = null; render();
+          location.href = payUrl;
+        } catch (e) { paying = false; fail(e.message || "Não deu pra abrir o pagamento."); }
       };
       const cb = q("[data-coupon]"); if (cb) cb.onclick = async () => {
         const c = q("#oaCoupon").value.trim().toUpperCase(), pe = q("#oaPayer"); if (pe) email = pe.value.trim();
@@ -232,6 +256,13 @@ const Auth = (() => {
       const lo = q("[data-logout]"); if (lo) lo.onclick = async () => { await sb.auth.signOut(); cur = "signup"; msg = null; render(); };
       setTimeout(() => { const f = m.querySelector("input"); if (f && matchMedia("(pointer:fine)").matches) f.focus(); }, 30);
     }
+    // voltando pelo "voltar" (página restaurada do cache) ou do app do Mercado Pago
+    const revive = e => {
+      if (!document.body.contains(m)) { window.removeEventListener("pageshow", revive); return; }
+      if (e && e.type === "pageshow" && !e.persisted) return;
+      paying = false; render();
+    };
+    window.addEventListener("pageshow", revive);
     render();
   }
 
