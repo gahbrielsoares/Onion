@@ -19,6 +19,8 @@ pre{background:#14101d;color:#e8e1f0;border-radius:12px;padding:12px;overflow:au
 import { createClient } from &quot;npm:@supabase/supabase-js@2.45.4&quot;;
 
 const CORS = { &quot;Access-Control-Allow-Origin&quot;: &quot;*&quot;, &quot;Access-Control-Allow-Headers&quot;: &quot;authorization, x-client-info, apikey, content-type&quot;, &quot;Access-Control-Allow-Methods&quot;: &quot;POST, OPTIONS&quot; };
+// nenhuma chamada ao Mercado Pago pode travar o botão do cliente
+const mpFetch = (u: string, init: RequestInit = {}) =&gt; fetch(u, { ...init, signal: AbortSignal.timeout(12000) });
 const json = (b: unknown, s = 200) =&gt; new Response(JSON.stringify(b), { status: s, headers: { ...CORS, &quot;content-type&quot;: &quot;application/json&quot; } });
 
 Deno.serve(async (req) =&gt; {
@@ -35,7 +37,7 @@ Deno.serve(async (req) =&gt; {
 
     if (body.action === &quot;cancel&quot;) {
       if (!sub?.preapproval_id) return json({ error: &quot;Você não tem assinatura ativa.&quot; }, 400);
-      const r = await fetch(`https://api.mercadopago.com/preapproval/${sub.preapproval_id}`, { method: &quot;PUT&quot;, headers: { Authorization: `Bearer ${MP}`, &quot;content-type&quot;: &quot;application/json&quot; }, body: JSON.stringify({ status: &quot;cancelled&quot; }) });
+      const r = await mpFetch(`https://api.mercadopago.com/preapproval/${sub.preapproval_id}`, { method: &quot;PUT&quot;, headers: { Authorization: `Bearer ${MP}`, &quot;content-type&quot;: &quot;application/json&quot; }, body: JSON.stringify({ status: &quot;cancelled&quot; }) });
       if (!r.ok) return json({ error: &quot;O Mercado Pago não aceitou o cancelamento: &quot; + (await r.text()).slice(0, 200) }, 502);
       const until = sub.next_payment_date &amp;&amp; new Date(sub.next_payment_date) &gt; new Date() ? sub.next_payment_date : sub.access_until;
       await admin.from(&quot;subscriptions&quot;).update({ status: &quot;cancelled&quot;, access_until: until, updated_at: new Date().toISOString() }).eq(&quot;user_id&quot;, user.id);
@@ -57,7 +59,7 @@ Deno.serve(async (req) =&gt; {
     const tries = [...new Set([price, ...(price &lt; 1 ? [1, 2, 5] : [])])];
     let p: any = null, ok = false, used = price;
     for (const amount of tries) {
-      const r = await fetch(&quot;https://api.mercadopago.com/preapproval&quot;, {
+      const r = await mpFetch(&quot;https://api.mercadopago.com/preapproval&quot;, {
         method: &quot;POST&quot;, headers: { Authorization: `Bearer ${MP}`, &quot;content-type&quot;: &quot;application/json&quot; },
         body: JSON.stringify({
           reason: code ? `Onion Park · assinatura mensal (cupom ${code})` : &quot;Onion Park · assinatura mensal&quot;,
@@ -68,13 +70,17 @@ Deno.serve(async (req) =&gt; {
           auto_recurring: { frequency: 1, frequency_type: &quot;months&quot;, transaction_amount: amount, currency_id: &quot;BRL&quot; }
         })
       });
-      p = await r.json(); ok = r.ok &amp;&amp; !!p.init_point; used = amount;
+      p = await r.json().catch(() =&gt; ({ message: `resposta inválida (${r.status})` })); ok = r.ok &amp;&amp; !!p.init_point; used = amount;
       if (ok) break;
     }
     if (!ok) return json({ error: &quot;O Mercado Pago recusou: &quot; + (p?.message || JSON.stringify(p).slice(0, 200)) }, 502);
     await admin.from(&quot;subscriptions&quot;).upsert({ user_id: user.id, preapproval_id: p.id, status: &quot;pending&quot;, payer_email: payer, updated_at: new Date().toISOString() });
     return json({ init_point: p.init_point, price: used });
-  } catch (e) { return json({ error: String(e?.message || e) }, 500); }
+  } catch (e) {
+    const m = String(e?.message || e);
+    if (/timed? ?out|abort/i.test(m)) return json({ error: &quot;O Mercado Pago demorou para responder. Tente de novo em instantes.&quot; }, 504);
+    return json({ error: m }, 500);
+  }
 });
 </pre>
 <h2>2. mp-webhook</h2><button class="b" data-c="wh">📋 Copiar o código do mp-webhook</button><div class="ok" id="ok-wh"></div><pre id="wh">// Onion Park · recebe os avisos do Mercado Pago e atualiza a assinatura.
