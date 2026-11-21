@@ -26,3 +26,8 @@ const st=document.getElementById("stars"); for(let i=0;i<60;i++){ const s=docume
 
 // cadastro: os botões de entrar abrem a janela de cadastro/login (quando o cadastro estiver ligado)
 if (window.Auth) Auth.wireEnterButtons();
+
+// celular: barra de Entrar/Assinar aparece depois do topo e some quando o botão de preço já está na tela
+(()=>{const b=document.getElementById("mbar"); if(!b) return; const price=document.querySelector("#preco .btn.wide");
+const f=()=>{const r=price&&price.getBoundingClientRect(), priceOn=r&&r.top<innerHeight&&r.bottom>0; b.classList.toggle("on",scrollY>520&&!priceOn);};
+addEventListener("scroll",f,{passive:true}); addEventListener("resize",f); f();})();

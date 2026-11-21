@@ -176,7 +176,7 @@ footer .copy{width:100%;border-top:1.5px solid var(--line);padding-top:16px}
   .ba{aspect-ratio:4/3}.ba .before{grid-template-columns:1fr 1fr}
   .ba .before .term:nth-child(n+5){display:none}
 }
-@media (max-width:560px){.grid3{grid-template-columns:1fr}.nav .act .btn:not(.primary){display:none}.hero{padding-top:130px}.nav .bar{gap:10px}}
+@media (max-width:560px){.grid3{grid-template-columns:1fr}.nav .act{gap:7px}.nav .act .btn.small{font-size:14px;padding:8px 12px}.menu{font-size:24px;padding:0 2px}.hero{padding-top:130px}.nav .bar{gap:10px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}.browser{transform:none}html{scroll-behavior:auto}}
 .hero .wrap,.hero .stage,.hero .marquee{position:relative;z-index:1}
 .cloud{z-index:0}
@@ -235,3 +235,22 @@ footer .copy{width:100%;border-top:1.5px solid var(--line);padding-top:16px}
 .price .was s{text-decoration-thickness:2px}
 .price .save{display:inline-block;margin-top:10px;background:#e7f6ec;color:#1d5b33;border:1.5px solid #b5e0c3;border-radius:10px;padding:6px 10px;font-size:14px;font-weight:700}
 .price .ribbon{background:#1B1424;color:#fff}
+/* celular: cabeçalho com Entrar + Assinar + menu sempre visíveis */
+@media (max-width:560px){
+  .wrap{width:calc(100% - 32px)}
+  .nav .bar{padding:8px 8px 8px 12px;gap:8px}
+  .logo{font-size:18px;gap:6px;flex-shrink:0}.logo svg{width:24px;height:24px}
+  .nav .act{gap:6px}.nav .act .btn.small{font-size:13.5px;padding:7px 11px;box-shadow:2px 2px 0 var(--ink);white-space:nowrap}
+  .chip.bn{font-size:13px;padding:6px 12px;gap:6px;white-space:nowrap}.chip.bn .tag{font-size:11px}
+}
+@media (max-width:374px){.logo{font-size:16px}.logo svg{width:22px;height:22px}.nav .act .btn.small{padding:7px 9px;font-size:13px}.chip.bn{font-size:12px;padding:5px 10px}}
+
+/* celular: barra fixa embaixo com Entrar e Assinar, aparece depois do topo */
+.mbar{display:none}
+@media (max-width:900px){
+  .mbar{display:flex;gap:8px;position:fixed;left:0;right:0;bottom:0;z-index:60;padding:10px 16px calc(env(safe-area-inset-bottom,0px) + 10px);background:rgba(251,247,241,.94);backdrop-filter:blur(10px);border-top:1.5px solid var(--line);transform:translateY(110%);transition:transform .25s ease}
+  .mbar.on{transform:none}
+  .mbar .btn{flex:1;justify-content:center;text-align:center;font-size:15px;padding:12px 10px;white-space:nowrap}
+  .mbar .btn:not(.primary){flex:0 0 34%}
+  footer{padding-bottom:90px}
+}
