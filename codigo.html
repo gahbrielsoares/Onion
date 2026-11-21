@@ -11,7 +11,13 @@ pre{background:#14101d;color:#e8e1f0;border-radius:12px;padding:12px;overflow:au
 <body><main>
 <h1>Códigos das funções do pagamento</h1>
 <p>Toque em <b>Copiar</b>, vá no editor do Supabase, apague o exemplo e cole. Esta página não é traduzida, então o código vem certinho.</p>
-<h2>1. mp-checkout <small style="font-size:13px;color:#7A2E8E">(atualizado em 20/11, 21h30)</small></h2><button class="b" data-c="ck">📋 Copiar o código do mp-checkout</button><div class="ok" id="ok-ck"></div><pre id="ck">// Onion Park · cria a assinatura no Mercado Pago e devolve o link do checkout.
+<h2>0. Permissões do banco <small style="font-size:13px;color:#7A2E8E">(rode uma vez · SQL Editor › New query › Run)</small></h2><button class="b" data-c="sq">📋 Copiar o SQL</button><div class="ok" id="ok-sq"></div><pre id="sq">-- Onion Park · libera as funções do servidor (chave service_role) para gravar as assinaturas.
+-- Sem isso, o pagamento é aprovado no Mercado Pago mas o Onion Park nunca fica sabendo.
+-- Cole no Supabase › SQL Editor › New query › Run. Pode rodar mais de uma vez.
+grant usage on schema public to service_role;
+grant all on public.subscriptions, public.profiles, public.admins, public.usage_events to service_role;
+</pre>
+<h2>1. mp-checkout <small style="font-size:13px;color:#7A2E8E">(atualizado em 20/11, 21h40)</small></h2><button class="b" data-c="ck">📋 Copiar o código do mp-checkout</button><div class="ok" id="ok-ck"></div><pre id="ck">// Onion Park · cria a assinatura no Mercado Pago e devolve o link do checkout.
 // Também cancela (body: {action:&quot;cancel&quot;}) confere o pagamento direto no Mercado Pago (body: {action:&quot;sync&quot;}),
 // e no painel de contas confere todas as assinaturas pagas (body: {action:&quot;reconcile&quot;}, só administrador).
 // Segredos: MP_ACCESS_TOKEN, APP_URL (ex.: https://gahbrielsoares.github.io/Onion/app/), PRICE (opcional, padrão 29.90)
@@ -34,7 +40,8 @@ Deno.serve(async (req) =&gt; {
     const { data: { user } } = await admin.auth.getUser(jwt);
     if (!user) return json({ error: &quot;Faça login de novo.&quot; }, 401);
     const body = await req.json().catch(() =&gt; ({}));
-    const { data: sub } = await admin.from(&quot;subscriptions&quot;).select(&quot;*&quot;).eq(&quot;user_id&quot;, user.id).maybeSingle();
+    const { data: sub, error: se } = await admin.from(&quot;subscriptions&quot;).select(&quot;*&quot;).eq(&quot;user_id&quot;, user.id).maybeSingle();
+    if (se) return json({ error: &quot;O banco não deixou a função ler a assinatura (&quot; + se.message + &quot;). Rode o SQL de permissões da página codigo.html.&quot; }, 500);
 
     if (body.action === &quot;cancel&quot;) {
       if (!sub?.preapproval_id) return json({ error: &quot;Você não tem assinatura ativa.&quot; }, 400);
@@ -80,7 +87,8 @@ Deno.serve(async (req) =&gt; {
 
     // painel de contas: confere TODAS as assinaturas pagas e libera quem pagou (só administrador)
     if (body.action === &quot;reconcile&quot;) {
-      const { data: adm } = await admin.from(&quot;admins&quot;).select(&quot;email&quot;).eq(&quot;email&quot;, user.email).maybeSingle();
+      const { data: adm, error: ae } = await admin.from(&quot;admins&quot;).select(&quot;email&quot;).eq(&quot;email&quot;, user.email).maybeSingle();
+      if (ae) return json({ error: &quot;O banco não deixou a função ler os dados (&quot; + ae.message + &quot;). Rode o SQL de permissões da página codigo.html.&quot; }, 500);
       if (!adm) return json({ error: &quot;Só administrador.&quot; }, 403);
       const { data: profs } = await admin.from(&quot;profiles&quot;).select(&quot;id,email&quot;);
       const byId = new Map((profs || []).map((x: any) =&gt; [x.id, x.email])), byEmail = new Map((profs || []).map((x: any) =&gt; [lower(x.email), x.id]));
@@ -123,7 +131,8 @@ Deno.serve(async (req) =&gt; {
       if (ok) break;
     }
     if (!ok) return json({ error: &quot;O Mercado Pago recusou: &quot; + (p?.message || JSON.stringify(p).slice(0, 200)) }, 502);
-    await admin.from(&quot;subscriptions&quot;).upsert({ user_id: user.id, preapproval_id: p.id, status: &quot;pending&quot;, payer_email: payer, updated_at: new Date().toISOString() });
+    const { error: ue } = await admin.from(&quot;subscriptions&quot;).upsert({ user_id: user.id, preapproval_id: p.id, status: &quot;pending&quot;, payer_email: payer, updated_at: new Date().toISOString() });
+    if (ue) console.log(&quot;não gravou a assinatura pendente:&quot;, ue.message);
     return json({ init_point: p.init_point, price: used });
   } catch (e) {
     const m = String(e?.message || e);
@@ -132,7 +141,7 @@ Deno.serve(async (req) =&gt; {
   }
 });
 </pre>
-<h2>2. mp-webhook <small style="font-size:13px;color:#7A2E8E">(atualizado em 20/11, 17h)</small></h2><button class="b" data-c="wh">📋 Copiar o código do mp-webhook</button><div class="ok" id="ok-wh"></div><pre id="wh">// Onion Park · recebe os avisos do Mercado Pago e atualiza a assinatura.
+<h2>2. mp-webhook <small style="font-size:13px;color:#7A2E8E">(atualizado em 20/11, 21h40)</small></h2><button class="b" data-c="wh">📋 Copiar o código do mp-webhook</button><div class="ok" id="ok-wh"></div><pre id="wh">// Onion Park · recebe os avisos do Mercado Pago e atualiza a assinatura.
 // Publique com &quot;Verify JWT&quot; DESLIGADO (o Mercado Pago não manda login).
 // Segredos: MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET (assinatura secreta das notificações)
 import { createClient } from &quot;npm:@supabase/supabase-js@2.45.4&quot;;
@@ -178,7 +187,8 @@ Deno.serve(async (req) =&gt; {
   const next = pre.next_payment_date || null;
   const row: Record&lt;string, unknown&gt; = { user_id: pre.external_reference, preapproval_id: pre.id, status: pre.status, payer_email: pre.payer_email || null, next_payment_date: next, updated_at: new Date().toISOString() };
   if (pre.status === &quot;authorized&quot; &amp;&amp; next) row.access_until = next;   // pago até a próxima cobrança
-  await admin.from(&quot;subscriptions&quot;).upsert(row);
+  const { error } = await admin.from(&quot;subscriptions&quot;).upsert(row);
+  if (error) { console.log(&quot;não gravou:&quot;, error.message); return new Response(&quot;erro no banco&quot;, { status: 500 }); }   // o Mercado Pago tenta de novo depois
   return new Response(&quot;ok&quot;);
 });
 </pre>

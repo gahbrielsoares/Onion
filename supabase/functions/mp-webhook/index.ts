@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
   const next = pre.next_payment_date || null;
   const row: Record<string, unknown> = { user_id: pre.external_reference, preapproval_id: pre.id, status: pre.status, payer_email: pre.payer_email || null, next_payment_date: next, updated_at: new Date().toISOString() };
   if (pre.status === "authorized" && next) row.access_until = next;   // pago até a próxima cobrança
-  await admin.from("subscriptions").upsert(row);
+  const { error } = await admin.from("subscriptions").upsert(row);
+  if (error) { console.log("não gravou:", error.message); return new Response("erro no banco", { status: 500 }); }   // o Mercado Pago tenta de novo depois
   return new Response("ok");
 });

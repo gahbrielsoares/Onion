@@ -21,7 +21,8 @@ Deno.serve(async (req) => {
     const { data: { user } } = await admin.auth.getUser(jwt);
     if (!user) return json({ error: "Faça login de novo." }, 401);
     const body = await req.json().catch(() => ({}));
-    const { data: sub } = await admin.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle();
+    const { data: sub, error: se } = await admin.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle();
+    if (se) return json({ error: "O banco não deixou a função ler a assinatura (" + se.message + "). Rode o SQL de permissões da página codigo.html." }, 500);
 
     if (body.action === "cancel") {
       if (!sub?.preapproval_id) return json({ error: "Você não tem assinatura ativa." }, 400);
@@ -67,7 +68,8 @@ Deno.serve(async (req) => {
 
     // painel de contas: confere TODAS as assinaturas pagas e libera quem pagou (só administrador)
     if (body.action === "reconcile") {
-      const { data: adm } = await admin.from("admins").select("email").eq("email", user.email).maybeSingle();
+      const { data: adm, error: ae } = await admin.from("admins").select("email").eq("email", user.email).maybeSingle();
+      if (ae) return json({ error: "O banco não deixou a função ler os dados (" + ae.message + "). Rode o SQL de permissões da página codigo.html." }, 500);
       if (!adm) return json({ error: "Só administrador." }, 403);
       const { data: profs } = await admin.from("profiles").select("id,email");
       const byId = new Map((profs || []).map((x: any) => [x.id, x.email])), byEmail = new Map((profs || []).map((x: any) => [lower(x.email), x.id]));
@@ -110,7 +112,8 @@ Deno.serve(async (req) => {
       if (ok) break;
     }
     if (!ok) return json({ error: "O Mercado Pago recusou: " + (p?.message || JSON.stringify(p).slice(0, 200)) }, 502);
-    await admin.from("subscriptions").upsert({ user_id: user.id, preapproval_id: p.id, status: "pending", payer_email: payer, updated_at: new Date().toISOString() });
+    const { error: ue } = await admin.from("subscriptions").upsert({ user_id: user.id, preapproval_id: p.id, status: "pending", payer_email: payer, updated_at: new Date().toISOString() });
+    if (ue) console.log("não gravou a assinatura pendente:", ue.message);
     return json({ init_point: p.init_point, price: used });
   } catch (e) {
     const m = String(e?.message || e);
