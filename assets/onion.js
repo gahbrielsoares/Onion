@@ -81,13 +81,26 @@ const BK=Object.fromEntries(B.map(b=>[b.k,b]));
 /* ============ HUD ============ */
 const t0=Date.now();
 setInterval(()=>{ const s=(Date.now()-t0)/1000|0; document.getElementById("clock").textContent=[s/3600|0,(s/60|0)%60,s%60].map(n=>String(n).padStart(2,"0")).join(":"); },1000);
+// o que fazer em cada escritório, em poucas palavras
+const NEXT_TXT={admin:"Colocar a chave de IA",ideias:"Escolher o tema do vídeo",titulos:"Escolher o título",roteiro:"Gerar o roteiro",descricao:"Gerar a descrição",imagens:"Preencher as imagens",narracao:"Gravar a narração",montagem:"Montar o vídeo"};
+// cartão de baixo: mostra só o próximo passo (tocável); no computador, passar o mouse mostra o escritório
 function showInfo(b){
-  const el=document.getElementById("info");
-  if(!b){ el.innerHTML=`<h2>Você no comando</h2><p>Cada escritório é uma etapa. Clique num escritório pra abrir as opções e mande o trabalho pro próximo.</p>`; return; }
-  const locked=!isUnlocked(b.k);
-  el.innerHTML=`<h2><span class="sq" style="background:${b.c}"></span>${esc(b.n)}</h2><p>${esc(b.desc)}</p><div class="hint">${b.step?`Etapa ${b.step} de 6 · `:""}${locked?"Bloqueado até a etapa anterior terminar":"Clique no escritório pra abrir"}</div>`;
+  const el=document.getElementById("info"), ns=nextStage();
+  el.onclick=null; el.onkeydown=null; el.removeAttribute("role"); el.removeAttribute("tabindex");
+  if(b && b.k!==ns){
+    const done=S.project&&S.project.done&&S.project.done[b.k], locked=!isUnlocked(b.k);
+    el.className="info";
+    el.innerHTML=`<h2><span class="sq" style="background:${b.c}"></span>${esc(b.n)}</h2><div class="hint">${b.step?`Etapa ${b.step} de 6 · `:""}${done?"✓ Concluída":locked?"🔒 Abre depois da etapa anterior":"Clique pra abrir"}</div>`; return;
+  }
+  if(busy){ el.className="info off"; return; }
+  const go=k=>{ el.setAttribute("role","button"); el.tabIndex=0; el.onclick=()=>openPanel(k); el.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openPanel(k); } }; };
+  el.className="info next";
+  if(!ns){ el.innerHTML=`<span class="dot" style="background:#4caf6a">✓</span><div class="tx"><small>Vídeo pronto</small><b>Ver e baixar na Biblioteca</b></div><span class="arr">Abrir</span>`; go("arquivo"); return; }
+  const n=BK[ns];
+  el.innerHTML=`<span class="dot" style="background:${n.c}"></span><div class="tx"><small>Próximo passo · ${esc(n.n)}</small><b>${esc(NEXT_TXT[ns]||"Abrir")}</b></div><span class="arr">Abrir</span>`; go(ns);
 }
 function renderProd(){
+  if(typeof hoverK==="undefined"||!hoverK) try{ showInfo(null); }catch(e){}
   const el=document.getElementById("prod"); const P=S.project;
   const ap=(typeof AP!=="undefined"&&AP.on)?`<div class="st" style="color:var(--accent);font-weight:700">🤖 Piloto automático · vídeo ${AP.cur} de ${AP.total} <button class="btn ghost small" style="padding:2px 8px;margin-left:auto" onclick="openPanel('auto')">ver</button></div>`:"";
   el.classList.toggle("mobile", !!(busy||P) && vw<720 && !panelKey);
@@ -168,7 +181,7 @@ function freeKeyModal(){
 const esc2=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 window.freeKeyModal=freeKeyModal;
 function aiNote(){
-  if(!AI.ready()) return `<div class="note">A equipe ainda não tem chave de IA configurada. <div class="btns" style="margin-top:6px"><button class="btn small" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button><button class="btn ghost small" onclick="openPanel('admin')">Abrir Administração</button></div></div>`;
+  if(!AI.ready()) return `<div class="note">A equipe ainda não tem chave de IA configurada. <div class="btns" style="margin-top:6px"><button class="btn small" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button><button class="btn ghost small" onclick="openPanel('admin')">Abrir Configurações</button></div></div>`;
   return "";
 }
 
@@ -230,7 +243,8 @@ async function comboAfter(stage){
 let panelKey=null;
 function openPanel(k){ window._panelAt=Date.now();
   panelKey=k; const b=BK[k]||PSEUDO[k];
-  document.getElementById("ptitle").innerHTML=esc(b.n)+(b.step?`<span class="step">Etapa ${b.step} de 6 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Configurações":(k==="auto"?"O gerente decide tudo":(k==="stories"?"Edite o vídeo que você gravou":"Sempre aberto")))}</span>`);
+  if(k==="admin"){ admTab=window._admTabReq||"chaves"; window._admTabReq=null; }
+  document.getElementById("ptitle").innerHTML=esc(k==="admin"?"Configurações":b.n)+(b.step?`<span class="step">Etapa ${b.step} de 6 · ${esc(b.role)}</span>`:`<span class="step">${k==="arquivo"?"Biblioteca":(k==="admin"?"Perfil, assinatura e chaves de IA":(k==="auto"?"O gerente decide tudo":(k==="stories"?"Edite o vídeo que você gravou":"Comece por aqui")))}</span>`);
   document.getElementById("psq").style.background=b.c;
   document.getElementById("panel").classList.add("open"); document.getElementById("panel").setAttribute("aria-hidden","false");
   document.getElementById("scrim").classList.toggle("open", k!=="auto");
@@ -646,7 +660,7 @@ async function imagePool(jobs,conc,onDone){
 }
 function imgNote(){
   if(AI.stageReady("image")) return "";
-  return `<div class="note">As imagens de verdade saem quando o cartão Imagens e capas estiver pronto. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
+  return `<div class="note">As imagens de verdade saem quando o cartão Imagens e capas estiver pronto. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Configurações</button></div>`;
 }
 
 /* ---- Capa ---- */
@@ -771,7 +785,7 @@ Responda só com JSON: {"cenas":[{"trecho":"...","prompt":"..."}]}`;
   }catch(e){ ui.imgErr=errMsg(e); P.imgPhase=0; clearBusy(); return renderPanel(); }
   clearBusy();
   if(AI.stageReady("image")) await drawScenes(P.scenes.map((_,i)=>i));
-  else { ui.imgErr="Os prompts estão prontos. Configure Imagens e capas na Administração pra gerar as imagens."; renderPanel(); }
+  else { ui.imgErr="Os prompts estão prontos. Configure Imagens e capas em Configurações pra gerar as imagens."; renderPanel(); }
 }
 async function drawScenes(idx){
   const P=S.project; ui.imgErr=null; const st=P.style;
@@ -813,7 +827,7 @@ function colagemView0(){
     <div class="m" style="font-size:12.5px">${[st.real?`📷 ${st.real} grátis da internet`:"",st.own?`📁 ${st.own} suas`:"",st.ai?`🎨 ${st.ai} geradas com IA`:"",st.nofound?`🔎 ${st.nofound} sem foto livre`:""].filter(Boolean).join(" · ")||"nenhuma ainda"}</div>
     ${st.pend?`<div class="btns" style="margin-top:8px">
       <button class="btn small" id="bsearch" ${busy?"disabled":""}>🔎 Buscar ${st.pend} grátis</button>
-      <button class="btn ghost small" id="bai" ${busy||!AI.stageReady("image")?"disabled":""} title="${AI.stageReady("image")?"":"Configure Imagens e capas na Administração"}">🎨 Gerar ${st.pend} pela API (pago)</button></div>
+      <button class="btn ghost small" id="bai" ${busy||!AI.stageReady("image")?"disabled":""} title="${AI.stageReady("image")?"":"Configure Imagens e capas em Configurações"}">🎨 Gerar ${st.pend} pela API (pago)</button></div>
       <p class="m" style="font-size:12px;margin:6px 0 0">Pra trocar ou preencher uma imagem: toque no quadrado e use 🌐 Google ou ✨ Gemini, depois Ctrl+V. · <label style="cursor:pointer;color:var(--accent)">enviar várias do computador<input type="file" id="bup" accept="image/*" multiple style="display:none"></label> · <a href="#" id="bcopy" style="color:var(--accent)">copiar a lista</a></p>`:""}
   </div>
   <div class="scenes">${P.board.assets.map(a=>{ const ok=a.img==="ok"; return `<button type="button" class="scene ${P.selAsset===a.id?"cur":""} ${ok?"":"pend"}" data-as="${esc(a.id)}" ${ok?`data-img="${mkey(P.id,"asset",a.id)}"`:""} style="background-color:${ok?tp.bg:"transparent"};background-size:${doc?"cover":"contain"}!important;background-repeat:no-repeat;color:${ok?tp.ink:"var(--text)"}" title="${esc(a.nome)}">
@@ -955,7 +969,7 @@ async function drawAssets(ids,mode="auto"){
       if(!blob&&mode==="search"){ a.img="nofound"; }
       else {
         if(!blob){
-          if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas na Administração pra gerar com IA."};
+          if(!AI.stageReady("image")) throw {code:"no_image",message:"Configure Imagens e capas em Configurações pra gerar com IA."};
           if(doc){
             const desc=a.descricao&&a.descricao!==a.nome?a.descricao:`${a.busca||a.nome}. If a person appears, show an anonymous figure (from behind, silhouette or in shadow) with no recognizable face.`;
             const raw=await AI.image(`${Doc.STYLE[a.estilo]||Doc.STYLE.reconstrucao} Scene: ${desc}.`,{aspect:"16:9",signal:busy.ctl.signal});
@@ -1002,7 +1016,7 @@ VIEWS.stories=()=>{ const T=story(), working=busy&&busy.k==="stories", st=T.stud
       <label class="btn ghost small" style="cursor:pointer">📁 Adicionar fotos e vídeos<input type="file" id="stmedia" accept="image/*,video/*" multiple style="display:none"></label>
       ${T.media.length?`<div class="scenes" style="margin-top:8px">${T.media.map(m=>`<div class="scene" ${m.type.startsWith("image")?`data-img="st${T.id}:${m.id}"`:""} style="background:#222;background-size:cover;background-position:center"><span>${m.type.startsWith("video")?"🎬":"🖼"} ${esc(m.id)}</span><small style="position:absolute;left:4px;right:4px;bottom:3px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</small><button class="x" data-mdel="${m.id}" style="position:absolute;right:3px;top:3px;width:22px;height:22px;font-size:12px" aria-label="Remover">×</button></div>`).join("")}</div>`:""}</div>
     <div class="field" style="max-width:340px"><label for="stdest">Pra onde vai</label><select id="stdest">${DESTINOS.map(d=>`<option ${d===T.dest?"selected":""}>${d}</option>`).join("")}</select></div>
-    <div class="btns"><button class="btn" id="ststudy" ${!T.hasSrc||busy||!g?"disabled":""}>🔍 ${st?"Estudar de novo":"Iniciar estudo"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}${!g?`<span class="m" style="font-size:12px">O estudo usa o Gemini: cole a chave do Google na Administração.</span>`:""}</div>
+    <div class="btns"><button class="btn" id="ststudy" ${!T.hasSrc||busy||!g?"disabled":""}>🔍 ${st?"Estudar de novo":"Iniciar estudo"}</button>${working?`<button class="btn ghost small" onclick="interrupt()">⏹ Interromper</button>`:""}${!g?`<span class="m" style="font-size:12px">O estudo usa o Gemini: cole a chave do Google em Configurações.</span>`:""}</div>
     ${working?`<div class="status"><span class="spin"></span>${esc(busy.action)}…</div>${T.prog!=null?`<div class="bar"><i style="width:${T.prog*100}%"></i></div>`:""}`:""}
     ${ui.stErr?`<div class="err">${esc(ui.stErr)}</div>`:""}
   </div>
@@ -1071,7 +1085,7 @@ function stopAudio(){ if(playing){ try{ playing.pause(); }catch(e){} playing=nul
 VIEWS.narracao=()=>{ const P=S.project; const working=busy&&busy.k==="narracao"; const c=AI.get(); const prov=c.voice.provider;
   const N=P.narr; const okN=N?N.chunks.filter(x=>x.st==="ok").length:0, badN=N?N.chunks.filter(x=>x.st&&x.st!=="ok"&&x.st!=="wait").length:0;
   const words=wc(scriptText()); const est=(words/(140*P.speed)).toFixed(1);
-  if(!AI.stageReady("voice")) return staleNote(P,"narracao")+`<p class="lead">O roteiro narrado com voz realista.</p><div class="note">Configure o cartão Narração na Administração pra escolher as vozes. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Administração</button></div>`;
+  if(!AI.stageReady("voice")) return staleNote(P,"narracao")+`<p class="lead">O roteiro narrado com voz realista.</p><div class="note">Configure o cartão Narração em Configurações pra escolher as vozes. <button class="btn small" style="margin-top:6px" onclick="openPanel('admin')">Abrir Configurações</button></div>`;
   return staleNote(P,"narracao")+`
   <p class="lead">O roteiro narrado com voz realista. Voz por <b>${esc(AI.PROVIDERS[prov].name)}</b> · ${esc(c.voice.model)} <a href="#" onclick="openPanel('admin');return false" style="color:var(--accent)">trocar</a></p>
   <div class="row" style="align-items:end"><div class="field" style="margin:0"><label for="vq">Buscar voz</label><input id="vq" placeholder="nome, estilo, sotaque" value="${esc(ui.vq||"")}"></div>
@@ -1484,10 +1498,32 @@ function modelField(st,field,label){
   const opts=(cur&&!ids.includes(cur)?[cur,...ids]:ids);
   return `<div class="field"><label for="${id}">${label}</label><select id="${id}" data-model="${st}:${field}">${field==="quick"?`<option value="">Mesmo do principal</option>`:""}${opts.map(m=>`<option ${m===cur?"selected":""}>${esc(m)}</option>`).join("")}</select></div>`;
 }
-VIEWS.admin=()=>{ const c=AI.get(); return `
-  <div class="btns" style="margin:0 0 12px"><button class="btn" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button>${window.Auth&&Auth.enabled?`<button class="btn ghost small" id="admOut">Sair da conta</button>`:""}</div>
-  ${window.Auth&&Auth.enabled?`<div class="card" id="subBox" style="padding:12px 14px;margin-bottom:12px"><span class="spin"></span> verificando a assinatura…</div>`:""}
-  <p class="lead">Pra cada etapa, escolha quem faz o trabalho e cole a chave. A mesma chave vale pra todas as etapas do mesmo provedor. Tudo fica guardado só neste navegador.</p>
+let admTab="chaves";
+window.openSettings=tab=>{ window._admTabReq=tab; openPanel("admin"); };
+VIEWS.admin=()=>{ const c=AI.get(), auth=window.Auth&&Auth.enabled;
+  const tabs=[["chaves","🔑 Chaves de IA"],["parque","🌗 Escritórios"],...(auth?[["perfil","👤 Perfil"]]:[])];
+  if(!tabs.some(t=>t[0]===admTab)) admTab="chaves";
+  const head=`<div class="pills" data-group="admtab" style="margin:0 0 14px">${tabs.map(([v,t])=>`<button type="button" class="pill" aria-pressed="${v===admTab}" data-v="${v}">${t}</button>`).join("")}</div>`;
+  if(admTab==="perfil") return head+`
+  <section class="card" style="padding:14px;margin-bottom:12px">
+    <small class="m">Conta Google</small><div class="t" id="pfMail" style="font-size:15.5px;font-weight:700;margin-top:2px;word-break:break-all">…</div>
+  </section>
+  <section class="card" style="padding:14px;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0">Assinatura</h3><span id="subTag"><span class="spin"></span></span></div>
+    <div class="btns" style="margin-top:10px"><button class="btn ghost small" id="subManage">Gerenciar assinatura</button></div>
+    <div id="subBox" hidden style="margin-top:10px"></div>
+  </section>
+  <div class="btns"><button class="btn ghost small" id="admOut">Sair da conta</button></div>`;
+  if(admTab==="parque") return head+`
+  <section class="card" style="padding:14px;margin-bottom:12px">
+    <h3 style="margin:0">Dia, noite e sons</h3>
+    <div class="row" style="margin-top:10px"><div class="field"><label for="ptime">Dia e noite</label><select id="ptime">${[["auto","Automático (horário de Brasília)"],["dia","Sempre de dia"],["noite","Sempre de noite"]].map(([v,t])=>`<option value="${v}" ${((S.park||{}).time||"auto")===v?"selected":""}>${t}</option>`).join("")}</select></div></div>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="pamb" ${(S.park||{}).amb!==false?"checked":""}> Sons de natureza bem baixinho (passarinhos de dia, grilos à noite)</label>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="palert" ${(S.park||{}).alert!==false?"checked":""}> Som 8-bit quando um vídeo fica pronto</label>
+    <div class="btns" style="margin-top:6px"><button class="btn ghost small" id="ptest">🔊 Testar o som de pronto</button></div>
+  </section>
+`;
+  return head+`<div class="btns" style="margin:0 0 12px"><button class="btn" onclick="freeKeyModal()">🔑 Pegar chave de IA grátis</button></div>
   ${Object.entries(AI.STAGES).map(([st,S2])=>{
     const p=c[st].provider, P2=AI.PROVIDERS[p];
     const others=Object.keys(AI.STAGES).filter(o=>o!==st&&c[o].provider===p&&!P2.noKey).map(o=>AI.STAGES[o].name);
@@ -1512,21 +1548,16 @@ VIEWS.admin=()=>{ const c=AI.get(); return `
     </section>`;}).join("")}
   <section class="card" style="padding:14px;margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><h3 style="margin:0">Tendências ao vivo</h3>${(c.keys.youtube||c.keys.google)?`<span class="tag gold">${c.keys.youtube?"chave própria":"usa a chave do Google"}</span>`:`<span class="tag">opcional</span>`}</div>
-    <p class="m" style="margin:4px 0 10px">O Laboratório de Virais lê o YouTube em alta com a YouTube Data API v3 (grátis, 10 mil unidades por dia). Pode ser a mesma chave do Google, desde que a API esteja ativada no projeto dela. A pesquisa no Google usa a chave do Gemini, e a Wikipedia não precisa de chave.</p>
+    <p class="m" style="margin:4px 0 10px">Opcional. Mostra o que está em alta no YouTube. Vazio usa a chave do Google.</p>
     <div class="field"><label for="k-yt">Chave da YouTube Data API (deixe vazio pra usar a do Google)</label><div style="display:flex;gap:6px"><input id="k-yt" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(c.keys.youtube||"")}"><button type="button" class="btn ghost small" data-show="k-yt" aria-label="Mostrar chave">👁</button></div></div>
     <div class="btns" style="margin-top:4px"><button class="btn small" id="yttest">Salvar e testar o YouTube</button></div>
     ${admMsg.yt?`<div class="${admMsg.yt.ok?"status":"err"}" style="${admMsg.yt.ok?"color:var(--ok)":""}">${esc(admMsg.yt.text)}</div>`:""}
   </section>
-  <section class="card" style="padding:14px;margin-bottom:12px">
-    <h3 style="margin:0">🌗 Escritórios</h3>
-    <div class="row" style="margin-top:10px"><div class="field"><label for="ptime">Dia e noite</label><select id="ptime">${[["auto","Automático (horário de Brasília)"],["dia","Sempre de dia"],["noite","Sempre de noite"]].map(([v,t])=>`<option value="${v}" ${((S.park||{}).time||"auto")===v?"selected":""}>${t}</option>`).join("")}</select></div></div>
-    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="pamb" ${(S.park||{}).amb!==false?"checked":""}> Sons de natureza bem baixinho (passarinhos de dia, grilos à noite)</label>
-    <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:4px 0"><input type="checkbox" id="palert" ${(S.park||{}).alert!==false?"checked":""}> Som 8-bit quando um vídeo fica pronto</label>
-    <div class="btns" style="margin-top:6px"><button class="btn ghost small" id="ptest">🔊 Testar o som de pronto</button></div>
-  </section>
-  <div class="note">Defina um limite mensal de gasto no painel de cada provedor. Nunca cole chaves no código nem no repositório: o site é público, as chaves não.</div>
+  <div class="note">Dica: defina um limite de gasto mensal no painel de cada provedor. As chaves ficam só neste navegador.</div>
   <div class="btns"><button class="btn ghost small" id="aclear">Apagar todas as chaves deste navegador</button></div>`; };
 BIND.admin=el=>{
+  bindPills(el,"admtab",v=>{ admTab=v; renderPanel(); el.scrollTop=0; });
+  const $=q=>el.querySelector(q);
   Object.keys(AI.STAGES).forEach(st=>{
     bindPills(el,"prov-"+st,v=>{ AI.setStage(st,{provider:v,model:"",...(st==="text"?{quick:""}:{})}); const ids=AI.cachedModels(v,st); if(ids.length) AI.setStage(st,{model:AI.pickDefault(st,ids),...(st==="text"?{quick:AI.pickQuick(ids)}:{})}); admMsg[st]=null; renderPanel();
       if(!ids.length && !AI.PROVIDERS[v].noKey && AI.get().keys[v]){ const b=document.querySelector(`[data-test="${st}"]`); if(b) b.click(); } });
@@ -1557,22 +1588,27 @@ BIND.admin=el=>{
     }catch(e){ admMsg[st]={ok:false,text:e.message||"Não deu pra testar a chave."}; }
     renderPanel(); showInfo(null); renderProd();
   });
-  el.querySelector("#yttest").onclick=async e=>{ const b=e.currentTarget; AI.setKey("youtube",el.querySelector("#k-yt").value); b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando…`;
+  if($("#yttest")) $("#yttest").onclick=async e=>{ const b=e.currentTarget; AI.setKey("youtube",el.querySelector("#k-yt").value); b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando…`;
     try{ await Trends.testYouTube(); admMsg.yt={ok:true,text:"✓ O YouTube respondeu. O Laboratório de Virais já pode ler o que está em alta."}; }
     catch(err){ admMsg.yt={ok:false,text:err.message||"Não deu certo"}; } renderPanel(); };
-  const sb2=el.querySelector("#subBox"); if(sb2) (async()=>{ const {data:{user}}=await Auth.sb.auth.getUser(); if(!user){ sb2.remove(); return; } const sub=await Auth.subscription(user.id);
-    const d=x=>x?new Date(x).toLocaleDateString("pt-BR"):"";
-    const txt=sub.status==="authorized"?`✓ Assinatura <b>ativa</b>${sub.next_payment_date?` · próxima cobrança em ${d(sub.next_payment_date)}`:""}`:sub.active?`Assinatura cancelada · acesso liberado até ${d(sub.access_until)}`:sub.status==="pending"?"Pagamento pendente no Mercado Pago":Auth.requirePayment?"Sem assinatura":"Acesso gratuito (período de testes)";
-    sb2.innerHTML=`<div class="t" style="font-size:14.5px">${txt}</div>${sub.status==="authorized"?`<div class="btns" style="margin-top:8px"><button class="btn ghost small" id="subCancel">Cancelar assinatura</button></div>`:!sub.active?`<div class="btns" style="margin-top:8px"><button class="btn small" id="subBuy">Assinar agora · R$ ${Auth.price}/mês</button></div>`:""}`;
+  const sb2=$("#subBox"); if(sb2) (async()=>{ const {data:{user}}=await Auth.sb.auth.getUser(); if(!user) return;
+    $("#pfMail").textContent=user.email||"";
+    const sub=await Auth.subscription(user.id), d=x=>x?new Date(x).toLocaleDateString("pt-BR"):"";
+    const tag=sub.status==="authorized"?`<span class="tag gold">ativa</span>`:sub.active?`<span class="tag">cancelada</span>`:sub.status==="pending"?`<span class="tag hot">pendente</span>`:Auth.requirePayment?`<span class="tag hot">sem assinatura</span>`:`<span class="tag">gratuito</span>`;
+    $("#subTag").innerHTML=tag;
+    const txt=sub.status==="authorized"?`Plano mensal · R$ ${esc(Auth.price)}/mês${sub.next_payment_date?`<br>Próxima cobrança em <b>${d(sub.next_payment_date)}</b>`:""}`:sub.active?`Cancelada. Seu acesso continua até <b>${d(sub.access_until)}</b>.`:sub.status==="pending"?"O pagamento ainda não foi confirmado pelo Mercado Pago.":Auth.requirePayment?"Você ainda não tem assinatura.":"Acesso gratuito.";
+    sb2.innerHTML=`<div class="t" style="font-size:14px">${txt}</div>${sub.status==="authorized"?`<div class="btns" style="margin-top:10px"><button class="btn ghost small" id="subCancel" style="color:#c0392b">Cancelar assinatura</button></div><p class="m" style="font-size:12px;margin:6px 0 0">Se cancelar, você continua usando até o fim do mês já pago.</p>`:!sub.active?`<div class="btns" style="margin-top:10px"><button class="btn small" id="subBuy">Assinar · R$ ${esc(Auth.price)}/mês</button></div>`:""}`;
+    const mg=$("#subManage"); mg.onclick=()=>{ sb2.hidden=false; mg.parentNode.remove(); };
+    if(!sub.active||sub.status==="pending"){ sb2.hidden=false; mg.parentNode.remove(); }
     const bb=sb2.querySelector("#subBuy"); if(bb) bb.onclick=()=>Auth.open({step:"plan",userEmail:user.email,onDone:()=>renderPanel()});
-    const sc=sb2.querySelector("#subCancel"); if(sc) sc.onclick=async()=>{ if(!confirm("Cancelar a assinatura? O acesso continua até o fim do mês já pago.")) return; sc.disabled=true; sc.innerHTML=`<span class="spin"></span>`; try{ const r=await Auth.cancelSub(); toast("Assinatura cancelada"+(r.access_until?` · acesso até ${d(r.access_until)}`:"")); }catch(e){ toast(e.message); } renderPanel(); };
+    const sc=sb2.querySelector("#subCancel"); if(sc) sc.onclick=async()=>{ if(!confirm("Cancelar a assinatura? Você continua usando até o fim do mês já pago.")) return; sc.disabled=true; sc.innerHTML=`<span class="spin"></span>`; try{ const r=await Auth.cancelSub(); toast("Assinatura cancelada"+(r.access_until?` · acesso até ${d(r.access_until)}`:"")); }catch(e){ toast(e.message); } renderPanel(); };
   })();
   const ao=el.querySelector("#admOut"); if(ao) ao.onclick=async()=>{ await Auth.signOut(); location.href="../"; };
   const pk=()=>{ if(!S.park) S.park={time:"auto",amb:true,alert:true}; return S.park; };
-  el.querySelector("#ptime").onchange=e=>{ pk().time=e.target.value; save(); if(typeof updateDaylight==="function") updateDaylight(); };
+  if($("#ptime")){ el.querySelector("#ptime").onchange=e=>{ pk().time=e.target.value; save(); if(typeof updateDaylight==="function") updateDaylight(); };
   el.querySelector("#pamb").onchange=e=>{ pk().amb=e.target.checked; save(); };
   el.querySelector("#palert").onchange=e=>{ pk().alert=e.target.checked; save(); };
-  el.querySelector("#ptest").onclick=()=>{ if(typeof ParkAudio!=="undefined") ParkAudio.jingle(); };
-  el.querySelector("#aclear").onclick=()=>{ AI.clearAll(); admMsg={}; toast("Chaves apagadas deste navegador"); renderPanel(); };
+  el.querySelector("#ptest").onclick=()=>{ if(typeof ParkAudio!=="undefined") ParkAudio.jingle(); }; }
+  if($("#aclear")) $("#aclear").onclick=()=>{ AI.clearAll(); admMsg={}; toast("Chaves apagadas deste navegador"); renderPanel(); };
 };
 

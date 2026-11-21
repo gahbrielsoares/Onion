@@ -283,7 +283,7 @@ const Auth = (() => {
     const s = await state();
     if (s.ok) {
       track("abriu");
-      if (/preapproval_id/.test(location.search)) { history.replaceState(null, "", location.pathname); setTimeout(() => { if (window.openPanel) openPanel("admin"); if (window.toast) toast("Pagamento enviado! A confirmação do Mercado Pago aparece aqui em alguns segundos."); }, 1200); }
+      if (/preapproval_id/.test(location.search)) { history.replaceState(null, "", location.pathname); setTimeout(() => { if (window.openSettings) openSettings("perfil"); else if (window.openPanel) openPanel("admin"); if (window.toast) toast("Pagamento enviado! A confirmação do Mercado Pago aparece aqui em alguns segundos."); }, 1200); }
       return true;
     }
     const fromMP = /preapproval_id|collection_status|status=/.test(location.search);

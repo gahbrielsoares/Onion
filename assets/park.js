@@ -810,7 +810,8 @@ function drawLabels() {
     if (x < -220 || x > vw + 220 || y < -60 || y > vh + 60) return;
     const locked = !isUnlocked(b.k), working = busy && busy.k === b.k, active = working || (ns === b.k && !busy), hov = hoverK === b.k;
     ctx.font = `700 13px "Pixelify Sans", monospace`; ctx.textBaseline = "middle";
-    const txt = b.n, tw = ctx.measureText(txt).width, bw = Math.round(tw + 30), bh = 24, bx = Math.round(x - bw / 2), by = Math.round(y - 13) - (hov ? 2 : 0);
+    const doneK = !working && S.project && S.project.done && S.project.done[b.k];
+    const txt = (doneK ? "✓ " : "") + b.n, tw = ctx.measureText(txt).width, bw = Math.round(tw + 30), bh = 24, bx = Math.round(x - bw / 2), by = Math.round(y - 13) - (hov ? 2 : 0);
     // botão com sombra deslocada, no estilo do site
     const bg = locked ? "#ece8f1" : active ? "#f2c14e" : "#fff8ec";
     ctx.fillStyle = locked ? "rgba(43,35,64,.35)" : INK; ctx.fillRect(bx + 3, by + 3, bw, bh);
