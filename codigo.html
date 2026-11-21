@@ -11,8 +11,9 @@ pre{background:#14101d;color:#e8e1f0;border-radius:12px;padding:12px;overflow:au
 <body><main>
 <h1>Códigos das funções do pagamento</h1>
 <p>Toque em <b>Copiar</b>, vá no editor do Supabase, apague o exemplo e cole. Esta página não é traduzida, então o código vem certinho.</p>
-<h2>1. mp-checkout <small style="font-size:13px;color:#7A2E8E">(atualizado em 20/11, 17h)</small></h2><button class="b" data-c="ck">📋 Copiar o código do mp-checkout</button><div class="ok" id="ok-ck"></div><pre id="ck">// Onion Park · cria a assinatura no Mercado Pago e devolve o link do checkout.
-// Também cancela (body: {action:&quot;cancel&quot;}) e confere o pagamento direto no Mercado Pago (body: {action:&quot;sync&quot;}).
+<h2>1. mp-checkout <small style="font-size:13px;color:#7A2E8E">(atualizado em 20/11, 21h30)</small></h2><button class="b" data-c="ck">📋 Copiar o código do mp-checkout</button><div class="ok" id="ok-ck"></div><pre id="ck">// Onion Park · cria a assinatura no Mercado Pago e devolve o link do checkout.
+// Também cancela (body: {action:&quot;cancel&quot;}) confere o pagamento direto no Mercado Pago (body: {action:&quot;sync&quot;}),
+// e no painel de contas confere todas as assinaturas pagas (body: {action:&quot;reconcile&quot;}, só administrador).
 // Segredos: MP_ACCESS_TOKEN, APP_URL (ex.: https://gahbrielsoares.github.io/Onion/app/), PRICE (opcional, padrão 29.90)
 // COUPONS (opcional, JSON com o preço mensal de cada cupom), ex.: {&quot;BLACK19&quot;:19.90,&quot;NOVEM9&quot;:9.90}
 // Os cupons ficam só no Supabase (o código do site é público).
@@ -44,22 +45,52 @@ Deno.serve(async (req) =&gt; {
       return json({ ok: true, access_until: until });
     }
 
+    const H = { headers: { Authorization: `Bearer ${MP}` } };
+    // lista as assinaturas PAGAS da conta do Mercado Pago (são poucas), das mais novas para as mais antigas
+    const paidList = async (extra = &quot;&quot;) =&gt; {
+      const all: any[] = [];
+      for (let off = 0; off &lt; 1000; off += 100) {
+        const r = await mpFetch(`https://api.mercadopago.com/preapproval/search?status=authorized&amp;sort=date_created:desc&amp;limit=100&amp;offset=${off}${extra}`, H);
+        if (!r.ok) break;
+        const res = (await r.json()).results || []; all.push(...res); if (res.length &lt; 100) break;
+      }
+      return all;
+    };
+    const lower = (x: unknown) =&gt; String(x || &quot;&quot;).trim().toLowerCase();
+    const save = async (uid: string, pre: any, payer?: string | null) =&gt; {
+      const next = pre.next_payment_date || null;
+      const row: Record&lt;string, unknown&gt; = { user_id: uid, preapproval_id: pre.id, status: pre.status, payer_email: pre.payer_email || payer || null, next_payment_date: next, updated_at: new Date().toISOString() };
+      if (pre.status === &quot;authorized&quot;) row.access_until = next || new Date(Date.now() + 31 * 864e5).toISOString();
+      const { error } = await admin.from(&quot;subscriptions&quot;).upsert(row); if (error) throw new Error(&quot;Supabase: &quot; + error.message);
+    };
+
     // confere direto no Mercado Pago (não depende do aviso automático chegar)
     if (body.action === &quot;sync&quot;) {
-      const H = { headers: { Authorization: `Bearer ${MP}` } };
-      let list: any[] = [];
-      const r = await mpFetch(`https://api.mercadopago.com/preapproval/search?external_reference=${user.id}&amp;limit=50`, H);
-      if (r.ok) list = ((await r.json()).results || []).filter((x: any) =&gt; x.external_reference === user.id);
-      if (sub?.preapproval_id &amp;&amp; !list.some((x: any) =&gt; x.id === sub.preapproval_id)) {
-        const r2 = await mpFetch(`https://api.mercadopago.com/preapproval/${sub.preapproval_id}`, H); if (r2.ok) list.push(await r2.json());
+      const mine = [lower(user.email), lower(sub?.payer_email)].filter(Boolean);
+      let pre: any = null;
+      if (sub?.preapproval_id) { const r = await mpFetch(`https://api.mercadopago.com/preapproval/${sub.preapproval_id}`, H); if (r.ok) { const x = await r.json(); if (x.status === &quot;authorized&quot;) pre = x; } }
+      if (!pre) {
+        const list = await paidList();
+        pre = list.find((x: any) =&gt; x.external_reference === user.id) || list.find((x: any) =&gt; mine.includes(lower(x.payer_email)));
       }
-      const pre = list.find((x: any) =&gt; x.status === &quot;authorized&quot;) || list.find((x: any) =&gt; x.id === sub?.preapproval_id);
-      if (!pre) return json({ status: sub?.status || &quot;none&quot; });
-      const next = pre.next_payment_date || null;
-      const row: Record&lt;string, unknown&gt; = { user_id: user.id, preapproval_id: pre.id, status: pre.status, payer_email: pre.payer_email || sub?.payer_email || null, next_payment_date: next, updated_at: new Date().toISOString() };
-      if (pre.status === &quot;authorized&quot; &amp;&amp; next) row.access_until = next;
-      await admin.from(&quot;subscriptions&quot;).upsert(row);
-      return json({ status: pre.status });
+      if (!pre) return json({ status: sub?.status || &quot;none&quot;, found: false });
+      await save(user.id, pre, sub?.payer_email);
+      return json({ status: pre.status, found: true });
+    }
+
+    // painel de contas: confere TODAS as assinaturas pagas e libera quem pagou (só administrador)
+    if (body.action === &quot;reconcile&quot;) {
+      const { data: adm } = await admin.from(&quot;admins&quot;).select(&quot;email&quot;).eq(&quot;email&quot;, user.email).maybeSingle();
+      if (!adm) return json({ error: &quot;Só administrador.&quot; }, 403);
+      const { data: profs } = await admin.from(&quot;profiles&quot;).select(&quot;id,email&quot;);
+      const byId = new Map((profs || []).map((x: any) =&gt; [x.id, x.email])), byEmail = new Map((profs || []).map((x: any) =&gt; [lower(x.email), x.id]));
+      const list = await paidList(), out: any[] = [];
+      for (const pre of list) {
+        const uid = byId.has(pre.external_reference) ? pre.external_reference : byEmail.get(lower(pre.payer_email));
+        if (uid) await save(uid, pre);
+        out.push({ id: pre.id, payer_email: pre.payer_email || &quot;&quot;, amount: pre.auto_recurring?.transaction_amount, created: pre.date_created, next: pre.next_payment_date, account: uid ? byId.get(uid) : null });
+      }
+      return json({ ok: true, total: list.length, linked: out.filter(x =&gt; x.account).length, items: out });
     }
 
     // cupom: o preço vem só do servidor

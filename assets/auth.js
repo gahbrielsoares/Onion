@@ -41,8 +41,10 @@ const Auth = (() => {
       const { data: adm } = await sb.from("admins").select("email").eq("email", user.email).maybeSingle();
       if (!adm) {
         // pagou e o aviso do Mercado Pago não chegou? confere direto lá antes de pedir pagamento
-        if (sub.status !== "none" && await syncSub()) { const s2 = await subscription(user.id); if (s2.active) return { ok: true, user, p, sub: s2 }; }
-        return { ok: false, step: "plan", user, p, sub };
+        const r = await syncSub();
+        if (r && r.found) { const s2 = await subscription(user.id); if (s2.active) return { ok: true, user, p, sub: s2 }; }
+        const hint = sub.status === "pending" && r && r.found === false ? `Ainda não encontramos um pagamento aprovado para ${user.email}. Se você já pagou entrando com outra conta Google, toque em "Entrar com outra conta" e use aquela.` : "";
+        return { ok: false, step: "plan", user, p, sub, hint };
       }
     }
     return { ok: true, user, p, sub };
@@ -53,7 +55,7 @@ const Auth = (() => {
     s.active = s.status === "authorized" || (!!s.access_until && new Date(s.access_until).getTime() > now);
     return s;
   }
-  async function syncSub() { try { await callMp({ action: "sync" }, 15000); return true; } catch (e) { return false; } }
+  async function syncSub() { try { return await callMp({ action: "sync" }, 20000); } catch (e) { return null; } }
   // chama a função do pagamento com limite de tempo: o botão nunca fica girando pra sempre
   async function callMp(body, ms = 30000) {
     let timer;
@@ -286,7 +288,7 @@ const Auth = (() => {
     }
     const fromMP = /preapproval_id|collection_status|status=/.test(location.search);
     const step = s.step === "confirm" ? "login" : (s.step === "plan" && fromMP ? "waiting" : s.step);
-    return new Promise(res => open({ step, blocking: true, userEmail: s.user && s.user.email, onDone: () => { track("abriu"); if (fromMP) history.replaceState(null, "", location.pathname); res(true); } }));
+    return new Promise(res => open({ step, blocking: true, userEmail: s.user && s.user.email, flash: step === "plan" ? s.hint || "" : "", onDone: () => { track("abriu"); if (fromMP) history.replaceState(null, "", location.pathname); res(true); } }));
   }
   // na página inicial: os botões de entrar abrem a janela (ou vão direto, se já estiver tudo certo)
   function wireEnterButtons(sel = "a[href='app/'],a[href='./app/']") {
@@ -294,11 +296,11 @@ const Auth = (() => {
     document.querySelectorAll(sel).forEach(a => a.addEventListener("click", async e => {
       e.preventDefault(); const s = await state();
       if (s.ok) { location.href = appUrl; return; }
-      open({ step: s.step === "confirm" ? "login" : s.step, userEmail: s.user && s.user.email, onDone: () => { location.href = appUrl; } });
+      open({ step: s.step === "confirm" ? "login" : s.step, userEmail: s.user && s.user.email, flash: s.step === "plan" ? s.hint || "" : "", onDone: () => { location.href = appUrl; } });
     }));
   }
   async function signOut() { if (enabled) await sb.auth.signOut(); }
-  return { enabled, sb, state, open, gate, track, wireEnterButtons, signOut, subscription, cancelSub, requirePayment: !!C.requirePayment, price: C.price || "29,90" };
+  return { enabled, sb, state, open, gate, track, wireEnterButtons, signOut, subscription, cancelSub, callMp, requirePayment: !!C.requirePayment, price: C.price || "29,90" };
 })();
 window.Auth = Auth;
 window.onionTrack = k => Auth.track(k);
