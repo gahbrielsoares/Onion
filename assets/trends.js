@@ -36,7 +36,8 @@ const Trends = (() => {
     "Egito": { yt: "EG", wiki: "ar.wikipedia", lang: "ar", nome: "no Egito", t24: "egypt/", news: "hl=ar&gl=EG&ceid=EG:ar" }
   };
   const fail = (code, message) => ({ code, message });
-  const ytKey = () => AI.get().keys.youtube || AI.get().keys.google || "";
+  // chaves novas do Gemini (AQ.) só valem pro Gemini; pro YouTube serve a chave própria ou uma AIza antiga
+const ytKey = () => { const k = AI.get().keys; return k.youtube || (/^AIza/.test(k.google || "") ? k.google : ""); };
   const fmtN = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace(".0", "") + " mi" : n >= 1e3 ? Math.round(n / 1e3) + " mil" : String(n);
 
   async function ytFetch(path, params) {

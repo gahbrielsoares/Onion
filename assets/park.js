@@ -803,7 +803,8 @@ function toScreen(wx, wy) { return [(wx - camX) * zoom, (wy - camY) * zoom]; }
 function labelAnchor(b) { const h = buildingHull(b); let top = h[0]; h.forEach(p => { if (p[1] < top[1]) top = p; }); const [cx] = W(b.cx, b.cy); return [cx, top[1] - 10]; }
 function drawLabels() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const ns = nextStage(), INK = "#2b2340";
+  // na demonstração guiada, a seta aponta pro escritório que o tour pede (null = nenhum)
+  const ns = window.TOUR_MAP !== undefined ? window.TOUR_MAP : nextStage(), INK = "#2b2340";
   B.forEach(b => {
     if (!b.poly) return;
     const [wx, wy] = labelAnchor(b); const [x, y] = toScreen(wx, wy);
@@ -911,6 +912,10 @@ document.getElementById("admBtn").onclick = () => openPanel("admin");
 window.addEventListener("resize", resize);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closePanel(); });
 
+
+// demonstração guiada: centraliza um escritório e diz onde está o nome dele na tela
+window.parkFocus = k => { const b = BK[k]; if (!b || !b.poly) return; const [wx, wy] = labelAnchor(b); camX = wx - vw / zoom / 2; camY = wy - vh / zoom * .45; clampCam(); };
+window.parkLabelXY = k => { const b = BK[k]; if (!b || !b.poly) return null; const [wx, wy] = labelAnchor(b); const [x, y] = toScreen(wx, wy); return [x, y - 13]; };
 
 /* ============ INÍCIO ============ */
 resize(); center(); showInfo(null); renderProd();

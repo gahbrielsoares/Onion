@@ -251,6 +251,11 @@ footer .copy{width:100%;border-top:1.5px solid var(--line);padding-top:16px}
   .mbar{display:flex;gap:8px;position:fixed;left:0;right:0;bottom:0;z-index:60;padding:10px 16px calc(env(safe-area-inset-bottom,0px) + 10px);background:rgba(251,247,241,.94);backdrop-filter:blur(10px);border-top:1.5px solid var(--line);transform:translateY(110%);transition:transform .25s ease}
   .mbar.on{transform:none}
   .mbar .btn{flex:1;justify-content:center;text-align:center;font-size:15px;padding:12px 10px;white-space:nowrap}
-  .mbar .btn:not(.primary){flex:0 0 34%}
+  .mbar .btn:not(.primary){flex:0 0 42%}
   footer{padding-bottom:90px}
 }
+
+/* botão "Ver como funciona" (abre a demonstração guiada) */
+.btn.demo{background:#fff;border-color:var(--ink)}
+.btn.demo::first-letter{color:var(--purple,#7A2E8E)}
+@media (max-width:1359px){.nav .act .demo-top{display:none}}

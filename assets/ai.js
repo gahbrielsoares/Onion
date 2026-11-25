@@ -8,8 +8,8 @@ const AI = (() => {
 
   const PROVIDERS = {
     anthropic:  { name: "Anthropic (Claude)", keyHint: "sk-ant-…", where: "platform.claude.com › Settings › API keys" },
-    google:     { name: "Google Gemini",      keyHint: "AIza…",    where: "aistudio.google.com" },
-    google_free:{ name: "Gemini grátis",      keyHint: "AIza… (de um projeto SEM faturamento)", where: "aistudio.google.com › Criar chave › Criar em um projeto novo, sem ativar o faturamento" },
+    google:     { name: "Google Gemini",      keyHint: "AQ.… ou AIza…", where: "aistudio.google.com › Get API key › Copiar chave" },
+    google_free:{ name: "Gemini grátis",      keyHint: "AQ.… ou AIza… (de um projeto SEM faturamento)", where: "aistudio.google.com › Criar chave › Criar em um projeto novo, sem ativar o faturamento" },
     openai:     { name: "OpenAI",             keyHint: "sk-…",     where: "platform.openai.com" },
     elevenlabs: { name: "ElevenLabs",         keyHint: "sk_…",     where: "elevenlabs.io" },
     local:      { name: "Sem IA (no navegador)", noKey: true }

@@ -150,10 +150,10 @@ function freeKeyModal(){
       <li>Clique no botão abaixo: abre a <b>página oficial do Google AI Studio</b> (o Gemini pra desenvolvedores).</li>
       <li>Entre com a sua conta Google (ou crie uma).</li>
       <li>Na página <b>Chaves de API</b> (API Keys), clique em <b>Criar chave de API</b> (Create API key).</li>
-      <li>Copie a chave (ela começa com <b>AIza</b>), volte aqui, cole no campo abaixo e clique em <b>Salvar e usar</b>.</li>
+      <li>Toque em <b>Copiar chave</b> (Copy key). Chaves novas começam com <b>AQ.</b> e as antigas com <b>AIza</b>; as duas funcionam. Volte aqui, cole no campo abaixo e clique em <b>Salvar e usar</b>.</li>
     </ol>
     <a class="btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex">🌐 Abrir o Google AI Studio</a>
-    <div class="field" style="margin-top:14px"><label for="fkKey">Cole a sua chave aqui</label><input id="fkKey" placeholder="AIza…" autocomplete="off" spellcheck="false"></div>
+    <div class="field" style="margin-top:14px"><label for="fkKey">Cole a sua chave aqui</label><input id="fkKey" placeholder="AQ.… ou AIza…" autocomplete="off" spellcheck="false"></div>
     <div id="fkMsg"></div>
     <div class="btns"><button class="btn" id="fkSave">Salvar e usar</button><button class="btn ghost small" id="fkClose">Fechar</button></div>
     <div class="warn">⚠ Lembrando: as chaves gratuitas têm limites diários de uso. Na cota grátis, o Google pode usar os pedidos pra melhorar os modelos, e alguns recursos (como gerar imagens) podem não estar liberados.</div>
@@ -163,8 +163,8 @@ function freeKeyModal(){
   document.addEventListener("keydown",esc); m.onclick=e=>{ if(e.target===m) close(); };
   m.querySelector("#fkClose").onclick=close; setTimeout(()=>m.querySelector("#fkKey").focus(),50);
   m.querySelector("#fkSave").onclick=async()=>{
-    const k=m.querySelector("#fkKey").value.trim(), msg=m.querySelector("#fkMsg"), b=m.querySelector("#fkSave");
-    if(!/^AIza[\w-]{20,}$/.test(k)){ msg.innerHTML=`<div class="err">Isso não parece uma chave do Gemini. Ela começa com AIza e tem uns 39 caracteres.</div>`; return; }
+    const k=m.querySelector("#fkKey").value.replace(/\s+/g,"").replace(/^["']|["']$/g,""), msg=m.querySelector("#fkMsg"), b=m.querySelector("#fkSave");
+    if(!/^(AIza[\w-]{30,}|AQ\.[\w.-]{30,})$/.test(k)){ msg.innerHTML=`<div class="err">Isso não parece uma chave do Gemini. Ela começa com <b>AQ.</b> (chaves novas) ou <b>AIza</b> (antigas). Se o Google mostrou a chave cortada com "…", abra a chave e use <b>Copiar chave</b>.</div>`; return; }
     b.disabled=true; b.innerHTML=`<span class="spin"></span> Testando a chave…`;
     try{
       AI.setKey("google",k);
@@ -1547,9 +1547,9 @@ VIEWS.admin=()=>{ const c=AI.get(), auth=window.Auth&&Auth.enabled;
       ${msg?`<div class="${msg.ok?"status":"err"}" style="${msg.ok?"color:var(--ok)":""}">${esc(msg.text)}</div>`:""}`}
     </section>`;}).join("")}
   <section class="card" style="padding:14px;margin-bottom:12px">
-    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><h3 style="margin:0">Tendências ao vivo</h3>${(c.keys.youtube||c.keys.google)?`<span class="tag gold">${c.keys.youtube?"chave própria":"usa a chave do Google"}</span>`:`<span class="tag">opcional</span>`}</div>
-    <p class="m" style="margin:4px 0 10px">Opcional. Mostra o que está em alta no YouTube. Vazio usa a chave do Google.</p>
-    <div class="field"><label for="k-yt">Chave da YouTube Data API (deixe vazio pra usar a do Google)</label><div style="display:flex;gap:6px"><input id="k-yt" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(c.keys.youtube||"")}"><button type="button" class="btn ghost small" data-show="k-yt" aria-label="Mostrar chave">👁</button></div></div>
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><h3 style="margin:0">Tendências ao vivo</h3>${(c.keys.youtube||/^AIza/.test(c.keys.google||""))?`<span class="tag gold">${c.keys.youtube?"chave própria":"usa a chave do Google"}</span>`:`<span class="tag">opcional</span>`}</div>
+    <p class="m" style="margin:4px 0 10px">Opcional. Mostra o que está em alta no YouTube. Vazio usa a chave do Google, se ela começar com AIza.</p>
+    <div class="field"><label for="k-yt">Chave da YouTube Data API (chaves AIza do Google também servem; as novas AQ. não)</label><div style="display:flex;gap:6px"><input id="k-yt" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(c.keys.youtube||"")}"><button type="button" class="btn ghost small" data-show="k-yt" aria-label="Mostrar chave">👁</button></div></div>
     <div class="btns" style="margin-top:4px"><button class="btn small" id="yttest">Salvar e testar o YouTube</button></div>
     ${admMsg.yt?`<div class="${admMsg.yt.ok?"status":"err"}" style="${admMsg.yt.ok?"color:var(--ok)":""}">${esc(admMsg.yt.text)}</div>`:""}
   </section>
