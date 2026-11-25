@@ -914,7 +914,10 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closePanel()
 
 
 // demonstração guiada: centraliza um escritório e diz onde está o nome dele na tela
-window.parkFocus = k => { const b = BK[k]; if (!b || !b.poly) return; const [wx, wy] = labelAnchor(b); camX = wx - vw / zoom / 2; camY = wy - vh / zoom * .45; clampCam(); };
+window.parkFocus = (k, z) => { const b = BK[k]; if (!b || !b.poly) return; if (z && z !== zoom) { zoom = z; low.width = Math.ceil(vw / zoom) + 2; low.height = Math.ceil(vh / zoom) + 2; }
+  const h = buildingHull(b), [wx] = labelAnchor(b), cy = (Math.min(...h.map(p => p[1])) + Math.max(...h.map(p => p[1]))) / 2; camX = wx - vw / zoom / 2; camY = cy - vh / zoom * .42; clampCam(); };
+window.parkBuildingRect = k => { const b = BK[k]; if (!b || !b.poly) return null; const pts = buildingHull(b).map(p => toScreen(p[0], p[1])), [lx, ly] = labelAnchor(b), [sx, sy] = toScreen(lx, ly);
+  const xs = pts.map(p => p[0]).concat([sx - 80, sx + 80]), ys = pts.map(p => p[1]).concat([sy - 16]); return { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) }; };
 window.parkLabelXY = k => { const b = BK[k]; if (!b || !b.poly) return null; const [wx, wy] = labelAnchor(b); const [x, y] = toScreen(wx, wy); return [x, y - 13]; };
 
 /* ============ INÍCIO ============ */

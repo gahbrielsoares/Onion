@@ -10,7 +10,7 @@
   const KEY = "AQ.Ab8RN6demonstracaoOnionPark_chaveFicticia_9x2";
   const CANAL = { nicho: "Mistérios e Casos Não Resolvidos", publico: "Brasileiros adultos" };
   const TEMA = "O mistério do Triângulo das Bermudas";
-  const IDEIA = "Contar o caso do Voo 19 e mostrar o que é lenda e o que tem explicação";
+  const IDEIA = "Criar um vídeo de curiosidade sobre os aviões misteriosos que sumiram no Triângulo das Bermudas";
   const ROTEIRO = "Cinco de dezembro de 1945. Cinco aviões da Marinha americana decolam da Flórida para um treino de rotina. Duas horas depois, o líder do voo manda uma mensagem estranha: as bússolas enlouqueceram e o oceano não parece normal. Depois disso, silêncio. Nenhum avião voltou. Nenhum destroço foi encontrado. O hidroavião enviado para o resgate também sumiu, com treze homens a bordo. Nascia ali a lenda do Triângulo das Bermudas, um pedaço do Atlântico entre Miami, Porto Rico e as Bermudas. Desde então, mais de cinquenta navios e vinte aviões teriam desaparecido na região. Mas aqui vem a virada: as seguradoras não cobram mais caro para atravessar o triângulo. Tempestades súbitas, correntes fortíssimas e muito tráfego explicam quase tudo. Quase. E é esse quase que ninguém consegue apagar. Você atravessaria o triângulo?";
   const TITULOS = [
     ["Cinco aviões sumiram aqui e ninguém achou nada", "o caso real do Voo 19", "curiosidade"],
@@ -189,70 +189,114 @@
   const M = (titulo, texto, extra) => ({ modal: { titulo, texto, ...extra } });
   const STEPS = [
     M("Seja bem-vindo à Onion", "Aqui, criar conteúdo pra internet é fácil e leva menos de 2 minutos.", { hero: true, btn: "Começar" }),
-    M("Este é o MAPA", "Aqui ficam os setores da sua empresa: <b>IDEIAS</b>, <b>TÍTULOS</b>, <b>ROTEIROS</b>, <b>IMAGENS</b>, <b>NARRAÇÃO</b> e o <b>ONIONCUT</b>, que monta o vídeo. Você vai de setor em setor, sempre seguindo a <b>seta dourada</b>."),
-    M("Primeiro, a IA", "Pra criar o vídeo, primeiro escolhemos uma IA, grátis ou paga. Toque no setor <b>ADMINISTRAÇÃO</b>, onde a seta indica no mapa."),
-    { map: "admin" },
+    // o mapa, setor por setor
+    { spot: "ideias", text: "Este é o <b>MAPA</b> da sua empresa. Cada prédio é um setor.<br><br><b>Aqui nascem as ideias:</b> você diz o tema do vídeo e pra quem ele é." },
+    { spot: "titulos", text: "<b>Aqui a IA cria os títulos</b> que fazem as pessoas clicarem." },
+    { spot: "roteiro", text: "<b>Aqui são escritos os roteiros</b>, o texto que o narrador vai falar." },
+    { spot: "descricao", text: "<b>Aqui sai a descrição</b> do vídeo, com as hashtags." },
+    { spot: "imagens", text: "<b>Aqui são escolhidas as imagens</b> de cada cena do vídeo." },
+    { spot: "narracao", text: "<b>Aqui o roteiro vira voz</b>, com o narrador que você escolher." },
+    { spot: "montagem", text: "<b>Aqui junta tudo pra editar o seu vídeo</b> e finalizar: imagens, voz, legendas e trilha." },
+    { spot: "arquivo", text: "<b>Aqui ficam guardados</b> todos os vídeos prontos." },
+    { spot: "admin", text: "E esta é a <b>ADMINISTRAÇÃO</b>. Pra criar um vídeo, primeiro escolhemos uma IA, grátis ou paga. É por aqui que começamos!", btn: "Vamos lá" },
+    { map: "admin", tip: "Toque em <b>ADMINISTRAÇÃO</b>, onde a seta indica." },
+    // a IA
     M("Vamos escolher a IA", "Pra começar, vamos usar uma versão <b>gratuita</b>. Ela tem créditos limitados, mas já é o suficiente pra criarmos o nosso <b>PRIMEIRO VÍDEO</b>."),
     { el: '#pbody button[onclick="freeKeyModal()"]', panel: "admin", tip: "Toque aqui pra pegar a chave grátis do Google.", until: () => !!$(".modal #fkKey") },
-    { el: "#fkSave", tip: "No uso real, você copia a chave no site do Google e cola aqui. Na demonstração, <b>já colamos uma de exemplo</b>. Agora é só salvar.", before: () => typeInto("#fkKey", KEY), until: () => AI.ready() && !$(".modal #fkKey") },
-    M("IA ligada! ✓", "Agora vamos ao <b>LABORATÓRIO DE IDEIAS</b>, onde o vídeo nasce.", { after: () => closePanel() }),
-    { map: "ideias" },
-    M("Seu canal ou sua marca", "Aqui você conta pra Onion sobre o que é o seu canal, pra quem você fala e o estilo. Isso é feito <b>uma vez só</b>. Já preenchemos um exemplo."),
-    { el: "#csave", panel: "ideias", tip: "Confira e toque em <b>Salvar canal</b>.", before: async () => { await typeInto("#cn", CANAL.nicho); await typeInto("#cp", CANAL.publico); }, until: () => !!S.config },
-    { el: "#start", panel: "ideias", tip: "Agora o vídeo: o tema e o que você quer passar. Escolhemos um <b>Short</b> (vertical, 1 minuto). Toque em <b>Começar produção</b>.",
-      before: async () => { const k = $("#dkind"); if (k) { k.value = "short"; k.dispatchEvent(new Event("change", { bubbles: true })); } await typeInto("#dtema", TEMA); await typeInto("#dideia", IDEIA); }, until: () => !!P() && panelKey === "titulos" },
-    M("Torre dos Títulos", "A IA cria <b>10 títulos</b>, cada um com um gatilho diferente pra fazer a pessoa clicar."),
-    { el: "#tgo", panel: "titulos", tip: "Toque em <b>Gerar 10 títulos</b>.", until: () => P() && P().titles.length && !busy },
-    { el: '[data-t="0"]', panel: "titulos", tip: "Escolha o título. Vamos com este.", until: () => P() && !!P().title },
-    { el: "#tok", panel: "titulos", tip: "Confirme e mande pro roteiro.", until: () => P() && P().done.titulos },
+    { field: "#fkKey", text: "No uso real, você copia a sua chave no site do Google e cola <b>neste campo</b>. Na demonstração, vamos colar uma de exemplo.", fill: KEY, done: "Chave colada! Agora é só salvar." },
+    { el: "#fkSave", tip: "Toque em <b>Salvar e usar</b>.", until: () => AI.ready() && !$(".modal #fkKey") },
+    // ideias
+    { map: "ideias", tip: "IA ligada! ✓ Agora toque no <b>LABORATÓRIO DE IDEIAS</b>, onde o vídeo nasce." },
+    { field: "#cn", panel: "ideias", text: "Primeiro, o seu canal ou a sua marca (isso é feito <b>uma vez só</b>).<br><br>Aqui vai o <b>assunto</b>. No exemplo, um canal de mistérios.", fill: CANAL.nicho, done: "Pronto! Vamos pro próximo campo." },
+    { field: "#cp", panel: "ideias", text: "Aqui vai o <b>seu público</b>: quem você quer que assista.", fill: CANAL.publico, done: "Anotado. A IA vai escrever do jeito que esse público gosta." },
+    { info: "#pbody .stylecards", panel: "ideias", text: "Aqui você escolhe o <b>estilo visual</b> do vídeo. Vamos de <b>Documentário</b>, que já está marcado." },
+    { el: "#csave", panel: "ideias", tip: "O resto pode ficar como está. Toque em <b>Salvar canal</b>.", until: () => !!S.config },
+    { field: "#dtema", panel: "ideias", text: "Agora o vídeo. Aqui vai o <b>tema</b>: do que o vídeo fala.", fill: TEMA, done: "Tema escrito! Vamos pro próximo campo." },
+    { field: "#dideia", panel: "ideias", text: "Aqui você escreve, com as suas palavras, <b>a ideia que quer transmitir</b>: qual o objetivo do vídeo.<br><br>No nosso exemplo, o objetivo é criar um vídeo de curiosidade sobre aviões misteriosos.", fill: IDEIA, done: "Pronto, escrevemos o que queremos transmitir. Vamos pro próximo campo." },
+    { field: "#dkind", panel: "ideias", text: "Aqui você escolhe o <b>tipo</b>: vídeo longo, Short ou os dois juntos. Vamos fazer um <b>Short</b> (vertical, 1 minuto).", fill: "short", done: "Short escolhido!" },
+    { el: "#start", panel: "ideias", tip: "Tudo pronto. Toque em <b>Começar produção</b>.", until: () => !!P() },
+    // títulos
+    { map: "titulos", tip: "A ideia foi pra <b>TORRE DOS TÍTULOS</b>. Toque nela." },
+    { el: "#tgo", panel: "titulos", tip: "A IA cria <b>10 títulos</b>, cada um com um gatilho diferente. Toque em <b>Gerar 10 títulos</b>.", until: () => P() && P().titles.length && !busy },
+    { el: '[data-t="0"]', panel: "titulos", tip: "Escolha o título que mais chama atenção. Vamos com este.", until: () => P() && !!P().title },
+    { info: "#own", panel: "titulos", text: "Se você já tiver um título pronto, é só colar <b>neste campo</b>." },
+    { el: "#tok", panel: "titulos", tip: "Confirme o título.", until: () => P() && P().done.titulos },
+    // roteiro
+    { map: "roteiro", tip: "Título escolhido! Agora toque no <b>ESCRITÓRIO DE ROTEIROS</b>." },
     { el: "#rgo", panel: "roteiro", tip: "A IA escreve o roteiro inteiro pra você. Toque em <b>Escrever roteiro</b>.", until: () => P() && P().script.length && !busy },
-    { el: "#rok", panel: "roteiro", tip: "Pronto! Você pode editar à vontade. Aqui, vamos aprovar.", until: () => P() && P().done.roteiro },
-    { el: "#dgo", panel: "descricao", tip: "Agora a descrição do vídeo, com hashtags. Toque em <b>Gerar descrição</b>.", until: () => P() && P().description && !busy },
-    { el: "#dok", panel: "descricao", tip: "Aprove e siga pras imagens.", until: () => P() && P().done.descricao },
-    M("Imagens e Marketing", "Primeiro a equipe lê o roteiro e lista as imagens que o vídeo precisa. Depois busca cada uma <b>de graça</b> na internet."),
-    { el: "#cgo2", panel: "imagens", tip: "Toque pra criar a lista de imagens.", until: () => P() && P().board && !busy },
-    { el: "#bsearch", panel: "imagens", tip: "Agora toque em <b>Buscar grátis</b>.", until: () => P() && P().board && P().board.assets.every(a => a.img === "ok") && !busy },
-    { el: "#iok", panel: "imagens", tip: "Todas prontas! Aprove e vá pra narração.", until: () => P() && P().done.imagens },
-    { el: "#vlist [data-voice]", panel: "narracao", tip: "Escolha a voz do narrador. Toque no ▶ pra ouvir uma amostra.", until: () => P() && !!P().voice },
+    { info: "#pbody .rblk", panel: "roteiro", text: "Este é o roteiro. Você pode <b>editar o texto</b> à vontade, como num bloco de notas." },
+    { info: "#pbody .rinstr", panel: "roteiro", text: "Ou peça uma mudança pra IA neste campo. Por exemplo: <i>deixa o começo mais forte</i>." },
+    { el: "#rok", panel: "roteiro", tip: "Ficou bom! Toque pra aprovar o roteiro.", until: () => P() && P().done.roteiro },
+    // descrição
+    { map: "descricao", tip: "Roteiro aprovado! Agora toque na <b>REDAÇÃO</b>." },
+    { el: "#dgo", panel: "descricao", tip: "Toque em <b>Gerar descrição</b>.", until: () => P() && P().description && !busy },
+    { info: "#dt", panel: "descricao", text: "A <b>descrição</b> pronta pra colar no YouTube. Dá pra mudar o que quiser." },
+    { info: "#dh", panel: "descricao", text: "E as <b>hashtags</b>, que ajudam o vídeo a ser encontrado." },
+    { el: "#dok", panel: "descricao", tip: "Toque pra aprovar.", until: () => P() && P().done.descricao },
+    // imagens
+    { map: "imagens", tip: "Agora toque em <b>IMAGENS E MARKETING</b>." },
+    { el: "#cgo2", panel: "imagens", tip: "Primeiro a equipe lê o roteiro e lista as imagens que o vídeo precisa. Toque aqui.", until: () => P() && P().board && !busy },
+    { el: "#bsearch", panel: "imagens", tip: "Agora toque em <b>Buscar grátis</b>: cada imagem é buscada de graça na internet.", until: () => P() && P().board && P().board.assets.every(a => a.img === "ok") && !busy },
+    { info: "#pbody .scenes", panel: "imagens", text: "Prontas! Se não gostar de alguma, é só tocar nela e trocar." },
+    { el: "#iok", panel: "imagens", tip: "Toque pra aprovar as imagens.", until: () => P() && P().done.imagens },
+    // narração
+    { map: "narracao", tip: "Imagens aprovadas! Toque no <b>ESTÚDIO DE NARRAÇÃO</b>." },
+    { el: "#vlist [data-voice]", panel: "narracao", tip: "Escolha a voz do narrador. O ▶ toca uma amostra.", until: () => P() && !!P().voice },
+    { field: "#vsty", panel: "narracao", text: "Aqui você diz o <b>jeito de falar</b> do narrador. É opcional.", fill: "calmo e misterioso", done: "Pronto! O narrador vai falar assim." },
     { el: "#ngo", panel: "narracao", tip: "Toque pra gravar a narração. <small>(Na demonstração, a voz é simulada pelo seu navegador.)</small>", until: () => P() && P().narration && !busy },
-    { el: "#nok", panel: "narracao", tip: "Narração pronta! Aprove e mande pro OnionCut.", until: () => P() && P().done.narracao },
-    M("OnionCut", "O montador automático junta imagens, voz, legendas e trilha, e corta tudo nas pausas da narração. <b>Sem você editar nada.</b>"),
-    { el: "#mprep", panel: "montagem", tip: "Toque em <b>Montar no OnionCut</b>.", until: () => !!Cut._R && !busy },
+    { el: "#nok", panel: "narracao", tip: "Narração pronta! Toque pra aprovar.", until: () => P() && P().done.narracao },
+    // OnionCut
+    { map: "montagem", tip: "Agora toque no <b>ONIONCUT</b>, onde tudo vira vídeo." },
+    { info: "#mtpl", panel: "montagem", text: "Aqui você escolhe o <b>visual</b> do vídeo: cores e acabamento." },
+    { info: "#mcap", panel: "montagem", text: "Aqui, o estilo das <b>legendas</b>." },
+    { info: "#mmood", panel: "montagem", text: "E aqui a <b>trilha sonora</b>. Dá pra usar uma música sua também." },
+    { el: "#mprep", panel: "montagem", tip: "Toque em <b>Montar no OnionCut</b>. A edição é toda automática.", until: () => !!Cut._R && !busy },
     { el: "#pplay", panel: "montagem", tip: "Seu vídeo está montado! Toque pra <b>assistir à prévia</b>.", until: () => window.__demoPlayed },
     { el: "#mrender", panel: "montagem", tip: "Gostou? Toque em <b>Renderizar</b>. No seu acesso, aqui sai o arquivo MP4 pronto pra postar.", delay: 6000, until: () => P() && P().render && !busy },
-    { el: "#mok", panel: "montagem", tip: "Salve na Biblioteca, onde ficam todos os seus vídeos.", until: () => panelKey === "arquivo" },
+    { el: "#mok", panel: "montagem", tip: "Toque em <b>Salvar na Biblioteca</b>.", until: () => !P() },
+    { map: "arquivo", tip: "Vídeo salvo! Toque em <b>ARQUIVO E DATACENTER</b> pra ver." },
     M("Você criou um vídeo! 🎉", "Foi assim: ideia, título, roteiro, imagens, narração e edição, tudo feito pela equipe da Onion. Agora é a sua vez, com o seu tema e a sua marca.", { end: true })
   ];
 
   /* ================== motor do passeio ================== */
-  let i = -1, started = 0, lastEl = null, beforeDone = -1, stepAt = 0;
+  let i = -1, started = 0, beforeDone = -1, stepAt = 0, phase = 0, mapTapAt = 0;
+  const ZOOM = 1;
   async function typeInto(sel, text) {
     const el = $(sel); if (!el) return; el.scrollIntoView({ block: "center", behavior: "smooth" });
-    for (let k = 1; k <= text.length; k += 2) { el.value = text.slice(0, k); el.dispatchEvent(new Event("input", { bubbles: true })); await wait(18); }
-    el.value = text; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true }));
+    if (el.tagName === "SELECT") { await wait(400); el.value = text; el.dispatchEvent(new Event("change", { bubbles: true })); return; }
+    for (let k = 1; k <= text.length; k++) { el.value = text.slice(0, k); el.dispatchEvent(new Event("input", { bubbles: true })); await wait(text.length > 60 ? 22 : 38); }
+    el.dispatchEvent(new Event("change", { bubbles: true }));
   }
   const ui0 = document.createElement("div"); ui0.id = "tour"; document.body.appendChild(ui0);
   ui0.innerHTML = `<div class="tb" data-b="t"></div><div class="tb" data-b="b"></div><div class="tb" data-b="l"></div><div class="tb" data-b="r"></div>
-    <div class="tring"></div><div class="tballoon">👆 CLIQUE AQUI</div><div class="ttip"></div><div class="tmodal"></div>
+    <div class="tring"></div><div class="tballoon">CLIQUE AQUI</div><div class="ttip"></div><div class="tmodal"></div>
     <div class="tbar"><span>👀 Demonstração · tudo aqui é de mentirinha</span><a href="../">Sair</a></div>`;
   const B = k => ui0.querySelector(`[data-b="${k}"]`), ring = ui0.querySelector(".tring"), bal = ui0.querySelector(".tballoon"), tip = ui0.querySelector(".ttip"), mod = ui0.querySelector(".tmodal");
-  ui0.querySelectorAll(".tb").forEach(b => b.onclick = () => { bal.classList.remove("nudge"); void bal.offsetWidth; bal.classList.add("nudge"); });
+  ui0.querySelectorAll(".tb").forEach(b => b.onclick = () => { const t = bal.style.display !== "none" ? bal : tip; t.classList.remove("nudge"); void t.offsetWidth; t.classList.add("nudge"); });
   const hide = (...els) => els.forEach(e => e.style.display = "none");
-  const nModal = STEPS.filter(s => s.modal).length;
+  const hideAll = () => hide(ring, bal, tip, B("t"), B("b"), B("l"), B("r"));
+  window.addEventListener("pointerup", e => { if (e.target && e.target.id === "park") mapTapAt = Date.now(); }, true);
 
   function go(n) {
-    i = n; beforeDone = -1; stepAt = Date.now(); const s = STEPS[i]; if (!s) return;
-    window.TOUR_MAP = s.map || null;
-    if (s.map) { closePanel(); window.parkFocus && parkFocus(s.map); }
+    i = n; beforeDone = -1; stepAt = Date.now(); phase = 0; const s = STEPS[i]; if (!s) return;
+    window.TOUR_MAP = s.map || s.spot || null;
+    if (s.map || s.spot) { closePanel(); window.parkFocus && parkFocus(s.map || s.spot, ZOOM); }
     if (s.modal) showModal(s.modal); else mod.style.display = "none";
   }
+  // botão "Continuar" dos balões de explicação
+  function next() {
+    const s = STEPS[i]; if (!s) return;
+    if (s.field && s.fill && phase === 0) { phase = 1; const k = i; typeInto(s.field, s.fill).then(() => { if (i === k) phase = 2; }); return; }
+    if (phase === 1) return;
+    go(i + 1);
+  }
+  tip.addEventListener("click", e => { if (e.target.closest("[data-tnext]")) next(); });
   function showModal(m) {
-    const k = STEPS.slice(0, i + 1).filter(s => s.modal).length;
     mod.innerHTML = `<div class="tcard${m.hero ? " hero" : ""}">
       ${m.hero ? `<div class="tlogo"><svg width="46" height="46" viewBox="0 0 34 34" aria-hidden="true"><path d="M17 3c1 3 1 4 0 6" stroke="#7cc95a" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M17 9c-7 3-12 8-12 14 0 5 5 8 12 8s12-3 12-8c0-6-5-11-12-14z" fill="#8a2f7c"/><path d="M17 10v21" stroke="#e3a8d8" stroke-width="1.4"/></svg><span>Onion <i>Park</i></span></div>` : ""}
       <h2>${m.titulo}</h2><p>${m.texto}</p>
       ${m.end ? `<div class="tbtns col"><a class="tbtn gold" href="../#preco">Assinar por R$ ${(window.ONION_CFG && ONION_CFG.price) || "29,90"}/mês →</a><a class="tbtn" href="./">Entrar e criar o meu</a></div><p class="tsmall">Levou ${Math.max(1, Math.round((Date.now() - started) / 60000))} min, com você só tocando nos botões.</p>`
-        : `<div class="tbtns"><button class="tbtn gold" id="tnext">${m.btn || "Continuar"} →</button></div><div class="tfoot"><span>${k} de ${nModal}</span><a href="../">Sair da demonstração</a></div>`}
+        : `<div class="tbtns"><button class="tbtn gold" id="tnext">${m.btn || "Continuar"} →</button></div><div class="tfoot"><a href="../">Sair da demonstração</a></div>`}
     </div>`;
     mod.style.display = "grid";
     const nx = mod.querySelector("#tnext"); if (nx) { nx.onclick = () => { if (!started) started = Date.now(); mod.style.display = "none"; m.after && m.after(); go(i + 1); }; setTimeout(() => nx.focus(), 50); }
@@ -266,53 +310,74 @@
     Object.assign(ring.style, { display: "block", left: x0 + "px", top: y0 + "px", width: (x1 - x0) + "px", height: (y1 - y0) + "px" });
     return { x0, y0, x1, y1 };
   }
-  function placeTips(box, cx, html) {
-    bal.style.display = "block"; const bw = bal.offsetWidth, bh = bal.offsetHeight;
-    const above = box.y0 - bh - 14 > 8; bal.classList.toggle("down", !above);
-    bal.style.left = Math.max(8, Math.min(innerWidth - bw - 8, cx - bw / 2)) + "px"; bal.style.top = (above ? box.y0 - bh - 12 : box.y1 + 12) + "px";
+  function placeTips(box, cx, html, withBalloon = true) {
+    let bh = 0, above = true;
+    if (withBalloon) { bal.style.display = "block"; const bw = bal.offsetWidth; bh = bal.offsetHeight; above = box.y0 - bh - 14 > 8; bal.classList.toggle("down", !above);
+      bal.style.left = Math.max(8, Math.min(innerWidth - bw - 8, cx - bw / 2)) + "px"; bal.style.top = (above ? box.y0 - bh - 12 : box.y1 + 12) + "px"; }
+    else bal.style.display = "none";
     if (!html) { tip.style.display = "none"; return; }
     if (tip.dataset.h !== html) { tip.innerHTML = html; tip.dataset.h = html; }
-    tip.style.display = "block"; const tw = Math.min(330, innerWidth - 24); tip.style.width = tw + "px"; const th = tip.offsetHeight;
-    const spaceBelow = innerHeight - (above ? box.y1 : box.y1 + bh + 24), spaceAbove = above ? box.y0 - bh - 24 : box.y0;
-    let ty = spaceBelow > th + 16 ? (above ? box.y1 + 14 : box.y1 + bh + 26) : spaceAbove > th + 16 ? (above ? box.y0 - bh - th - 26 : box.y0 - th - 14) : innerHeight - th - 70;
+    tip.style.display = "block"; const tw = Math.min(340, innerWidth - 24); tip.style.width = tw + "px"; const th = tip.offsetHeight;
+    const gapB = withBalloon && !above ? bh + 24 : 14, gapA = withBalloon && above ? bh + 24 : 14;
+    const spaceBelow = innerHeight - box.y1 - gapB, spaceAbove = box.y0 - gapA;
+    let ty = spaceBelow > th + 16 ? box.y1 + gapB : spaceAbove > th + 16 ? box.y0 - gapA - th : innerHeight - th - 16;
     tip.style.left = Math.max(12, Math.min(innerWidth - tw - 12, cx - tw / 2)) + "px"; tip.style.top = Math.max(8, ty) + "px";
   }
+  const btn = t => `<button class="tbtn gold" data-tnext>${t} →</button>`;
   function tick() {
     requestAnimationFrame(tick);
     ui0.classList.remove("focus");
-    const s = STEPS[i]; if (!s || s.modal) { hide(ring, bal, tip, B("t"), B("b"), B("l"), B("r")); return; }
-    if (s.map && panelKey === s.map) { window.TOUR_MAP = null; hide(bal, tip); go(i + 1); return; }
-    if (s.until && s.until() && Date.now() - stepAt > 400) { hide(ring, bal, tip, B("t"), B("b"), B("l"), B("r")); go(i + 1); return; }
-    if (s.delay && Date.now() - stepAt < s.delay && cutPrev) { hide(ring, bal, tip, B("t"), B("b"), B("l"), B("r")); return; }
-    // passo no mapa (ou o painel certo foi fechado sem querer: guia de volta pelo mapa)
+    const s = STEPS[i]; if (!s || s.modal) { hideAll(); return; }
+    // apresentação do mapa: um setor aceso de cada vez
+    if (s.spot) {
+      const r = window.parkBuildingRect && parkBuildingRect(s.spot); if (!r) return hideAll();
+      ui0.classList.add("focus"); const box = place(r);
+      placeTips(box, (box.x0 + box.x1) / 2, `<p>${s.text}</p>${btn(s.btn || "Continuar")}`, false); return;
+    }
+    if (s.map && panelKey === s.map) { window.TOUR_MAP = null; hideAll(); go(i + 1); return; }
+    if (s.until && s.until() && Date.now() - stepAt > 400) { hideAll(); go(i + 1); return; }
+    if (s.delay && Date.now() - stepAt < s.delay && cutPrev) { hideAll(); return; }
+    // tocar no setor do mapa (ou o painel certo foi fechado sem querer: guia de volta pelo mapa)
     const mapK = s.map || (s.panel && panelKey !== s.panel && !$(".modal") ? s.panel : null);
     if (mapK) {
       hide(ring, B("t"), B("b"), B("l"), B("r"));
-      if (window.TOUR_MAP !== mapK) { window.TOUR_MAP = mapK; window.parkFocus && parkFocus(mapK); }
+      if (window.TOUR_MAP !== mapK) { window.TOUR_MAP = mapK; window.parkFocus && parkFocus(mapK, ZOOM); }
       const xy = window.parkLabelXY && parkLabelXY(mapK); if (!xy) return hide(bal, tip);
       const box = { x0: xy[0] - 60, x1: xy[0] + 60, y0: xy[1] - 34, y1: xy[1] + 26 };
-      placeTips(box, xy[0], s.map ? `Toque em <b>${BK[mapK].n.toUpperCase()}</b>.` : `Você fechou a janela. Toque em <b>${BK[mapK].n.toUpperCase()}</b> pra continuar.`);
+      placeTips(box, xy[0], s.map ? (s.tip || `Toque em <b>${BK[mapK].n.toUpperCase()}</b>.`) : `Você fechou a janela. Toque em <b>${BK[mapK].n.toUpperCase()}</b> pra continuar.`);
       return;
     }
     window.TOUR_MAP = null;
-    if (busy) { hide(ring, bal, tip, B("t"), B("b"), B("l"), B("r")); return; }
-    const el = $(s.el);
-    if (!el || !el.offsetParent) { hide(ring, bal, tip, B("t"), B("b"), B("l"), B("r")); return; }
-    if (beforeDone !== i) { beforeDone = i; el.scrollIntoView({ block: "center", behavior: "smooth" }); if (s.before) { const k = i; beforeDone = k; Promise.resolve(s.before()).then(() => { const e2 = $(s.el); if (e2 && i === k) e2.scrollIntoView({ block: "center", behavior: "smooth" }); }); } }
-    if (el !== lastEl) { lastEl = el; }
+    if (busy) { hideAll(); return; }
+    const sel = s.el || s.field || s.info, el = $(sel);
+    if (!el || !el.offsetParent) { hideAll(); return; }
+    if (beforeDone !== i) { beforeDone = i; el.scrollIntoView({ block: "center", behavior: "smooth" }); }
     const r = el.getBoundingClientRect(); if (r.width === 0) return;
     ui0.classList.add("focus");
-    const box = place(r); placeTips(box, (box.x0 + box.x1) / 2, s.tip);
+    const box = place(r), cx = (box.x0 + box.x1) / 2;
+    if (s.el) return placeTips(box, cx, s.tip);
+    // campo a campo: explica, escreve sozinho e confirma
+    const html = s.info ? `<p>${s.text}</p>${btn("Continuar")}`
+      : phase === 0 ? `<p>${s.text}</p>${btn("Continuar")}`
+      : phase === 1 ? `<p>${s.text}</p><div class="ttyping">✍️ escrevendo…</div>`
+      : `<p>${s.done}</p>${btn("Próximo")}`;
+    placeTips(box, cx, html, false);
   }
-  // no passeio, o mapa só abre o setor indicado
+  // no passeio, a pessoa vai de setor em setor pelo mapa: os painéis só abrem tocando no prédio
   const open0 = window.openPanel;
-  window.openPanel = k => { const s = STEPS[i]; if (s && s.map && k !== s.map) { toast(`Na demonstração, toque em ${BK[s.map].n} (onde está a seta)`); return; } open0(k); };
+  window.openPanel = k => {
+    const s = STEPS[i];
+    if (s && s.map && k !== s.map) { toast(`Na demonstração, toque em ${BK[s.map].n} (onde está a seta)`); return; }
+    if (Date.now() - mapTapAt > 700) { closePanel(); return; }
+    open0(k);
+  };
   window.addEventListener("beforeunload", hush);
-  window.__tour = { go: n => go(n), steps: STEPS, at: () => i };
+  window.__tour = { go: n => go(n), steps: STEPS, at: () => i, next };
 
   /* ================== visual ================== */
   const css = document.createElement("style"); css.textContent = `
   #info{display:none!important}
+  #prod.mobile{display:none!important}
   #pbody::after{content:"";display:block;height:40vh}
   #tour.focus .tbar{display:none}
   #tour .tb{position:fixed;z-index:9990;background:rgba(18,12,28,.55);display:none}
@@ -326,6 +391,10 @@
   @keyframes tshake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
   #tour .ttip{position:fixed;z-index:9992;display:none;background:#fffaf2;color:#1b1424;border:2px solid #1b1424;box-shadow:4px 4px 0 #1b1424;border-radius:14px;padding:12px 14px;font:500 15px/1.45 Figtree,system-ui,sans-serif}
   #tour .ttip small{display:block;color:#6a5f74;font-size:12.5px;margin-top:4px}
+  #tour .ttip p{margin:0}
+  #tour .ttip .tbtn{width:100%;margin-top:12px;min-height:44px;font-size:15px}
+  #tour .ttyping{margin-top:10px;color:#7A2E8E;font-weight:700}
+  #tour .ttip.nudge{animation:tshake .4s}
   #tour .tmodal{position:fixed;inset:0;z-index:9995;display:none;place-items:center;padding:16px;background:rgba(18,12,28,.62);backdrop-filter:blur(2px)}
   #tour .tcard{width:min(400px,100%);background:#fffaf2;color:#1b1424;border:2px solid #1b1424;box-shadow:6px 6px 0 #1b1424;border-radius:20px;padding:22px 22px 16px;font:15px/1.5 Figtree,system-ui,sans-serif;animation:tin .25s ease-out}
   @keyframes tin{from{transform:translateY(12px) scale(.98);opacity:0}}
