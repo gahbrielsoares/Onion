@@ -134,7 +134,7 @@ function errMsg(e){
 }
 function cfgText(){
   const c=S.config;
-  return `Nicho: ${c.nicho}. Público-alvo: ${c.publico}. Formato: ${c.formato}. Estilo do gancho: ${c.gancho}. Voz do narrador: ${c.voz}. Duração: ${c.duracao} minutos. Idioma do vídeo: ${c.idioma}.`;
+  return `Nicho: ${c.nicho}. Público-alvo: ${c.publico}. Formato: ${c.formato}.${c.gancho?` Estilo do gancho: ${c.gancho}.`:""}${c.voz?` Voz do narrador: ${c.voz}.`:""} Duração: ${c.duracao} minutos. Idioma do vídeo: ${c.idioma}.`;
 }
 async function ask(prompt,{json=false,tier="default",onText,maxTokens}={}){
   const opts={tier,signal:busy&&busy.ctl.signal}; if(onText) opts.onText=onText; if(maxTokens) opts.maxTokens=maxTokens;
@@ -379,7 +379,7 @@ Responda só com JSON: {"ideias":[...]}`;
 function draft(){ if(!S.draft) S.draft={tema:"",ideia:"",comeco:"",meio:"",fim:"",mural:false,nomes:""}; return S.draft; }
 VIEWS.ideias=()=>{
   const D=draft();
-  const c=S.config||{nicho:"",publico:"",formato:FORMATOS[0],gancho:GANCHOS[0],voz:"Masculina",duracao:10,idioma:"Português",visual:"documentario",ipm:3};
+  const c=S.config||{nicho:"",publico:"",formato:FORMATOS[0],gancho:"",voz:"",duracao:10,idioma:"Português",visual:"documentario",ipm:3};
   return `
   <details ${S.config?"":"open"} class="card" style="padding:0"><summary style="padding:12px;cursor:pointer;font-weight:700">Seu canal ou marca ${S.config?`<span class="tag gold">${esc(c.nicho)} · ${esc(c.idioma)}</span>`:`<span class="tag hot">configure primeiro</span>`}</summary>
   <div style="padding:0 12px 12px">
@@ -387,13 +387,9 @@ VIEWS.ideias=()=>{
   <datalist id="dl-publico">${PUBLICOS.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
   <div class="field"><label for="cn">Nicho ou assunto do canal / marca</label><input id="cn" list="dl-nicho" value="${esc(c.nicho)}" placeholder="Escreva ou escolha: mistérios, minha loja de roupas, imobiliária…"></div>
   <div class="row"><div class="field"><label for="cp">Público-alvo</label><input id="cp" list="dl-publico" value="${esc(c.publico)}" placeholder="Escreva ou escolha"></div>
-  <div class="field"><label for="cf">Formato</label><select id="cf">${FORMATOS.map(n=>`<option ${n===c.formato?"selected":""}>${n}</option>`).join("")}</select></div></div>
-  <div class="row"><div class="field"><label for="cg">Estilo do gancho</label><select id="cg">${GANCHOS.map(n=>`<option ${n===c.gancho?"selected":""}>${n}</option>`).join("")}</select></div>
-  <div class="field"><label for="cv">Voz</label><select id="cv">${["Masculina","Feminina"].map(n=>`<option ${n===c.voz?"selected":""}>${n}</option>`).join("")}</select></div></div>
-  <div class="row"><div class="field"><label for="cd">Duração do vídeo longo (min)</label><input id="cd" type="number" min="1" max="60" value="${c.duracao}"></div>
   <div class="field"><label for="clang">Idioma dos vídeos</label><select id="clang">${IDIOMAS.map(i=>`<option value="${i[0]}" ${i[0]===c.idioma?"selected":""}>${i[0]}</option>`).join("")}</select></div></div>
-  <div class="field"><label>Estilo visual</label><div class="stylecards">${VISUAIS.map(([v,t])=>`<button type="button" class="stylecard" data-vis="${v}" aria-pressed="${(c.visual||"documentario")===v}"><img alt="" data-prev="${v}"><span>${t}</span></button>`).join("")}</div></div>
-  <div class="field" style="max-width:220px"><label for="cipm">Imagens por minuto</label><input id="cipm" type="number" min="1" max="20" step="1" value="${c.ipm||3}"></div>
+  <div class="field"><label>Estilo visual <span class="m" style="font-weight:400">(como o vídeo aparece na tela)</span></label><div class="stylecards">${VISUAIS.map(([v,t])=>`<button type="button" class="stylecard" data-vis="${v}" aria-pressed="${(c.visual||"documentario")===v}"><img alt="" data-prev="${v}"><span>${t}</span></button>`).join("")}</div></div>
+  <div class="field" id="cipmw" style="max-width:220px;${(c.visual||"documentario")==="cinema"?"":"display:none"}"><label for="cipm">Imagens por minuto</label><input id="cipm" type="number" min="1" max="20" step="1" value="${c.ipm||3}"></div>
   <div class="btns"><button class="btn" id="csave">${S.config?"Salvar alterações":"Salvar canal"}</button></div>
   </div></details>
 
@@ -412,7 +408,9 @@ VIEWS.ideias=()=>{
       ${D.mural?`<div class="field"><label for="dnomes">Nomes no mural (um por linha; copie dos inscritos recentes do YouTube Studio)</label><textarea id="dnomes" rows="3" placeholder="Maria S.&#10;João Pedro&#10;Ana Lima">${esc(D.nomes)}</textarea>
       <div class="m" style="font-size:12px;margin-top:4px">Sem nomes, o mural mostra “Seu nome pode aparecer aqui no próximo vídeo”. Use nomes reais: inventar inscritos engana quem assiste e pode virar denúncia.</div></div>`:""}
     </details>
-    <div class="field" style="margin-top:10px;max-width:320px"><label for="dkind">Tipo</label><select id="dkind">${[["combo","Casada: longo + Short"],["long","Vídeo longo"],["short","Short / Reels / Stories (vertical)"]].map(([v,t])=>`<option value="${v}" ${(ui.kind||"combo")===v?"selected":""}>${t}</option>`).join("")}</select></div>
+    <div class="field" style="margin-top:10px"><label for="cf">Formato <span class="m" style="font-weight:400">(como a história é contada)</span></label><select id="cf">${FORMATOS.map(n=>`<option ${n===c.formato?"selected":""}>${n}</option>`).join("")}</select></div>
+    <div class="row"><div class="field"><label for="dkind">Tipo</label><select id="dkind">${[["combo","Casada: longo + Short"],["long","Vídeo longo"],["short","Short / Reels / Stories (vertical)"]].map(([v,t])=>`<option value="${v}" ${(ui.kind||"combo")===v?"selected":""}>${t}</option>`).join("")}</select></div>
+    <div class="field" id="cdw" style="${(ui.kind||"combo")==="short"?"display:none":""}"><label for="cd">Duração do vídeo longo (min)</label><input id="cd" type="number" min="1" max="60" value="${c.duracao}"></div></div>
     <div class="btns"><button class="btn" id="start" ${!S.config||!D.tema.trim()||S.project?"disabled":""}>🚀 Começar produção</button><button class="btn ghost small" id="dqueue" ${!D.tema.trim()?"disabled":""}>Guardar na fila pra depois</button>${!S.config?`<span class="m" style="font-size:12.5px;color:var(--muted)">Salve o canal primeiro</span>`:""}</div>
   </div>
   ${S.ideias.length?`<details class="card" style="padding:0;margin-top:10px" ${S.ideias.length<6?"open":""}><summary style="padding:12px;cursor:pointer;font-weight:700">Fila de ideias <span class="tag">${S.ideias.length}</span></summary><div style="padding:0 12px 10px">
@@ -424,11 +422,11 @@ BIND.ideias=el=>{
   bindVirais(el);
   let vis=(S.config&&S.config.visual)||"documentario";
   const cd=el.querySelector("#cd");
-  const readCfg=()=>({nicho:el.querySelector("#cn").value.trim()||"Geral",publico:el.querySelector("#cp").value.trim()||"Público geral",formato:el.querySelector("#cf").value,gancho:el.querySelector("#cg").value,voz:el.querySelector("#cv").value,
+  const readCfg=()=>({nicho:el.querySelector("#cn").value.trim()||"Geral",publico:el.querySelector("#cp").value.trim()||"Público geral",formato:el.querySelector("#cf").value,gancho:(S.config&&S.config.gancho)||"",voz:(S.config&&S.config.voz)||"",
     duracao:Math.max(1,Math.min(60,+cd.value||10)),idioma:el.querySelector("#clang").value,visual:vis,ipm:Math.max(1,Math.min(20,+el.querySelector("#cipm").value||3))});
   const autosave=()=>{ if(S.config){ S.config=readCfg(); save(); renderProd(); } };
-  ["#cn","#cp","#cf","#cg","#cv","#cd","#clang","#cipm"].forEach(q=>{ const i=el.querySelector(q); if(i) i.onchange=autosave; });
-  el.querySelectorAll("[data-vis]").forEach(b=>b.onclick=()=>{ vis=b.dataset.vis; el.querySelectorAll("[data-vis]").forEach(x=>x.setAttribute("aria-pressed",x===b)); autosave(); });
+  ["#cn","#cp","#cf","#cd","#clang","#cipm"].forEach(q=>{ const i=el.querySelector(q); if(i) i.onchange=autosave; });
+  el.querySelectorAll("[data-vis]").forEach(b=>b.onclick=()=>{ vis=b.dataset.vis; el.querySelectorAll("[data-vis]").forEach(x=>x.setAttribute("aria-pressed",x===b)); const w=el.querySelector("#cipmw"); if(w) w.style.display=vis==="cinema"?"":"none"; autosave(); });
   el.querySelectorAll("img[data-prev]").forEach(im=>stylePreview(im.dataset.prev).then(u=>{ if(u) im.src=u; }));
   el.querySelector("#csave").onclick=()=>{ S.config=readCfg(); save(); toast("Canal salvo · vídeos em "+S.config.idioma); renderPanel(); };
   // formulário do novo vídeo (rascunho salvo a cada tecla)
@@ -443,7 +441,7 @@ BIND.ideias=el=>{
   el.querySelectorAll("[data-pick]").forEach(c=>c.onclick=e=>{ if(e.target.dataset.del) return; const i=S.ideias.find(x=>x.id===+c.dataset.pick); if(!i) return;
     S.draft={tema:i.tema||"",ideia:i.intencao||"",comeco:i.comeco||"",meio:i.meio||"",fim:i.fim||"",mural:!!(i.mural&&i.mural.on),nomes:((i.mural&&i.mural.nomes)||[]).join("\n"),angulo:i.angulo||"",origem:i.origem||"",fromId:i.id}; save(); renderPanel(); el.scrollTop=0; });
   el.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{ S.ideias=S.ideias.filter(i=>i.id!==+b.dataset.del); save(); renderPanel(); });
-  el.querySelector("#dkind").onchange=e=>{ ui.kind=e.target.value; };
+  el.querySelector("#dkind").onchange=e=>{ ui.kind=e.target.value; const w=el.querySelector("#cdw"); if(w) w.style.display=ui.kind==="short"?"none":""; };
   const d=el.querySelector("#discard"); if(d) d.onclick=()=>{ if(busy) interrupt(); Store.delPrefix(`p${S.project.id}:`); S.project=null; save(); toast("Produção descartada"); renderPanel(); renderProd(); };
   el.querySelector("#start").onclick=()=>{
     sync(); if(!D.tema.trim()) return;
@@ -567,7 +565,7 @@ async function runRoteiro(){
       const docStyle=(/documentário contado/i.test(P.config.formato||"")?` ESTILO DE NARRAÇÃO: conte como um contador de histórias carismático e muito bem informado. Abra no meio da ação, com data e lugar (ex.: "16 de julho de 1945. Berlim está em ruínas…"). Apresente cada pessoa com nome e quem ela é. Use números, datas e detalhes concretos e sensoriais, perguntas retóricas, ironia leve na medida certa e frases curtas de impacto. Organize em capítulos anunciados com naturalidade (ex.: "Capítulo 2: o mundo lá de baixo"), cada um terminando com um gancho. Fale com o espectador ("você"), sem parecer aula.`:"")+promoStyle;
       const battle=(isBattle(P)?` FORMATO BATALHA: compare os dois lados rodada por rodada (ex.: força, velocidade, inteligência, resistência, poder especial), diga a vantagem e a desvantagem de cada um em cada rodada, mantenha um placar falado e anuncie o vencedor com um argumento forte no final.`:"")+docStyle;
       const role = P.kind==="short" ? `Isto é um SHORT vertical de cerca de 55 segundos (~140 palavras). A primeira frase É o gancho e prende em 2 segundos, sem introdução. Frases curtas, ritmo rápido, uma informação surpreendente atrás da outra. ${P.linkToLong?" Termine chamando pro vídeo completo, de forma natural (ex.: \"a história inteira tá no vídeo completo do canal\").":" Termine com uma frase que faça a pessoa querer comentar ou assistir de novo."}${battle}${P.parentScript?`\nBaseie-se neste vídeo longo do canal e pegue a parte mais impressionante dele:\n"""${P.parentScript.slice(0,5000)}"""`:""}`
-        : (i===0 ? `Este é o PRIMEIRO bloco. Abra com um gancho no estilo "${P.config.gancho}" nas 2-3 primeiras frases, que prenda nos primeiros 15 segundos. Prometa o que o espectador vai ganhar ficando até o fim e abra um "loop" (uma pergunta ou história) que só será resolvido no último bloco. Termine o bloco com uma virada que puxe pro próximo.`
+        : (i===0 ? `Este é o PRIMEIRO bloco. Abra com um gancho ${P.config.gancho?`no estilo "${P.config.gancho}"`:"forte (o tipo que funcionar melhor pra este tema)"} nas 2-3 primeiras frases, que prenda nos primeiros 15 segundos. Prometa o que o espectador vai ganhar ficando até o fim e abra um "loop" (uma pergunta ou história) que só será resolvido no último bloco. Termine o bloco com uma virada que puxe pro próximo.`
         : i===n-1 ? `Este é o ÚLTIMO bloco. Feche o loop aberto no início, entregue o clímax e a lição. Inclua de forma natural um convite pra se inscrever e uma pergunta específica pra responder nos comentários. Termine com uma frase memorável.`
         : `Este é um bloco do MEIO (${i+1} de ${n}). Aprofunde com detalhes concretos, uma mini-história ou exemplo, mude o ritmo pra evitar monotonia e termine com um mini-suspense que puxe pro próximo bloco.`)+battle;
       const prompt=`Você é roteirista de vídeos (YouTube, Shorts, Reels e conteúdo de marca) com engenharia de retenção.
